@@ -4,6 +4,10 @@
 
 A top-down shooter where the enemies are the **open bugs in your backlog**. Every sprint is a project, every boss is that project's worst ticket, and every now and then a client pops into the chat with a "super urgent" mission.
 
+**Play it at [bug-killer.giovannilondero.dev](https://bug-killer.giovannilondero.dev/)**, on desktop or on the phone.
+
+![Sprint 4: the FND-2245 boss fills the arena with undefined while Ugo asks for no hits during a live demo](docs/gameplay.webp)
+
 ```sh
 pnpm install
 pnpm dev        # http://127.0.0.1:5199
