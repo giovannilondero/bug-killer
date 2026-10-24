@@ -237,8 +237,8 @@ export const it: Strings = {
   },
   notes: {
     title: "📦 Release notes",
-    scopeCreep: (n) => `+ ${n} richieste extra dei clienti gestite "al volo"`,
-    resurrections: (n) => `🧟 ${n} bug "non ancora fixati" secondo i clienti (e rifixati)`
+    scopeCreep: (n) => (n === 1 ? `+ 1 richiesta extra dei clienti gestita "al volo"` : `+ ${n} richieste extra dei clienti gestite "al volo"`),
+    resurrections: (n) => (n === 1 ? `🧟 1 bug "non ancora fixato" secondo i clienti (e rifixato)` : `🧟 ${n} bug "non ancora fixati" secondo i clienti (e rifixati)`)
   },
   cleared: {
     allTitle: "🏆 INBOX ZERO",
