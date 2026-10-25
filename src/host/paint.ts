@@ -1,7 +1,8 @@
 // Canvas 2D painters shared by the renderers: the Canvas renderer draws with them every frame,
 // the Pixi renderer bakes them into textures once. Each paints in its own local coordinates.
 import { arenaOf } from "../content/arenas.ts"
-import type { Priority, StatusTrait } from "../content/bugs.ts"
+import { ticketColors } from "../content/bugs.ts"
+import type { Priority, StatusTrait, TicketType } from "../content/bugs.ts"
 import type { Level } from "../content/levels.ts"
 import { PLAYER } from "../sim/constants.ts"
 import type { PickupKind } from "../sim/schema.ts"
@@ -87,6 +88,8 @@ export interface BugLook {
   trait: StatusTrait
   reopened: boolean
   boss?: boolean
+  /** Bug when absent. */
+  type?: TicketType
 }
 
 /** A bug facing +x, centred on the origin: legs, antennae, glowing body, spots, eyes, armour. */
@@ -138,6 +141,28 @@ export const paintBug = (ctx: CanvasRenderingContext2D, r: number, color: string
     ctx.setLineDash([6, 4])
     ctx.beginPath(); ctx.ellipse(-r * 0.15, 0, r * 0.95, r * 0.8, 0, 0, Math.PI * 2); ctx.stroke()
     ctx.setLineDash([])
+  }
+  if (options.type === "story") {
+    // A green rim and a bookmark on the back.
+    ctx.strokeStyle = ticketColors.story
+    ctx.lineWidth = Math.max(2, r * 0.1)
+    ctx.beginPath(); ctx.ellipse(-r * 0.15, 0, r * 0.9, r * 0.73, 0, 0, Math.PI * 2); ctx.stroke()
+    const w = r * 0.32
+    ctx.fillStyle = ticketColors.story
+    ctx.strokeStyle = "#ffffff"
+    ctx.lineWidth = 1.5
+    ctx.beginPath()
+    ctx.moveTo(-r * 0.75, -w); ctx.lineTo(-r * 0.15, -w); ctx.lineTo(-r * 0.3, 0); ctx.lineTo(-r * 0.15, w); ctx.lineTo(-r * 0.75, w)
+    ctx.closePath(); ctx.fill(); ctx.stroke()
+  } else if (options.type === "subtask") {
+    // Two linked boxes on the back.
+    const s = Math.max(3, r * 0.26)
+    ctx.strokeStyle = ticketColors.subtask
+    ctx.lineWidth = 2
+    ctx.fillStyle = "#ffffff"
+    for (const [bx, by] of [[-r * 0.6, -s * 0.9], [-r * 0.6 + s * 0.9, s * 0.1]] as const) {
+      ctx.fillRect(bx, by, s, s); ctx.strokeRect(bx, by, s, s)
+    }
   }
 }
 
@@ -254,16 +279,20 @@ export interface TooltipBug {
   priority: Priority
   summary: string
   trait: StatusTrait
+  type: TicketType
 }
 
 export const TOOLTIP_WIDTH = 300
 
-export const tooltipHeight = (bug: TooltipBug) => 44 + wrap(bug.summary, 44).length * 16 + (t().traits[bug.trait] ? 16 : 0)
+/** What the ticket does beyond its priority: its type's hint and its status trait, the ones that have one. */
+const tooltipHints = (bug: TooltipBug) => [t().ticketTypes[bug.type].hint, t().traits[bug.trait]].filter(Boolean)
+
+export const tooltipHeight = (bug: TooltipBug) => 44 + wrap(bug.summary, 44).length * 16 + tooltipHints(bug).length * 16
 
 /** The ticket you are aiming at, with its top-left corner on the origin. */
 export const paintTooltip = (ctx: CanvasRenderingContext2D, bug: TooltipBug, color: string) => {
   const lines = wrap(bug.summary, 44)
-  const trait = t().traits[bug.trait]
+  const hints = tooltipHints(bug)
   ctx.fillStyle = "rgba(10,12,20,0.92)"
   ctx.strokeStyle = color
   ctx.lineWidth = 1.5
@@ -272,15 +301,15 @@ export const paintTooltip = (ctx: CanvasRenderingContext2D, bug: TooltipBug, col
   ctx.textAlign = "left"
   ctx.font = `bold 12px ${MONO}`
   ctx.fillStyle = color
-  ctx.fillText(`${bug.key}  ·  ${bug.priority}`, 12, 20)
+  ctx.fillText(`${bug.key}  ·  ${t().ticketTypes[bug.type].label}  ·  ${bug.priority}`, 12, 20)
   ctx.font = `13px ${SANS}`
   ctx.fillStyle = "#e8ecf4"
   lines.forEach((line, i) => ctx.fillText(line, 12, 40 + i * 16))
-  if (trait) {
-    ctx.font = `bold 10px ${MONO}`
-    ctx.fillStyle = "#9aa4b8"
-    ctx.fillText(trait, 12, 40 + lines.length * 16 + 4)
-  }
+  ctx.font = `bold 10px ${MONO}`
+  hints.forEach((hint, i) => {
+    ctx.fillStyle = i === 0 && bug.type !== "bug" ? ticketColors[bug.type] : "#9aa4b8"
+    ctx.fillText(hint, 12, 40 + (lines.length + i) * 16 + 4)
+  })
 }
 
 export const paintHeart = (ctx: CanvasRenderingContext2D, x: number, y: number, color: string) => {

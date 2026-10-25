@@ -32,6 +32,7 @@ pnpm serve:cloudflare      # production as deployed, locally: the Worker and its
 Hover the crosshair over a bug to read its ticket.
 
 - **Priority → enemy type.** Lowest/Low are weak, High are fast, Highest are tanks that spawn 3 regressions when they die.
+- **Type → what it leaves behind.** Most tickets are Bugs. From Side Quests on (and in Endless after the first waves) some are **Stories**, bigger and ringed in green with a bookmark: closing one splits it into 2 smaller, faster **sub-tasks** (`KEY-123-1`, `KEY-123-2`, blue boxes on their back). The tooltip shows the type.
 - **Status → behaviour.** *Blocked/On hold* are shielded (half damage), *Ready for QA/UAT/review* may reopen (`REOPENED`), *In development* move erratically.
 - **Sprints.** Glacier → Side Quests (seven small projects) → Keystone → Foundry. Projects, keys and tickets are made up (`src/content/backlog.ts`).
 - **Bosses.** `GLC-37` the dispenser that only stops on a timeout, `QUIZ-276` the crash that restarts somewhere else, `KEY-3242` the 2FA that wants a second factor, `FND-2245` `TypeError: Cannot read properties of undefined`.
@@ -39,7 +40,7 @@ Hover the crosshair over a bug to read its ticket.
 - **Resurrected bugs.** Every now and then a client swears a bug you closed "is not fixed yet": it comes back to the arena as a zombie 🧟 (tougher, and missing from the release notes until you close it again) while the client laughs in the chat and tells you to work harder.
 - **Tobia** (Tech Lead) shows up when you're slow (too long without closing a bug, or bugs piling up) and asks "are you using the _tools_??", then leaves them next to you: 🤖 Tools, homing shots.
 - **Power-ups:** 🔥 Hotfix, 🔀 Refactor, ☕ Coffee, 🛡️ Green tests, ⏪ git reset, 🍕 Pizza, 🤖 Tools (from Tobia only), 🧠 AI.
-- At the end of a sprint: release notes with the closed tickets, copyable as Markdown.
+- At the end of a sprint: release notes with the closed tickets (Stories marked as such, sub-tasks only counted: "+ 14 sub-tasks"), copyable as Markdown.
 - **Endless:** the ∞ card below the sprints. Every open bug from every project, picked at random, forever; every 6 waves one of the four bosses arrives, in rotation, and every boss beaten makes the next round harder (tougher, faster bugs, bigger waves closer together). It only ends when you burn out; your record stays in the menu.
 - **Bonus calls:** every now and then a client calls you. On Meet a room appears in the arena: stay inside it for 5 seconds. On Slack their messages float around the arena: go read them all. Answering earns story points and a power-up; ignoring costs nothing but a passive-aggressive message. An arrow points the way when it's off screen.
 - **Minimap:** the whole arena in a box, top right below the story points (bottom centre on phones, between the thumbs): bugs in their priority colour, bosses, power-ups, the call to answer, the mission's blocker ticket blinking, and a rectangle for what you can see.

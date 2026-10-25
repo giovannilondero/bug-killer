@@ -376,7 +376,7 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
     const k = Math.floor((((age % period) + period) % period) / period * frames) % frames
     const blur = options.boss ? 30 : 12
     const half = Math.max(r * 1.45 + 4, r + blur * 1.6)
-    const look = `${options.flash > 0 ? "f" : ""}${options.reopened ? "r" : ""}${options.trait === "armored" ? "a" : ""}${options.boss ? "b" : ""}`
+    const look = `${options.flash > 0 ? "f" : ""}${options.reopened ? "r" : ""}${options.trait === "armored" ? "a" : ""}${options.boss ? "b" : ""}${options.type === "story" ? "s" : options.type === "subtask" ? "t" : ""}`
     return bakery.bake(`bug|${color}|${r}|${look}|${k}`, wres, around(half), (g) => paintBug(g, r, color, (k * period) / frames, options))
   }
 
@@ -667,7 +667,7 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
         }), x, y, { rotation: -time * 3, alpha: appear })
       }
       const color = bug.resurrectedBy ? "#9dff6b" : bugKinds[bug.priority].color
-      drawBug(x, y, bug.radius * (0.4 + appear * 0.6), bug.radius, color, heading, bug.age, { flash: bug.hitFlash, trait: bug.trait, reopened: bug.reopened || bug.resurrectedBy !== null }, appear)
+      drawBug(x, y, bug.radius * (0.4 + appear * 0.6), bug.radius, color, heading, bug.age, { flash: bug.hitFlash, trait: bug.trait, reopened: bug.reopened || bug.resurrectedBy !== null, type: bug.type }, appear)
       const isTarget = mission?.kind === "killTarget" && mission.target === bug.key
       if (isTarget) {
         const pulse = bug.radius * 1.6 + Math.sin(time * 8) * 4
@@ -682,7 +682,7 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
       const name = bug.resurrectedBy ? `🧟 ${bug.key}` : bug.reopened ? `${bug.key} ↺` : bug.key
       if (bug === chip) {
         const trait = t().traits[bug.trait].split(":")[0]
-        label(W, wres, [name, bug.priority, trait].filter(Boolean).join(" · "), x, y - bug.radius - 10, bugKinds[bug.priority].color, 16, bugKinds[bug.priority].color)
+        label(W, wres, [name, bug.type === "bug" ? "" : t().ticketTypes[bug.type].label, bug.priority, trait].filter(Boolean).join(" · "), x, y - bug.radius - 10, bugKinds[bug.priority].color, 16, bugKinds[bug.priority].color)
       } else {
         label(W, wres, name, x, y - bug.radius - 10, isTarget ? "#ff6b81" : bug.resurrectedBy ? "#9dff6b" : bug.reopened ? "#ff6b81" : "#e8ecf4")
       }
@@ -879,7 +879,7 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
   }
 
   const bakeTooltip = (bug: TooltipBug, color: string, boxH: number) =>
-    bakery.bake(`tooltip|${bug.key}|${bug.priority}|${bug.trait}|${locale()}|${bug.summary}`, dpr, { left: -2, top: -2, right: TOOLTIP_WIDTH + 2, bottom: boxH + 2 }, (g) => paintTooltip(g, bug, color))
+    bakery.bake(`tooltip|${bug.key}|${bug.type}|${bug.priority}|${bug.trait}|${locale()}|${bug.summary}`, dpr, { left: -2, top: -2, right: TOOLTIP_WIDTH + 2, bottom: boxH + 2 }, (g) => paintTooltip(g, bug, color))
 
   const drawHud = (view: View, width: number, height: number, accent: string) => {
     const res = dpr

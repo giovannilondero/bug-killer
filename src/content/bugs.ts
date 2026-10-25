@@ -35,6 +35,9 @@ export const ticketScales = {
   subtask: { hp: 0.5, speed: 1.4, radius: 0.7, points: 0.5 }
 } as const satisfies Record<TicketType, TicketScale>
 
+/** Jira's own colours: a Story is a green bookmark, a sub-task a blue pair of boxes. */
+export const ticketColors = { story: "#63ba3c", subtask: "#4bade8" } as const satisfies Record<Exclude<TicketType, "bug">, string>
+
 /** How many sub-tasks a closed Story splits into. */
 export const STORY_SUBTASKS = 2
 
