@@ -6,8 +6,12 @@ import type { ClientId } from "./clients.ts"
 import type { Tier } from "../sim/tiers.ts"
 
 /** How a boss fights; each pattern is one branch of the boss system. */
-export const bossPatterns = ["dispenser", "crash", "twoFactor", "undefined"] as const
+export const bossPatterns = ["dispenser", "crash", "twoFactor", "undefined", "mergeConflict"] as const
 export type BossPattern = (typeof bossPatterns)[number]
+
+/** The two halves a merge conflict splits into. */
+export const conflictSides = ["ours", "theirs"] as const
+export type ConflictSide = (typeof conflictSides)[number]
 
 export interface Boss {
   readonly key: string
@@ -20,7 +24,7 @@ export interface Boss {
   readonly shotText: string
 }
 
-export const levelIds = ["glacier", "sidequests", "keystone", "foundry", "endless"] as const
+export const levelIds = ["glacier", "sidequests", "keystone", "foundry", "monorepo", "endless"] as const
 export type LevelId = (typeof levelIds)[number]
 
 export interface Level {
@@ -129,12 +133,34 @@ export const levels: ReadonlyArray<Level> = [
       color: "#ff7a59",
       shotText: "undefined"
     }
+  }),
+  level({
+    id: "monorepo",
+    sprint: "Sprint 5",
+    name: "Monorepo",
+    projects: ["MONO"],
+    theme: { background: "#15120a", grid: "#2c2612", accent: "#e3b341" },
+    clients: ["fabrizio", "samanta", "kevin", "fabrizio", "ugo"],
+    clientEvery: 10,
+    waveSize: 7,
+    tier: 4,
+    boss: {
+      key: "MONO-4096",
+      title: "CONFLICT (content): Merge conflict in pnpm-lock.yaml",
+      pattern: "mergeConflict",
+      hp: 120,
+      radius: 58,
+      color: "#e3b341",
+      shotText: "======="
+    }
   })
 ]
 
 /**
  * Endless: every open bug from every project, drawn at random and forever,
- * a little tougher after each boss. The four sprint bosses take turns.
+ * a little tougher after each boss. Every sprint's boss takes its turn, in
+ * campaign order, and every sprint's clients write in: a new sprint joins
+ * the rotation just by being in `levels`.
  */
 export const endlessLevel: Level = {
   id: "endless",
@@ -142,7 +168,7 @@ export const endlessLevel: Level = {
   name: "Endless",
   projects: [...new Set(levels.flatMap((l) => l.projects))],
   theme: { background: "#0e0b14", grid: "#221a30", accent: "#ffd84a" },
-  clients: ["ugo", "ornella", "kevin", "samanta", "gualtiero"],
+  clients: [...new Set(levels.flatMap((l) => l.clients))],
   clientEvery: 13,
   waveSize: 4,
   // Every tier, up to S6: Endless climbs there a step at a time.

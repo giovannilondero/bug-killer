@@ -1,5 +1,5 @@
 import type { Strings } from "../i18n.ts"
-import { shout } from "./voice.ts"
+import { plusOne, shout } from "./voice.ts"
 
 export const it: Strings = {
   tag: "it-IT",
@@ -27,7 +27,8 @@ export const it: Strings = {
       laugh: "lol",
       voice: (text) => `Guarda che in staging funzionava eh. Comunque: ${text}`
     },
-    tobia: { role: "Tech Lead", laugh: "ahah", voice: (text) => text }
+    tobia: { role: "Tech Lead", laugh: "ahah", voice: (text) => text },
+    fabrizio: { role: "Stakeholder (in copia a tutto)", laugh: "+1", voice: plusOne }
   },
 
   tobiaLines: [
@@ -62,7 +63,8 @@ export const it: Strings = {
     tobia: {
       success: ["visto? con gli _strumenti_ è un attimo"],
       failure: ["ok ma la prossima volta usa gli _strumenti_"]
-    }
+    },
+    fabrizio: { success: ["+1"], failure: ["up"] }
   },
   missions: {
     killCount: (goal, seconds) => `Mi servono ${goal} bug chiusi entro ${seconds} secondi.`,
@@ -121,7 +123,12 @@ export const it: Strings = {
     room: "MEET",
     answered: (points) => `+${points} call risposta`
   },
-  bossPhase: { dispenserRestart: "timeout... si riparte", otp: "Inserisci il codice OTP" },
+  bossPhase: {
+    dispenserRestart: "timeout... si riparte",
+    otp: "Inserisci il codice OTP",
+    conflict: "CONFLITTO: nostri contro loro",
+    halfResolved: "un lato risolto, manca l'altro"
+  },
 
   traits: {
     armored: "BLOCCATO: dimezza i danni",
@@ -141,6 +148,7 @@ export const it: Strings = {
     sidequests: "Sette progetti piccoli, sette clienti grandi.",
     keystone: "Permessi, SSO e CVE. Qualcuno ha detto 2FA?",
     foundry: "Il backlog più grande. Ugo è online.",
+    monorepo: "Un solo repo per tutto, e tutti dentro. Fabrizio mette +1.",
     endless: "Tutti i bug di tutti i progetti, per sempre. Quanto resisti?"
   },
   pickups: {
@@ -185,6 +193,7 @@ export const it: Strings = {
     testsPassing: "✓ test verdi",
     booting: "⏳ riavvio...",
     factor: "FATTORE 2/2",
+    sides: { ours: "<<<<<<< nostri", theirs: ">>>>>>> loro" },
     startBanner: "Chiudi il backlog prima che arrivi il cliente",
     audioOn: "🔊 AUDIO ON",
     audioOff: "🔇 AUDIO OFF",

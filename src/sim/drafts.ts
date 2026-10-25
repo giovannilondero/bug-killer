@@ -4,7 +4,7 @@ import type { Boss as BossContent } from "../content/levels.ts"
 import type { ClientId } from "../content/clients.ts"
 import { EPIC, HOSTILE_SHOT, PLAYER, RESURRECT, ROCKET, SHOT, TURRET } from "./constants.ts"
 import { Body, Boss, Bug, Game, HostileShot, Pickup, Player, Position, Rocket, Shot, Turret, Velocity } from "./schema.ts"
-import type { PickupKind, TeammateValue, Vec } from "./schema.ts"
+import type { BossValue, PickupKind, TeammateValue, Vec } from "./schema.ts"
 import { basicGun } from "./weapons.ts"
 import { Ops } from "@typeonce/ritmo-math"
 
@@ -87,12 +87,18 @@ export const makeBug = (
   )
 }
 
-export const makeBoss = (boss: BossContent, at: Vec, hpFactor = 1) =>
+/** A boss as it is mid-fight: what a boss turns into when it changes shape. */
+export const spawnBoss = (boss: BossValue, at: Vec, radius: number) =>
   Game.Command.spawn(
     Game.Command.entry(Position, at),
     Game.Command.entry(Velocity, { x: 0, y: 0 }),
-    Game.Command.entry(Body, { radius: boss.radius }),
-    Game.Command.entry(Boss, {
+    Game.Command.entry(Body, { radius }),
+    Game.Command.entry(Boss, boss)
+  )
+
+export const makeBoss = (boss: BossContent, at: Vec, hpFactor = 1) =>
+  spawnBoss(
+    {
       key: boss.key,
       title: boss.title,
       pattern: boss.pattern,
@@ -106,8 +112,11 @@ export const makeBoss = (boss: BossContent, at: Vec, hpFactor = 1) =>
       volley: 0,
       hitFlash: 0,
       age: 0,
-      statuses: []
-    })
+      statuses: [],
+      side: null
+    },
+    at,
+    boss.radius
   )
 
 export const makeShot = (at: Vec, direction: Vec, pierce: number, homing: boolean, owner: number) =>

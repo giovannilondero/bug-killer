@@ -1,6 +1,6 @@
 import type { Priority, StatusTrait, TicketType } from "./bugs.ts"
 import type { CallKind, ClientId, MissionKind } from "./clients.ts"
-import type { LevelId } from "./levels.ts"
+import type { ConflictSide, LevelId } from "./levels.ts"
 import type { Voice } from "./text/voice.ts"
 import { en } from "./text/en.ts"
 import { it } from "./text/it.ts"
@@ -53,7 +53,14 @@ export interface Strings {
     readonly room: string
     readonly answered: (points: number) => string
   }
-  readonly bossPhase: { readonly dispenserRestart: string; readonly otp: string }
+  readonly bossPhase: {
+    readonly dispenserRestart: string
+    readonly otp: string
+    /** A merge conflict splits in two. */
+    readonly conflict: string
+    /** One half of a merge conflict is fixed, the other is still there. */
+    readonly halfResolved: string
+  }
 
   // --- What the host draws --------------------------------------------------
   readonly traits: Record<StatusTrait, string>
@@ -78,6 +85,8 @@ export interface Strings {
     readonly testsPassing: string
     readonly booting: string
     readonly factor: string
+    /** Under each half of a merge conflict. */
+    readonly sides: Record<ConflictSide, string>
     readonly startBanner: string
     readonly audioOn: string
     readonly audioOff: string
