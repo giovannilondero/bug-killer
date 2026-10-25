@@ -145,7 +145,8 @@ export const it: Strings = {
     tools: { label: "Strumenti", hint: "colpi a ricerca" },
     ai: { label: "AI", hint: "torretta automatica" },
     pairProgramming: { label: "Pair programming", hint: "due colpi alla volta" },
-    codeFreeze: { label: "Code freeze", hint: "i colpi congelano" }
+    codeFreeze: { label: "Code freeze", hint: "i colpi congelano" },
+    flameWar: { label: "Flame war", hint: "un cono di fuoco: this is fine 🔥" }
   },
   floorCode: [
     "console.log('qui ci arriva?')",

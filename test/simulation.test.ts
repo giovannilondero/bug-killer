@@ -616,3 +616,96 @@ test("Code freeze arrives with sprint 3 (Keystone) and not before", () => {
   assert.equal(isUnlocked("codeFreeze", levels[1]!.tier), false)
   assert.equal(isUnlocked("codeFreeze", levels[2]!.tier), true)
 })
+
+// --- Weapons: Flame war, and This is fine 🔥 --------------------------------
+
+/**
+ * One developer holding Flame war (picked up on the spot), aiming right, and
+ * `targets` spawned at offsets from them. `spray` holds the trigger for a few
+ * updates; `find` reads a target back by key.
+ */
+const flameScene = (targets: ReadonlyArray<{ key: string; dx: number; dy: number; priority?: BugSeed["priority"] }>) => {
+  const fx: Array<FxValue> = []
+  let firing = false
+  let aim = { x: 0, y: 0 }
+  const made = createSimulation({
+    level: levels[0]!,
+    seed: 4,
+    locale: "en",
+    input: { snapshot: () => ({ ...idleInput, aim, fire: firing }) },
+    presentation: { fx: (e) => fx.push(e), chat: () => undefined }
+  })
+  if (!made.ok) throw new Error(JSON.stringify(made.error))
+  const sim = made.value
+  const me = { ...sim.view().player!.position }
+  aim = { x: me.x + 400, y: me.y }
+  const Drop = Game.System("Test/Drop", { commands: Game.System.commands(Game.System.spawns(Pickup, Bug)) }, ({ commands }) => {
+    commands.spawn(makePickup("flameWar", { x: me.x, y: me.y }))
+    for (const target of targets) {
+      commands.spawn(makeBug({ key: target.key, summary: target.key, priority: target.priority ?? "Highest", status: "Open" }, { x: me.x + target.dx, y: me.y + target.dy }))
+    }
+  })
+  assert.ok(sim.runtime.tick(Game.Schedule(Drop, Game.Schedule.applyDeferred())).ok)
+  assert.ok(sim.step().ok)
+  assert.equal(sim.view().player!.weapon.kind, "flameWar", "the developer holds Flame war")
+  const wait = (frames: number) => {
+    for (let frame = 0; frame < frames; frame++) assert.ok(sim.step().ok)
+  }
+  const spray = (frames: number) => {
+    firing = true
+    wait(frames)
+    firing = false
+  }
+  const find = (key: string) => sim.view().bugs.find((bug) => bug.key === key)
+  return { sim, fx, wait, spray, find }
+}
+
+test("Flame war damages every bug inside its cone and none outside it", () => {
+  const { fx, spray, find } = flameScene([
+    { key: "IN-NEAR", dx: 80, dy: 0 },
+    { key: "IN-FAR", dx: 170, dy: 0 },
+    { key: "IN-SIDE", dx: 140, dy: 45 },
+    { key: "OUT-BEHIND", dx: -120, dy: 0 },
+    { key: "OUT-BEYOND", dx: 330, dy: 0 },
+    { key: "OUT-WIDE", dx: 70, dy: 140 }
+  ])
+  spray(1)
+  for (const key of ["IN-NEAR", "IN-FAR", "IN-SIDE"]) {
+    const bug = find(key)!
+    assert.ok(bug.hp < bug.maxHp, `${key} is inside the cone and got burnt`)
+    assert.ok(bug.hp > bug.maxHp - 1, `${key}: one tick of flame is low damage`)
+  }
+  for (const key of ["OUT-BEHIND", "OUT-BEYOND", "OUT-WIDE"]) {
+    const bug = find(key)!
+    assert.equal(bug.hp, bug.maxHp, `${key} is outside the cone`)
+    assert.equal(bug.statuses.length, 0, `${key} is not on fire`)
+  }
+  assert.ok(fx.some((e) => e.type === "shoot" && e.weapon === "flameWar"), "with its own sound cue")
+  assert.ok(fx.some((e) => e.type === "flame"), "and flames to draw")
+})
+
+test("This is fine: a burning bug takes damage over time and sets the bugs it touches on fire", () => {
+  // TOUCHING is outside the cone but right against BURNING.
+  const { find, spray, wait } = flameScene([
+    { key: "BURNING", dx: 150, dy: 40 },
+    { key: "TOUCHING", dx: 150, dy: 95 }
+  ])
+  spray(1)
+  assert.ok(find("BURNING")!.statuses.some((status) => status.kind === "burn"), "the flames set it on fire")
+  const hp = find("BURNING")!.hp
+  wait(60)
+  const burning = find("BURNING")!
+  assert.ok(burning.hp < hp - 1, `burnt ${(hp - burning.hp).toFixed(2)} hp in a second without being hit`)
+  const touching = find("TOUCHING")!
+  assert.ok(touching.statuses.some((status) => status.kind === "burn"), "the fire spread")
+  assert.ok(touching.hp < touching.maxHp - 1, "and burns it too")
+  wait(4 * 60)
+  assert.ok(find("BURNING") === undefined || find("BURNING")!.statuses.length === 0, "after about 3 s the fire is out")
+})
+
+test("Flame war arrives with sprint 6 and not before", () => {
+  assert.equal(contentTiers.flameWar, 5)
+  for (const level of levels) assert.ok(level.tier >= 5 || !isUnlocked("flameWar", level.tier), `not in ${level.id}`)
+  assert.ok(!isUnlocked("flameWar", tierOf(endlessLevel, 15)), "not in Endless before wave 16")
+  assert.ok(isUnlocked("flameWar", tierOf(endlessLevel, 16)))
+})

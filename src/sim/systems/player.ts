@@ -2,9 +2,9 @@ import { DT, PARTY, PLAYER } from "../constants.ts"
 import { makeShot } from "../drafts.ts"
 import { distanceSquared, length, normalize } from "../math.ts"
 import { PlayerWrite } from "../queries.ts"
-import { BombBlast, Fx, Game, Input, Run, Shot, pickupKinds } from "../schema.ts"
+import { BombBlast, FlameBurst, Fx, Game, Input, Run, Shot, pickupKinds } from "../schema.ts"
 import type { InputValue, Vec } from "../schema.ts"
-import { HOTFIX_COOLDOWN, WEAPONS, basicGun } from "../weapons.ts"
+import { HOTFIX_COOLDOWN, WEAPONS, basicGun, flameCone } from "../weapons.ts"
 import type { WeaponKind } from "../weapons.ts"
 import { Ops } from "@typeonce/ritmo-math"
 
@@ -48,7 +48,8 @@ export const PlayerControlSystem = Game.System(
     },
     events: {
       fx: Game.System.writeEvent(Fx),
-      bomb: Game.System.writeEvent(BombBlast)
+      bomb: Game.System.writeEvent(BombBlast),
+      flame: Game.System.writeEvent(FlameBurst)
     },
     commands: Game.System.commands(Game.System.spawns(Shot))
   },
@@ -73,7 +74,13 @@ export const PlayerControlSystem = Game.System(
     /** What each weapon does with one pull of the trigger. */
     const fire: Record<WeaponKind, (trigger: Trigger) => void> = {
       gun: (trigger) => bullets(trigger, [0]),
-      pairProgramming: (trigger) => bullets(trigger, [-8, 8])
+      pairProgramming: (trigger) => bullets(trigger, [-8, 8]),
+      // No bullets: a puff of fire that burns everything in the cone, resolved in Combat.
+      flameWar: (trigger) => {
+        const cone = flameCone(trigger.muzzle, trigger.aim)
+        events.flame.emit({ ...cone, owner: trigger.owner })
+        events.fx.emit({ type: "flame", x: cone.origin.x, y: cone.origin.y, angle: Ops.atan2(cone.direction.y, cone.direction.x), range: cone.range, spread: cone.halfAngle })
+      }
     }
 
     for (const { data } of team) {

@@ -5,7 +5,7 @@ import type { PickupKind } from "./schema.ts"
  * remembers who applied it, so whatever it does later (damage, a kill)
  * counts for that developer.
  */
-export const statusKinds = ["freeze"] as const
+export const statusKinds = ["freeze", "burn"] as const
 export type StatusKind = (typeof statusKinds)[number]
 
 export interface StatusValue {
@@ -27,12 +27,16 @@ export interface StatusEffect {
   dps: number
   /** Repeated hits add a stack up to this many; 1 only refreshes the timer. */
   maxStacks: number
+  /** Whether it catches on to bugs touching one that carries it, for the same developer. */
+  spreads?: boolean
 }
 
 /** What each status does. */
 export const statusEffects = {
   /** Code freeze: the bug stops dead, a boss is only slowed. */
-  freeze: { seconds: 2, bugSpeed: 0, bossSpeed: 0.5, dps: 0, maxStacks: 1 }
+  freeze: { seconds: 2, bugSpeed: 0, bossSpeed: 0.5, dps: 0, maxStacks: 1 },
+  /** This is fine 🔥: fast damage for a few seconds, catching on to every bug it touches. */
+  burn: { seconds: 3, bugSpeed: 1, bossSpeed: 1, dps: 2.5, maxStacks: 1, spreads: true }
 } as const satisfies Record<StatusKind, StatusEffect>
 
 export type StatusTable = Readonly<Record<StatusKind, StatusEffect>>
@@ -80,3 +84,6 @@ export const speedFactor = (statuses: ReadonlyArray<StatusValue>, boss: boolean,
 
 export const hasStatus = (statuses: ReadonlyArray<StatusValue>, kind: StatusKind): boolean =>
   statuses.some((status) => status.kind === kind)
+
+/** Whether `kind` catches on to the bugs touching one that carries it. */
+export const spreads = (kind: StatusKind, table: StatusTable = statusEffects): boolean => table[kind].spreads === true
