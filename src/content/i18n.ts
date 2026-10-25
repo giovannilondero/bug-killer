@@ -67,6 +67,8 @@ export interface Strings {
     readonly bossFixed: string
     readonly movedToDone: (key: string) => string
     readonly reopenedSub: (key: string) => string
+    readonly deployed: string
+    readonly deployedSub: string
     readonly resurrected: (key: string) => string
     readonly resurrectedSub: (name: string) => string
     readonly testsPassing: string

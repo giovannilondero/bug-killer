@@ -166,6 +166,8 @@ export const en: Strings = {
     bossFixed: "BOSS FIXED",
     movedToDone: (key) => `${key} moved to Done`,
     reopenedSub: (key) => `${key} failed QA`,
+    deployed: "DEPLOYED",
+    deployedSub: "straight to production",
     resurrected: (key) => `🧟 ${key} RESURRECTED`,
     resurrectedSub: (name) => `${name} says it's not fixed`,
     testsPassing: "✓ tests passing",

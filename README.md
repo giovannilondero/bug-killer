@@ -32,7 +32,7 @@ pnpm serve:cloudflare      # production as deployed, locally: the Worker and its
 Hover the crosshair over a bug to read its ticket.
 
 - **Priority → enemy type.** Lowest/Low are weak, High are fast, Highest are tanks that spawn 3 regressions when they die.
-- **Status → behaviour.** *Blocked/On hold* are shielded (half damage), *Ready for QA/UAT/review* may reopen (`REOPENED`), *In development* move erratically.
+- **Status → behaviour.** *Blocked/On hold* are shielded (half damage), *Ready for QA/UAT/review* may reopen (`REOPENED`), *In development* move erratically. From Foundry on, *Deploying* bugs (🚀) stop next to a developer, flash for about a second and explode: everyone in the blast loses 1 sanity and nearby bugs take damage, so one can set off the next. Shoot them from afar and they go off harmlessly where they are.
 - **Sprints.** Glacier → Side Quests (seven small projects) → Keystone → Foundry. Projects, keys and tickets are made up (`src/content/backlog.ts`).
 - **Bosses.** `GLC-37` the dispenser that only stops on a timeout, `QUIZ-276` the crash that restarts somewhere else, `KEY-3242` the 2FA that wants a second factor, `FND-2245` `TypeError: Cannot read properties of undefined`.
 - **Clients** (made up): Ugo WRITES EVERYTHING IN CAPS!!!, Ornella is "following up on my previous email", Kevin sends you voice notes, Samanta asks "while you're at it", Gualtiero says "it worked on staging". A mission completed earns story points and a power-up. A mission failed means scope creep: new `ESC-*` bugs in the arena.
