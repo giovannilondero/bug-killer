@@ -10,7 +10,7 @@ import { bugKinds } from "../content/bugs.ts"
 import { clients } from "../content/clients.ts"
 import type { BossPattern } from "../content/levels.ts"
 import { comboMultiplier } from "../sim/systems/combat.ts"
-import { lapOf, raceSpot } from "../sim/bosses.ts"
+import { lapOf, otherThread, raceSpot } from "../sim/bosses.ts"
 import { BREAKPOINT, BUFF_SECONDS, DEPLOY, PARTY, PLAYER, ROCKET, STACK, TURRET } from "../sim/constants.ts"
 import { isUnlocked } from "../sim/tiers.ts"
 import { hasStatus } from "../sim/statuses.ts"
@@ -625,7 +625,7 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
         text(W, wres, t().hud.threads[boss.thread], `bold 13px ${MONO}`, boss.color, boss.position.x, boss.position.y + boss.radius * 1.6)
         if (boss.revive <= 0) return
         // Its twin was fixed: a ghost where it restarts, and the seconds left to stop it.
-        const spot = raceSpot(arena, boss.age, boss.thread === "main" ? "worker" : "main")
+        const spot = raceSpot(arena, boss.age, otherThread(boss.thread))
         W.sprite(bakery.bake(`restartGhost|${boss.radius}`, wres, around(boss.radius + 3), (g) => paintRestartGhost(g, boss.radius, "#ffffff")), spot.x, spot.y, { rotation: time * 1.5 })
         text(W, wres, t().hud.restarting(boss.revive), `bold 14px ${MONO}`, Math.sin(time * 12) > 0 ? "#ffffff" : boss.color, spot.x, spot.y)
       }
