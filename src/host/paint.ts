@@ -20,6 +20,7 @@ export const pickupIcons = {
   tools: "🤖",
   ai: "🧠",
   pairProgramming: "👥",
+  codeFreeze: "❄️",
   pushForce: "🚀"
 } as const satisfies Record<PickupKind, string>
 
@@ -82,17 +83,23 @@ export const paintFloor = (level: Level): HTMLCanvasElement => {
 }
 
 /** Which floor a level has, in its arena and the current language, to know when to repaint it. */
-export const floorKey = (level: Level) => `${level.id}:${arenaOf(level).width}x${arenaOf(level).height}:${locale()}`
+export const floorKey = (level: Level) => {
+  const arena = arenaOf(level)
+  return `${level.id}:${arena.width}x${arena.height}:${locale()}`
+}
 
 export interface BugLook {
   flash: number
   trait: StatusTrait
   reopened: boolean
   boss?: boolean
+  /** Code freeze: iced over, legs still. */
+  frozen?: boolean
 }
 
 /** A bug facing +x, centred on the origin: legs, antennae, glowing body, spots, eyes, armour. */
-export const paintBug = (ctx: CanvasRenderingContext2D, r: number, color: string, t: number, options: BugLook) => {
+export const paintBug = (ctx: CanvasRenderingContext2D, r: number, color: string, time: number, options: BugLook) => {
+  const t = options.frozen ? 0 : time
   const legSwing = Math.sin(t * 18) * 0.35
   ctx.strokeStyle = shade(color, -0.25)
   ctx.lineWidth = Math.max(2, r * 0.12)
@@ -140,6 +147,22 @@ export const paintBug = (ctx: CanvasRenderingContext2D, r: number, color: string
     ctx.setLineDash([6, 4])
     ctx.beginPath(); ctx.ellipse(-r * 0.15, 0, r * 0.95, r * 0.8, 0, 0, Math.PI * 2); ctx.stroke()
     ctx.setLineDash([])
+  }
+  if (options.frozen) {
+    // A block of ice over the whole bug, with a few frost glints.
+    ctx.fillStyle = "rgba(170, 225, 255, 0.55)"
+    ctx.beginPath(); ctx.ellipse(0, 0, r * 1.15, r * 0.95, 0, 0, Math.PI * 2); ctx.fill()
+    ctx.strokeStyle = "rgba(235, 250, 255, 0.9)"
+    ctx.lineWidth = Math.max(1.5, r * 0.08)
+    ctx.stroke()
+    ctx.lineWidth = Math.max(1, r * 0.05)
+    for (const [gx, gy] of [[-0.5, -0.4], [0.35, 0.35], [0.6, -0.5]] as const) {
+      const s = r * 0.16
+      ctx.beginPath()
+      ctx.moveTo(gx * r - s, gy * r); ctx.lineTo(gx * r + s, gy * r)
+      ctx.moveTo(gx * r, gy * r - s); ctx.lineTo(gx * r, gy * r + s)
+      ctx.stroke()
+    }
   }
 }
 

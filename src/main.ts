@@ -631,7 +631,7 @@ const showDead = (v: View) => {
   // Endless only ends here, so this is where its best score is kept.
   const ended = v.level.endless !== undefined ? endEndless(progress, { score: v.run.score, solo: !remote }) : undefined
   const record = ended?.record ?? false
-  if (ended?.record) {
+  if (ended && record) {
     progress = ended.progress
     writeProgress(progress)
   }

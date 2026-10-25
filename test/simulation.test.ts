@@ -6,9 +6,11 @@ import type { Locale } from "../src/content/i18n.ts"
 import type { Level } from "../src/content/levels.ts"
 import { createSimulation, idleInput } from "../src/sim/simulation.ts"
 import type { View } from "../src/sim/simulation.ts"
-import { makeBug, makePickup } from "../src/sim/drafts.ts"
+import { makeBoss, makeBug, makePickup } from "../src/sim/drafts.ts"
+import type { BugSeed } from "../src/sim/drafts.ts"
 import { contentTiers, isUnlocked, tierOf } from "../src/sim/tiers.ts"
-import { Bug, Game, Pickup, pickupKinds } from "../src/sim/schema.ts"
+import { hasStatus } from "../src/sim/statuses.ts"
+import { Boss, Bug, Game, Pickup, pickupKinds } from "../src/sim/schema.ts"
 import type { ChatValue, FxValue, InputValue, PickupKind, Vec } from "../src/sim/schema.ts"
 
 /** A bot that kites the nearest bug and shoots at it: the same intents a player sends. */
@@ -379,11 +381,25 @@ test("endless unlocks one content tier every 3 waves, all of it by wave 18", () 
     if (!tierAt.has(v.run.wave)) tierAt.set(v.run.wave, v.tier)
   })
   assert.ok(view.run.wave >= 18, `only reached wave ${view.run.wave}`)
-  // `run.wave` counts the waves released so far: the next wave plays at this tier.
+  // `run.wave` is the wave on the floor (it counts up as each wave is released): waves 1–3 play at tier 0, 16–18 at tier 5.
   assert.deepEqual(
-    [0, 2, 3, 5, 6, 9, 12, 15, 17].map((wave) => tierAt.get(wave)),
-    [0, 0, 1, 1, 2, 3, 4, 5, 5]
+    [0, 1, 3, 4, 6, 7, 9, 10, 13, 15, 16, 18].map((wave) => tierAt.get(wave)),
+    [0, 0, 0, 1, 1, 2, 2, 3, 4, 4, 5, 5]
   )
+})
+
+test("the same seed and input replay the same endless run as it climbs the tiers", () => {
+  const quick = { ...endlessLevel, waveSize: 1, endless: { ...endlessLevel.endless!, every: 100 } }
+  const replay = () => {
+    const tiers: Array<number> = []
+    const view = watch({ level: quick, seed: 11 }, 120, (v) => tiers.push(v.tier))
+    return { view, tiers }
+  }
+  const a = replay()
+  const b = replay()
+  assert.ok(a.view.tier >= 2, `only reached tier ${a.view.tier}`)
+  assert.deepEqual(a.tiers, b.tiers)
+  assert.deepEqual(a.view, b.view)
 })
 
 test("drops, mission rewards and call rewards never offer a pickup above the level's tier", () => {
@@ -514,8 +530,8 @@ test("Pair programming arrives with Side Quests: never in Glacier, in Endless fr
   assert.equal(contentTiers.pairProgramming, 1)
   assert.ok(!isUnlocked("pairProgramming", levels[0]!.tier), "not in Glacier")
   assert.ok(isUnlocked("pairProgramming", levels[1]!.tier), "from Side Quests on")
-  assert.ok(!isUnlocked("pairProgramming", tierOf(endlessLevel, 2)), "not in Endless's first waves")
-  assert.ok(isUnlocked("pairProgramming", tierOf(endlessLevel, 3)))
+  assert.ok(!isUnlocked("pairProgramming", tierOf(endlessLevel, 3)), "not in Endless's first waves")
+  assert.ok(isUnlocked("pairProgramming", tierOf(endlessLevel, 4)))
 
   const seen = new Set<string>()
   watch({ level: levels[0]!, seed: 5 }, 240, (v) => {
@@ -523,6 +539,83 @@ test("Pair programming arrives with Side Quests: never in Glacier, in Endless fr
   })
   assert.ok(seen.size > 0, "Glacier drops something")
   assert.ok(!seen.has("pairProgramming"), `Glacier dropped ${[...seen].join(", ")}`)
+})
+
+// --- Statuses: Code freeze -------------------------------------------------
+
+/**
+ * One developer holding Code freeze (picked up on the spot), and a target
+ * spawned to their right. The developer fires at it until the first hit,
+ * then stands still; `track` follows the target every frame after that.
+ */
+const freezeScene = (target: { bug: BugSeed } | { boss: Level["boss"] }, waitBeforeFiring = 0) => {
+  const fx: Array<FxValue> = []
+  let aim: { x: number; y: number } | null = null
+  let firing = false
+  const made = createSimulation({
+    level: levels[2]!,
+    seed: 4,
+    locale: "en",
+    input: { snapshot: () => (firing && aim ? { ...idleInput, aim, fire: true } : idleInput) },
+    presentation: { fx: (e) => fx.push(e), chat: () => undefined }
+  })
+  if (!made.ok) throw new Error(JSON.stringify(made.error))
+  const sim = made.value
+  const me = sim.view().player!.position
+  const Drop = Game.System("Test/Drop", { commands: Game.System.commands(Game.System.spawns(Pickup, Bug, Boss)) }, ({ commands }) => {
+    commands.spawn(makePickup("codeFreeze", { x: me.x, y: me.y }))
+    const at = { x: me.x + 260, y: me.y }
+    if ("bug" in target) commands.spawn(makeBug(target.bug, at))
+    else commands.spawn(makeBoss(target.boss, at))
+  })
+  assert.ok(sim.runtime.tick(Game.Schedule(Drop, Game.Schedule.applyDeferred())).ok)
+  const find = () => [...sim.view().bugs, ...sim.view().bosses].find((t) => t.key === "FREEZE-1")
+  for (let frame = 0; frame < 1 + waitBeforeFiring * 60; frame++) assert.ok(sim.step().ok)
+  assert.ok(sim.view().player!.buffs.codeFreeze > 0, "the developer holds Code freeze")
+  firing = true
+  for (let frame = 0; frame < 120 && firing; frame++) {
+    aim = find()?.position ?? null
+    const before = fx.length
+    assert.ok(sim.step().ok)
+    if (fx.slice(before).some((e) => e.type === "hit")) firing = false
+  }
+  assert.equal(firing, false, "the shot landed")
+  /** Where the target is after each of the next `seconds`, sampled every frame. */
+  const track = (seconds: number) => {
+    const path: Array<{ x: number; y: number }> = []
+    for (let frame = 0; frame < seconds * 60; frame++) {
+      assert.ok(sim.step().ok)
+      const found = find()
+      assert.ok(found, "the target is still alive")
+      path.push({ ...found.position })
+    }
+    return path
+  }
+  return { sim, track, find }
+}
+
+test("Code freeze: a bug hit by a developer holding it stops for about 2 s, then moves again", () => {
+  const { track } = freezeScene({ bug: { key: "FREEZE-1", summary: "Frozen", priority: "High", status: "Open" } })
+  const path = track(3)
+  const moved = (from: number, to: number) => Math.hypot(path[to]!.x - path[from]!.x, path[to]!.y - path[from]!.y)
+  assert.ok(moved(0, 100) < 0.5, `moved ${moved(0, 100).toFixed(1)} px while frozen`)
+  assert.ok(moved(140, 179) > 30, `moved only ${moved(140, 179).toFixed(1)} px once thawed`)
+})
+
+test("Code freeze: a boss is only slowed, never stopped", () => {
+  // Wait out the boss's boot shield first: a shielded boss shrugs the hit off.
+  const { track } = freezeScene({ boss: { ...levels[0]!.boss, key: "FREEZE-1" } }, 2.2)
+  const path = track(4)
+  const moved = (from: number, to: number) => Math.hypot(path[to]!.x - path[from]!.x, path[to]!.y - path[from]!.y)
+  const slowed = moved(5, 95)
+  const free = moved(145, 235)
+  assert.ok(slowed > free * 0.3, `slowed ${slowed.toFixed(1)} px vs ${free.toFixed(1)} px free: it still moves`)
+  assert.ok(slowed < free * 0.7, `slowed ${slowed.toFixed(1)} px vs ${free.toFixed(1)} px free: about half as fast`)
+})
+
+test("Code freeze arrives with sprint 3 (Keystone) and not before", () => {
+  assert.equal(isUnlocked("codeFreeze", levels[1]!.tier), false)
+  assert.equal(isUnlocked("codeFreeze", levels[2]!.tier), true)
 })
 
 // --- git push --force --------------------------------------------------------
@@ -630,4 +723,15 @@ test("git push --force arrives with Sprint 5: a rare drop and a possible reward,
   assert.ok(isUnlocked("pushForce", 4))
   assert.ok(!isUnlocked("pushForce", tierOf(endlessLevel, 1)), "not in Endless's first waves")
   assert.ok(isUnlocked("pushForce", endlessLevel.tier), "but Endless gets there")
+})
+
+test("under Code freeze a rocket's blast freezes every bug it reaches", () => {
+  const { sim, wait, drop, volley } = range()
+  const at = sim.view().player!.position
+  drop("pushForce", "codeFreeze")
+  const bug = dummies(sim, { x: at.x + 400, y: at.y + 80 }, { x: at.x + 400, y: at.y - 80 }, { x: at.x + 400, y: at.y + 300 })
+  volley()
+  wait(1.2)
+  assert.ok(hasStatus(bug("DUMMY-1")!.statuses, "freeze") && hasStatus(bug("DUMMY-2")!.statuses, "freeze"), "both bugs in the blast are frozen")
+  assert.ok(!hasStatus(bug("DUMMY-3")!.statuses, "freeze"), "the one out of reach is not")
 })

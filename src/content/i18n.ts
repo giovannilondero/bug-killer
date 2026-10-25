@@ -12,7 +12,7 @@ export const defaultLocale: Locale = "en"
 
 export const isLocale = (value: unknown): value is Locale => (locales as ReadonlyArray<unknown>).includes(value)
 
-type Pickups = "hotfix" | "refactor" | "coffee" | "unitTest" | "revert" | "pizza" | "tools" | "ai" | "pairProgramming" | "pushForce"
+type Pickups = "hotfix" | "refactor" | "coffee" | "unitTest" | "revert" | "pizza" | "tools" | "ai" | "pairProgramming" | "codeFreeze" | "pushForce"
 
 /** Every word the game shows, in one language. */
 export interface Strings {

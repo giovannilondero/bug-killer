@@ -5,6 +5,7 @@ import type { Priority, StatusTrait } from "../content/bugs.ts"
 import type { CallKind, ClientId, MissionKind } from "../content/clients.ts"
 import type { Locale } from "../content/i18n.ts"
 import type { BossPattern, Level } from "../content/levels.ts"
+import type { StatusValue } from "./statuses.ts"
 import type { TierTable } from "./tiers.ts"
 import type { WeaponKind, WeaponValue } from "./weapons.ts"
 
@@ -60,6 +61,8 @@ export interface BugValue {
   resurrectedBy: ClientId | null
   /** A regression spawned by a Highest bug's death. */
   regression: boolean
+  /** Code freeze and the other status effects on it, with who applied them. */
+  statuses: ReadonlyArray<StatusValue>
 }
 export const Bug = Descriptor.Component<BugValue>()("BugKiller/Bug")
 
@@ -78,6 +81,8 @@ export interface BossValue {
   volley: number
   hitFlash: number
   age: number
+  /** Status effects slow a boss but never stop it. */
+  statuses: ReadonlyArray<StatusValue>
 }
 export const Boss = Descriptor.Component<BossValue>()("BugKiller/Boss")
 
@@ -88,7 +93,7 @@ export const HostileShot = Descriptor.Component<{ damage: number; life: number; 
 /** A slow rocket flying to the point it was aimed at, where it explodes unless a bug or a boss is in the way first. */
 export const Rocket = Descriptor.Component<{ target: Vec; owner: number }>()("BugKiller/Rocket")
 
-export const pickupKinds = ["hotfix", "refactor", "coffee", "unitTest", "revert", "pizza", "tools", "ai", "pairProgramming", "pushForce"] as const
+export const pickupKinds = ["hotfix", "refactor", "coffee", "unitTest", "revert", "pizza", "tools", "ai", "pairProgramming", "codeFreeze", "pushForce"] as const
 export type PickupKind = (typeof pickupKinds)[number]
 export const Pickup = Descriptor.Component<{ kind: PickupKind; life: number }>()("BugKiller/Pickup")
 

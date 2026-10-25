@@ -145,6 +145,7 @@ export const it: Strings = {
     tools: { label: "Strumenti", hint: "colpi a ricerca" },
     ai: { label: "AI", hint: "torretta automatica" },
     pairProgramming: { label: "Pair programming", hint: "due colpi alla volta" },
+    codeFreeze: { label: "Code freeze", hint: "i colpi congelano" },
     pushForce: { label: "git push --force", hint: "un razzo: boom dove miri" }
   },
   floorCode: [
