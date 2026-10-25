@@ -151,7 +151,7 @@ test("an Epic stays a still nest whatever its status: it never deploys, wanders 
 
   const spots = new Map(rows.map(([seed, at]) => [seed.key, at]))
   const closed = new Set<string>()
-  until((v) => [...spots.keys()].every((key) => closed.has(key)), 60, (v) => {
+  until(() => [...spots.keys()].every((key) => closed.has(key)), 60, (v) => {
     for (const bug of v.bugs) {
       const at = spots.get(bug.key)
       if (!at) continue
