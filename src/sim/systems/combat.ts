@@ -22,10 +22,12 @@ import {
   Rng,
   Run,
   Shot,
+  Tiers,
   Turret,
   pickupKinds
 } from "../schema.ts"
 import type { BugValue, PickupKind, PlayerValue, RunValue, Vec } from "../schema.ts"
+import { isUnlocked, tierOf } from "../tiers.ts"
 import { Ops } from "@typeonce/ritmo-math"
 
 const REOPEN_CHANCE = 0.4
@@ -58,7 +60,8 @@ export const CombatSystem = Game.System(
       run: Game.System.writeResource(Run),
       rng: Game.System.writeResource(Rng),
       language: Game.System.readResource(Language),
-      level: Game.System.readResource(LevelSpec)
+      level: Game.System.readResource(LevelSpec),
+      tiers: Game.System.readResource(Tiers)
     },
     events: {
       bombs: Game.System.readEvent(BombBlast),
@@ -128,8 +131,10 @@ export const CombatSystem = Game.System(
       }
 
       if (random.next() < dropChance[bug.priority]) {
-        const kindDropped = random.weighted(pickupKinds, (k) => dropWeights[k]) ?? "hotfix"
-        commands.spawn(makePickup(kindDropped, at))
+        // Only what the level has unlocked so far can drop.
+        const tier = tierOf(resources.level.get(), run.wave)
+        const kindDropped = random.weighted(pickupKinds, (k) => (isUnlocked(k, tier, resources.tiers.get()) ? dropWeights[k] : 0))
+        if (kindDropped) commands.spawn(makePickup(kindDropped, at))
       }
     }
 

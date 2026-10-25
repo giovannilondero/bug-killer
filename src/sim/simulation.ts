@@ -17,6 +17,8 @@ import { CALLS, FIRST_CLIENT_DELAY, TOBIA, PARTY, RESURRECT, WAVE_INTERVAL } fro
 import { makePlayer } from "./drafts.ts"
 import { BossRead, BugRead, HostileShotRead, PickupRead, PlayerRead, ShotRead } from "./queries.ts"
 import { Calls, Chat, Fx, Game, Input, InputSource, Interruptions, Language, LevelSpec, Missions, Party, Player, Position, Presentation, Run, Turret } from "./schema.ts"
+import { contentTiers, tierOf } from "./tiers.ts"
+import type { TierTable } from "./tiers.ts"
 import type { CallsValue, ChatValue, FxValue, InputValue, InputsValue, InterruptionsValue, MissionsValue, RunValue, TeammateValue } from "./schema.ts"
 import { BossBrainSystem } from "./systems/boss.ts"
 import { CallSystem } from "./systems/calls.ts"
@@ -121,6 +123,8 @@ export const ViewInspector = Game.Inspector(
       turrets: queries.turrets.each().map((m) => ({ id: m.entity.id, position: m.data.position.get(), ...m.data.turret.get() })),
       pickups: queries.pickups.each().map((m) => ({ id: m.entity.id, position: m.data.position.get(), ...m.data.pickup.get() })),
       run: resources.run.get(),
+      /** The highest content tier on offer right now. */
+      tier: tierOf(resources.level.get(), resources.run.get().wave),
       missions: resources.missions.get(),
       interruptions: resources.interruptions.get(),
       calls: resources.calls.get(),
@@ -143,7 +147,13 @@ export const idleInput: InputValue = { move: { x: 0, y: 0 }, aim: { x: arenas.no
 export const soloParty: Array<TeammateValue> = [{ slot: 0, name: "", color: PARTY.colors[0] }]
 
 /** The world a level starts from. */
-export const initialResources = (level: Level, seed: number, locale: Locale = defaultLocale, party: Array<TeammateValue> = soloParty) => {
+export const initialResources = (
+  level: Level,
+  seed: number,
+  locale: Locale = defaultLocale,
+  party: Array<TeammateValue> = soloParty,
+  tiers: TierTable = contentTiers
+) => {
   const run: RunValue = {
     time: 0,
     phase: "waves",
@@ -168,7 +178,7 @@ export const initialResources = (level: Level, seed: number, locale: Locale = de
   const interruptions: InterruptionsValue = { resurrectIn: RESURRECT.first, tobiaIn: TOBIA.firstCooldown, tobiaLine: 0, resurrections: 0 }
   const calls: CallsValue = { active: null, nextIn: CALLS.first, answered: 0, missed: 0 }
   const input: InputsValue = party.map(() => idleInput)
-  return { Input: input, Party: party.map((teammate) => ({ ...teammate })), LevelSpec: level, Language: locale, Rng: Random.seed(seed), Run: run, Missions: missions, Interruptions: interruptions, Calls: calls }
+  return { Input: input, Party: party.map((teammate) => ({ ...teammate })), LevelSpec: level, Language: locale, Tiers: tiers, Rng: Random.seed(seed), Run: run, Missions: missions, Interruptions: interruptions, Calls: calls }
 }
 
 export interface SimulationOptions {
@@ -181,6 +191,8 @@ export interface SimulationOptions {
   readonly inputs?: { snapshot: () => InputsValue }
   readonly input?: { snapshot: () => InputValue }
   readonly presentation: PresentationSink
+  /** Tests only: a different content-tier table, to gate a pickup that is tier 0 in the game. */
+  readonly tiers?: TierTable
 }
 
 export const createSimulation = (options: SimulationOptions) => {
@@ -191,7 +203,7 @@ export const createSimulation = (options: SimulationOptions) => {
       Game.Runtime.service(InputSource, inputs),
       Game.Runtime.service(Presentation, options.presentation)
     ),
-    resources: initialResources(options.level, options.seed, options.locale, options.party)
+    resources: initialResources(options.level, options.seed, options.locale, options.party, options.tiers)
   })
   if (!made.ok) {
     return Result.failure(made.error)
