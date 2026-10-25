@@ -119,6 +119,8 @@ const playFx = (event: FxValue) => {
     case "bomb": audio.bomb(); break
     case "dash": audio.dash(); break
     case "reopen": audio.reopen(); break
+    case "fuse": audio.fuse(); break
+    case "deploy": audio.deploy(); break
     case "teleport": audio.teleport(); break
     case "resurrect": break
     case "bossPhase": audio.boss(); break

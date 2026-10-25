@@ -112,6 +112,13 @@ export const makeAudio = () => {
       tone(90, 0.8, { type: "sawtooth", volume: 0.25, slide: 0.3 })
     },
     dash: () => noise(0.12, 0.12, 4000, 800),
+    /** A Deploying bug's fuse: beeps that speed up over its second. */
+    fuse: () => [0, 0.3, 0.52, 0.68, 0.8, 0.9].forEach((delay, i) => tone(880 + i * 90, 0.06, { type: "square", volume: 0.07, delay })),
+    /** It went to production: a short, dry blast, smaller than git reset --hard. */
+    deploy: () => {
+      noise(0.45, 0.45, 2400, 80)
+      tone(120, 0.35, { type: "sawtooth", volume: 0.18, slide: 0.35 })
+    },
     reopen: () => [400, 300, 200].forEach((f, i) => tone(f, 0.12, { type: "sawtooth", volume: 0.08, delay: i * 0.08 })),
     chat: (angry: boolean) => {
       const notes = angry ? [988, 988, 988] : [784, 1175]

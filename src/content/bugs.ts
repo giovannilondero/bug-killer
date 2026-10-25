@@ -65,7 +65,7 @@ export const bugKinds = {
 } as const satisfies Record<Priority, BugKind>
 
 /** Workflow statuses grouped by how the bug behaves in the arena. */
-export type StatusTrait = "armored" | "reopens" | "jittery" | "plain"
+export type StatusTrait = "armored" | "reopens" | "jittery" | "deploying" | "plain"
 
 const statusTraits: Partial<Record<string, StatusTrait>> = {
   "Blocked": "armored",
@@ -75,7 +75,8 @@ const statusTraits: Partial<Record<string, StatusTrait>> = {
   "Ready for UAT": "reopens",
   "Ready for review": "reopens",
   "Ready for release": "reopens",
-  "In development": "jittery"
+  "In development": "jittery",
+  "Deploying": "deploying"
 }
 
 export const traitOf = (status: string): StatusTrait => statusTraits[status] ?? "plain"

@@ -4,7 +4,7 @@ import { arenaOf } from "../content/arenas.ts"
 import { ticketColors } from "../content/bugs.ts"
 import type { Priority, StatusTrait, TicketType } from "../content/bugs.ts"
 import type { Level } from "../content/levels.ts"
-import { PLAYER } from "../sim/constants.ts"
+import { DEPLOY, PLAYER } from "../sim/constants.ts"
 import type { PickupKind } from "../sim/schema.ts"
 import { locale, t } from "./language.ts"
 
@@ -97,6 +97,26 @@ export interface BugLook {
   frozen?: boolean
   /** Bug when absent. */
   type?: TicketType
+  /** A Deploying bug's fuse, in seconds left, once lit. */
+  fuse?: number | null
+}
+
+/** How far a Deploying bug's fuse has burnt, from 0 to 1, or `null` while it is not lit. */
+export const fuseProgress = (fuse: number | null | undefined): number | null =>
+  fuse === null || fuse === undefined ? null : 1 - fuse / DEPLOY.fuse
+
+/** A lit fuse flashes the bug white, faster and faster as it burns down. */
+export const fuseBlink = (progress: number, age: number): boolean => Math.sin(age * (14 + progress * 46)) > 0
+
+/** The blast radius of a lit Deploying bug, centred on the origin: everyone inside loses sanity when it goes off. */
+export const paintFuseRing = (ctx: CanvasRenderingContext2D, radius: number) => {
+  ctx.fillStyle = "rgba(255, 90, 60, 0.12)"
+  ctx.beginPath(); ctx.arc(0, 0, radius, 0, Math.PI * 2); ctx.fill()
+  ctx.strokeStyle = "#ff5a3c"
+  ctx.lineWidth = 3
+  ctx.setLineDash([10, 8])
+  ctx.beginPath(); ctx.arc(0, 0, radius, 0, Math.PI * 2); ctx.stroke()
+  ctx.setLineDash([])
 }
 
 /** A bug facing +x, centred on the origin: legs, antennae, glowing body, spots, eyes, armour. */

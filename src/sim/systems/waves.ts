@@ -6,7 +6,7 @@ import { makeBoss, makeBug } from "../drafts.ts"
 import { edgePoint } from "../math.ts"
 import { BossRead, BugRead, PlayerRead, standing } from "../queries.ts"
 import { Boss, Bug, Fx, Game, LevelSpec, Rng, Run, Tiers } from "../schema.ts"
-import { ticketTypeAt, tierOf } from "../tiers.ts"
+import { isUnlocked, ticketTypeAt, tierOf } from "../tiers.ts"
 
 /**
  * The sprint's pacing: releases the level's backlog in waves, brings in the
@@ -69,6 +69,7 @@ export const WavesSystem = Game.System(
         const toughness = { hp: 1 + run.loop * ENDLESS.hpPerLoop, speed: Math.min(ENDLESS.maxSpeed, 1 + run.loop * ENDLESS.speedPerLoop) }
         // This wave plays at the tier it releases into: a ticket type it hasn't unlocked comes as a plain bug.
         const tier = tierOf(level, run.wave + 1)
+        const deploys = isUnlocked("deploying", tier, resources.tiers.get())
         for (let i = 0; i < count; i++) {
           const seed = endless ? random.pick(level.bugs) : level.bugs[run.nextBug + i]
           if (!seed) {
@@ -76,7 +77,7 @@ export const WavesSystem = Game.System(
           }
           // Away from one developer per bug, in turn, so nobody gets them all.
           const at = edgePoint(random, up[i % Math.max(1, up.length)] ?? null, arena)
-          commands.spawn(makeBug({ ...seed, type: ticketTypeAt(seed.type, tier, resources.tiers.get()) }, at, { toughness }))
+          commands.spawn(makeBug({ ...seed, type: ticketTypeAt(seed.type, tier, resources.tiers.get()) }, at, { toughness, deploys }))
           events.fx.emit({ type: "spawn", x: at.x, y: at.y })
         }
         run.nextBug += count

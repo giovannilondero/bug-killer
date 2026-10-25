@@ -18,8 +18,8 @@ export const WAVES_PER_TIER = 3
 /** Ticket types that arrive with a later sprint; until then such a ticket is a plain bug. */
 export type GatedType = Exclude<BacklogType, "bug">
 
-/** What can be gated by tier: pickups and ticket types. */
-export type Unlockable = PickupKind | GatedType
+/** What can be gated by tier: pickups, ticket types and the ticket kinds still to come. */
+export type Unlockable = PickupKind | GatedType | "deploying"
 
 /**
  * The one table both the campaign and Endless read. New content adds one entry
@@ -36,7 +36,8 @@ export const contentTiers = {
   ai: 0,
   pairProgramming: 1,
   codeFreeze: 2,
-  story: 1
+  story: 1,
+  deploying: 3
 } as const satisfies Record<Unlockable, Tier>
 
 export type TierTable = Readonly<Record<Unlockable, Tier>>

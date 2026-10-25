@@ -127,6 +127,7 @@ export const it: Strings = {
     armored: "BLOCCATO: dimezza i danni",
     reopens: "IN QA: può riaprirsi",
     jittery: "IN SVILUPPO: si muove a scatti",
+    deploying: "IN DEPLOY: si ferma accanto a te ed esplode",
     plain: ""
   },
   ticketTypes: {
@@ -173,6 +174,8 @@ export const it: Strings = {
     bossFixed: "BOSS FIXATO",
     movedToDone: (key) => `${key} spostato in Done`,
     reopenedSub: (key) => `${key} non passa la QA`,
+    deployed: "DEPLOYATO",
+    deployedSub: "dritto in produzione",
     resurrected: (key) => `🧟 ${key} RESUSCITATO`,
     resurrectedSub: (name) => `${name} dice che non è fixato`,
     testsPassing: "✓ test verdi",
