@@ -859,7 +859,7 @@ test("under Memory leak a rocket's blast poisons every bug it reaches", () => {
  * `targets` spawned at offsets from them. `spray` holds the trigger for a few
  * updates; `find` reads a target back by key.
  */
-const flameScene = (targets: ReadonlyArray<{ key: string; dx: number; dy: number; priority?: BugSeed["priority"] }>) => {
+const flameScene = (targets: ReadonlyArray<{ key: string; dx: number; dy: number; priority?: BugSeed["priority"]; hp?: number }>) => {
   const fx: Array<FxValue> = []
   let firing = false
   let aim = { x: 0, y: 0 }
@@ -877,7 +877,11 @@ const flameScene = (targets: ReadonlyArray<{ key: string; dx: number; dy: number
   const Drop = Game.System("Test/Drop", { commands: Game.System.commands(Game.System.spawns(Pickup, Bug)) }, ({ commands }) => {
     commands.spawn(makePickup("flameWar", { x: me.x, y: me.y }))
     for (const target of targets) {
-      commands.spawn(makeBug({ key: target.key, summary: target.key, priority: target.priority ?? "Highest", status: "Open" }, { x: me.x + target.dx, y: me.y + target.dy }))
+      commands.spawn(makeBug(
+        { key: target.key, summary: target.key, priority: target.priority ?? "Highest", status: "Open" },
+        { x: me.x + target.dx, y: me.y + target.dy },
+        { toughness: { hp: target.hp ?? 1, speed: 1 } }
+      ))
     }
   })
   assert.ok(sim.runtime.tick(Game.Schedule(Drop, Game.Schedule.applyDeferred())).ok)
@@ -936,6 +940,21 @@ test("This is fine: a burning bug takes damage over time and sets the bugs it to
   assert.ok(touching.hp < touching.maxHp - 1, "and burns it too")
   wait(4 * 60)
   assert.ok(find("BURNING") === undefined || find("BURNING")!.statuses.length === 0, "after about 3 s the fire is out")
+})
+
+test("This is fine: bugs touching each other never re-light one another, the cluster burns out", () => {
+  // Both inside the cone and touching, tough enough to outlive the fire.
+  const { spray, find, wait } = flameScene([
+    { key: "PAIR-A", dx: 120, dy: 0, hp: 40 },
+    { key: "PAIR-B", dx: 120, dy: 50, hp: 40 }
+  ])
+  spray(1)
+  const burning = () => ["PAIR-A", "PAIR-B"].some((key) => hasStatus(find(key)!.statuses, "burn"))
+  assert.ok(burning(), "the flames set them on fire")
+  let frames = 0
+  for (; frames < 10 * 60 && burning(); frames++) wait(1)
+  assert.ok(find("PAIR-A") && find("PAIR-B"), "both outlived the fire")
+  assert.ok(frames <= 3.5 * 60, `still burning ${(frames / 60).toFixed(1)} s after the last flame`)
 })
 
 test("Flame war flashes the bugs it burns without a hit sound per puff: the burner sound covers it", () => {

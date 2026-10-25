@@ -33,7 +33,7 @@ import {
   pickupKinds
 } from "../schema.ts"
 import type { BugValue, PickupKind, PlayerValue, RunValue, Vec } from "../schema.ts"
-import { applyStatus, hasStatus, inflictedBy, spreads, statusKinds, tickStatuses } from "../statuses.ts"
+import { applyStatus, catchStatus, hasStatus, inflictedBy, spreads, statusKinds, tickStatuses } from "../statuses.ts"
 import type { StatusKind, StatusValue } from "../statuses.ts"
 import { isUnlocked, tierOf } from "../tiers.ts"
 import { FLAME, inCone, isWeapon, pickUp } from "../weapons.ts"
@@ -247,7 +247,8 @@ export const CombatSystem = Game.System(
         if (!gone.has(match.entity.id)) damageBug(match, damage.amount, damage.by, { overTime: true })
       }
     }
-    // This is fine 🔥: a status that spreads catches on to the bugs touching one that carries it, for the same developer.
+    // This is fine 🔥: a status that spreads catches on to the bugs touching one that carries it, for the same developer,
+    // with only the time the carrier has left: touching bugs never re-light one another.
     for (const kind of statusKinds.filter((k) => spreads(k))) {
       const carriers = bugs.filter((match) => !gone.has(match.entity.id) && hasStatus(match.data.bug.get().statuses, kind))
       for (const match of bugs) {
@@ -256,8 +257,8 @@ export const CombatSystem = Game.System(
         const at = match.data.position.get()
         const radius = match.data.body.get().radius
         const source = carriers.find((other) => overlaps(at, radius, other.data.position.get(), other.data.body.get().radius))
-        const by = source?.data.bug.get().statuses.find((status) => status.kind === kind)?.by
-        if (by !== undefined) match.data.bug.set({ ...bug, statuses: applyStatus(bug.statuses, kind, by) })
+        const from = source?.data.bug.get().statuses.find((status) => status.kind === kind)
+        if (from) match.data.bug.set({ ...bug, statuses: catchStatus(bug.statuses, from) })
       }
     }
     for (const match of bosses) {

@@ -65,6 +65,10 @@ export const applyStatus = (
   return [...statuses.filter((status) => status.kind !== kind), next]
 }
 
+/** `statuses` after catching `from` off a touching carrier: the same owner and only the time it has left, so a cluster burns out with its first carrier. */
+export const catchStatus = (statuses: ReadonlyArray<StatusValue>, from: StatusValue): Array<StatusValue> =>
+  [...statuses.filter((status) => status.kind !== from.kind), { ...from, stacks: 1 }]
+
 /** One step of `dt`: what is left, and the damage each status deals, with who to credit it to. */
 export const tickStatuses = (
   statuses: ReadonlyArray<StatusValue>,
