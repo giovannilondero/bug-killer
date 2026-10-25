@@ -47,6 +47,9 @@ export const HOMING = { range: 520, turnRate: 9 } as const
 /** A Deploying bug lights its fuse this close to a developer (gap between bodies), then goes off over this radius. */
 export const DEPLOY = { reach: 50, fuse: 1, chainFuse: 0.12, radius: 130, damage: 4 } as const
 
+/** An Epic's nest: every few seconds it releases a sub-task of one of these priorities, while fewer than `brood` are alive. */
+export const EPIC = { every: 3, brood: 6, priorities: ["Lowest", "Low"], ring: 14 } as const
+
 /** Seconds each timed power-up lasts. Weapons time themselves (`weapons.ts`). */
 export const BUFF_SECONDS = { hotfix: 8, refactor: 10, coffee: 8, unitTest: 6, revert: 0, pizza: 0, tools: 10, ai: 0, pairProgramming: 0, codeFreeze: 8 } as const
 

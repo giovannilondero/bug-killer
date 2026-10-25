@@ -2,7 +2,7 @@ import { bugKinds, ticketScales, traitOf } from "../content/bugs.ts"
 import type { Priority, TicketType } from "../content/bugs.ts"
 import type { Boss as BossContent } from "../content/levels.ts"
 import type { ClientId } from "../content/clients.ts"
-import { HOSTILE_SHOT, PLAYER, RESURRECT, SHOT, TURRET } from "./constants.ts"
+import { EPIC, HOSTILE_SHOT, PLAYER, RESURRECT, SHOT, TURRET } from "./constants.ts"
 import { Body, Boss, Bug, Game, HostileShot, Pickup, Player, Position, Shot, Turret, Velocity } from "./schema.ts"
 import type { PickupKind, TeammateValue, Vec } from "./schema.ts"
 import { basicGun } from "./weapons.ts"
@@ -46,7 +46,7 @@ export interface BugSeed {
 export const makeBug = (
   seed: BugSeed,
   at: Vec,
-  options: { reopened?: boolean; regression?: boolean; resurrectedBy?: ClientId; toughness?: { hp: number; speed: number }; deploys?: boolean } = {}
+  options: { reopened?: boolean; regression?: boolean; resurrectedBy?: ClientId; toughness?: { hp: number; speed: number }; deploys?: boolean; parent?: string } = {}
 ) => {
   const kind = bugKinds[seed.priority]
   const type = seed.type ?? "bug"
@@ -80,7 +80,9 @@ export const makeBug = (
       regression: options.regression ?? false,
       statuses: [],
       type,
-      fuse: null
+      fuse: null,
+      nest: type === "epic" ? { next: EPIC.every, released: 0 } : null,
+      parent: options.parent ?? null
     })
   )
 }

@@ -1,9 +1,9 @@
 import * as Random from "@typeonce/ritmo-math/Random"
 
 import { arenaOf } from "../../content/arenas.ts"
-import { DT, ENDLESS, PARTY, WAVE_INTERVAL } from "../constants.ts"
+import { DT, ENDLESS, PARTY, SPAWN_SAFE_DISTANCE, WAVE_INTERVAL } from "../constants.ts"
 import { makeBoss, makeBug } from "../drafts.ts"
-import { edgePoint } from "../math.ts"
+import { centreOf, edgePoint, openPoint } from "../math.ts"
 import { BossRead, BugRead, PlayerRead, standing } from "../queries.ts"
 import { Boss, Bug, Fx, Game, LevelSpec, Rng, Run, Tiers } from "../schema.ts"
 import { isUnlocked, ticketTypeAt, tierOf } from "../tiers.ts"
@@ -75,9 +75,12 @@ export const WavesSystem = Game.System(
           if (!seed) {
             continue
           }
+          const type = ticketTypeAt(seed.type, tier, resources.tiers.get())
           // Away from one developer per bug, in turn, so nobody gets them all.
-          const at = edgePoint(random, up[i % Math.max(1, up.length)] ?? null, arena)
-          commands.spawn(makeBug({ ...seed, type: ticketTypeAt(seed.type, tier, resources.tiers.get()) }, at, { toughness, deploys }))
+          const avoid = up[i % Math.max(1, up.length)] ?? null
+          // An Epic never moves, so it nests out in the open instead of on the edge.
+          const at = type === "epic" ? openPoint(random, avoid ?? centreOf(arena), SPAWN_SAFE_DISTANCE, arena) : edgePoint(random, avoid, arena)
+          commands.spawn(makeBug({ ...seed, type }, at, { toughness, deploys }))
           events.fx.emit({ type: "spawn", x: at.x, y: at.y })
         }
         run.nextBug += count

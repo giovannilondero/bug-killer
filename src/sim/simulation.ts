@@ -23,6 +23,7 @@ import type { CallsValue, ChatValue, FxValue, InputValue, InputsValue, Interrupt
 import { BossBrainSystem } from "./systems/boss.ts"
 import { CallSystem } from "./systems/calls.ts"
 import { CombatSystem } from "./systems/combat.ts"
+import { EpicSystem } from "./systems/epics.ts"
 import { MissionDirectorSystem } from "./systems/missions.ts"
 import { TobiaSystem, ResurrectionSystem } from "./systems/interruptions.ts"
 import { BugBrainSystem, HomingSystem, IntegrateSystem, LifetimeSystem } from "./systems/movement.ts"
@@ -73,6 +74,7 @@ export const updateSchedule = Game.Schedule(
   TurretSystem,
   WavesSystem,
   BugBrainSystem,
+  EpicSystem,
   BossBrainSystem,
   HomingSystem,
   IntegrateSystem,

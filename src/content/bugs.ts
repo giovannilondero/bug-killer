@@ -14,9 +14,10 @@ export interface BacklogBug {
 
 /**
  * What kind of ticket it is. A Story splits into sub-tasks when it is closed;
- * sub-tasks only ever come from a Story, never from the backlog.
+ * an Epic stays put and keeps releasing sub-tasks until it is closed.
+ * Sub-tasks only ever come from a Story or an Epic, never from the backlog.
  */
-export const ticketTypes = ["bug", "story", "subtask"] as const
+export const ticketTypes = ["bug", "story", "subtask", "epic"] as const
 export type TicketType = (typeof ticketTypes)[number]
 /** The types a backlog row may have. */
 export type BacklogType = Exclude<TicketType, "subtask">
@@ -32,11 +33,13 @@ export interface TicketScale {
 export const ticketScales = {
   bug: { hp: 1, speed: 1, radius: 1, points: 1 },
   story: { hp: 1.5, speed: 0.9, radius: 1.2, points: 1.5 },
-  subtask: { hp: 0.5, speed: 1.4, radius: 0.7, points: 0.5 }
+  subtask: { hp: 0.5, speed: 1.4, radius: 0.7, points: 0.5 },
+  // An Epic never moves: a big nest that has to be dug out.
+  epic: { hp: 8, speed: 0, radius: 2, points: 4 }
 } as const satisfies Record<TicketType, TicketScale>
 
-/** Jira's own colours: a Story is a green bookmark, a sub-task a blue pair of boxes. */
-export const ticketColors = { story: "#63ba3c", subtask: "#4bade8" } as const satisfies Record<Exclude<TicketType, "bug">, string>
+/** Jira's own colours: a Story is a green bookmark, a sub-task a blue pair of boxes, an Epic a purple bolt. */
+export const ticketColors = { story: "#63ba3c", subtask: "#4bade8", epic: "#904ee2" } as const satisfies Record<Exclude<TicketType, "bug">, string>
 
 /** How many sub-tasks a closed Story splits into. */
 export const STORY_SUBTASKS = 2

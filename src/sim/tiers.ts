@@ -37,6 +37,7 @@ export const contentTiers = {
   pairProgramming: 1,
   codeFreeze: 2,
   story: 1,
+  epic: 4,
   deploying: 3
 } as const satisfies Record<Unlockable, Tier>
 

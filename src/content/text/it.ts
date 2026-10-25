@@ -133,7 +133,8 @@ export const it: Strings = {
   ticketTypes: {
     bug: { label: "Bug", hint: "" },
     story: { label: "Story", hint: "STORY: si divide in 2 sotto-task" },
-    subtask: { label: "Sotto-task", hint: "SOTTO-TASK: piccolo e veloce" }
+    subtask: { label: "Sotto-task", hint: "SOTTO-TASK: piccolo e veloce" },
+    epic: { label: "Epic", hint: "EPIC: un nido di sotto-task, l'ondata aspetta che sia chiusa" }
   },
   taglines: {
     glacier: "Si parte col freddo: tutto in Ready for QA, niente è davvero finito.",
