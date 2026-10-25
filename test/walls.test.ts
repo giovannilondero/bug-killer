@@ -5,6 +5,7 @@ import { arenaOf, arenas } from "../src/content/arenas.ts"
 import type { Arena, Wall } from "../src/content/arenas.ts"
 import { bonusLevels, endlessArenas, levels } from "../src/content/levels.ts"
 import type { Level } from "../src/content/levels.ts"
+import { stackTop } from "../src/sim/bosses.ts"
 import { BREAKPOINT, PLAYER, TURRET } from "../src/sim/constants.ts"
 import { makeBug, makeHostileShot, makePickup } from "../src/sim/drafts.ts"
 import { createSimulation, idleInput } from "../src/sim/simulation.ts"
@@ -12,6 +13,7 @@ import type { View } from "../src/sim/simulation.ts"
 import { Bug, Game, HostileShot, Pickup } from "../src/sim/schema.ts"
 import type { FxValue, InputValue, PickupKind, Vec } from "../src/sim/schema.ts"
 import { FLAME } from "../src/sim/weapons.ts"
+import { gunner, scene as fightScene } from "./scene.ts"
 
 /** Whether a circle of `radius` at `p` overlaps `wall`, by more than a hair. */
 const overlapsWall = (wall: Wall, p: Vec, radius: number): boolean => {
@@ -193,6 +195,47 @@ test("nothing is ever spawned, teleported or placed inside a wall", () => {
     teleports += fx.filter((e) => e.type === "teleport").length
   }
   assert.ok(teleports > 0, "the crash boss teleported at least once")
+})
+
+test("the Stack overflow's frames never drop inside a wall, even when its tower stands in one", () => {
+  const production = levels.find((level) => level.id === "production")!
+  // Production's boss, in Cubicles' arena, with nothing else to fight.
+  const fight: Level = { ...production, bugs: [], arena: arenas.walls }
+  const arena = arenaOf(fight)
+  let dropped = 0
+  for (let seed = 1; seed <= 6; seed++) {
+    let current: View | null = null
+    let frame = 0
+    const made = createSimulation({ level: fight, seed, locale: "en", input: wanderer(() => current, () => frame), presentation: { fx: () => undefined, chat: () => undefined } })
+    if (!made.ok) throw new Error(JSON.stringify(made.error))
+    const sim = made.value
+    current = sim.view()
+    const seen = new Set<string>()
+    for (; frame < 120 * 60 && current.run.phase !== "cleared" && current.run.phase !== "dead"; frame++) {
+      assert.ok(sim.step().ok)
+      current = sim.view()
+      for (const bug of current.bugs) {
+        if (!bug.key.startsWith("FRAME-") || seen.has(bug.key)) continue
+        seen.add(bug.key)
+        dropped++
+        assert.ok(!inAnyWall(arena, bug.position, bug.radius), `seed ${seed}, frame ${frame}: ${bug.key} at ${bug.position.x.toFixed(0)},${bug.position.y.toFixed(0)} is in a wall`)
+      }
+    }
+  }
+  assert.ok(dropped >= 6, `${dropped} frames dropped`)
+
+  // A wall right over the tower, and a weak boss shot from below: the frame on top drops into the wall.
+  const covered: Level = { ...production, bugs: [], boss: { ...production.boss, hp: 6 }, arena: { ...arenas.normal, walls: [{ x: 860, y: 265, width: 80, height: 40 }] } }
+  const run = fightScene(covered, { input: gunner })
+  let before = run.view()
+  run.until((v) => v.bugs.some((bug) => bug.key.startsWith("FRAME-")), 10, (v) => {
+    if (!v.bugs.some((bug) => bug.key.startsWith("FRAME-"))) before = v
+  })
+  const tower = before.bosses[0]!
+  const frames = run.view().bugs.filter((bug) => bug.key.startsWith("FRAME-"))
+  assert.ok(frames.length > 0, "a frame dropped")
+  assert.ok(inAnyWall(arenaOf(covered), stackTop(tower.position, tower.radius, tower.frames), 20), "the top of the tower stood in the wall")
+  for (const bug of frames) assert.ok(!inAnyWall(arenaOf(covered), bug.position, bug.radius), `${bug.key} at ${bug.position.x.toFixed(0)},${bug.position.y.toFixed(0)} is in a wall`)
 })
 
 /** Kites and shoots, drifting about so it goes everywhere, sets Breakpoints now and then, and walks to calls. */
