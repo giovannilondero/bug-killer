@@ -33,6 +33,8 @@ export interface PlayerValue {
   dashDirection: Vec
   aim: Vec
   bombs: number
+  /** Breakpoints left to place. */
+  breakpoints: number
   /** The weapon in hand and how long it lasts. */
   weapon: WeaponValue
   /** Seconds left on each power-up. */
@@ -90,7 +92,7 @@ export const Boss = Descriptor.Component<BossValue>()("BugKiller/Boss")
 export const Shot = Descriptor.Component<{ damage: number; life: number; pierce: number; homing: boolean; owner: number }>()("BugKiller/Shot")
 export const HostileShot = Descriptor.Component<{ damage: number; life: number; text: string }>()("BugKiller/HostileShot")
 
-export const pickupKinds = ["hotfix", "refactor", "coffee", "unitTest", "revert", "pizza", "tools", "ai", "pairProgramming", "codeFreeze"] as const
+export const pickupKinds = ["hotfix", "refactor", "coffee", "unitTest", "revert", "pizza", "tools", "ai", "pairProgramming", "codeFreeze", "breakpoint"] as const
 export type PickupKind = (typeof pickupKinds)[number]
 export const Pickup = Descriptor.Component<{ kind: PickupKind; life: number }>()("BugKiller/Pickup")
 
@@ -109,6 +111,9 @@ export interface TurretValue {
 }
 export const Turret = Descriptor.Component<TurretValue>()("BugKiller/Turret")
 
+/** A Breakpoint a developer set down: it waits for a bug to come close, then goes off for its owner. */
+export const Breakpoint = Descriptor.Component<{ owner: number }>()("BugKiller/Breakpoint")
+
 // --- Resources ----------------------------------------------------------
 
 /** One fixed update's input, in world coordinates. The host builds it. */
@@ -118,6 +123,8 @@ export interface InputValue {
   fire: boolean
   dash: boolean
   bomb: boolean
+  /** Set down a Breakpoint where the developer stands. */
+  breakpoint: boolean
 }
 /** Every developer's input this update, by slot; a missing slot stands still. */
 export type InputsValue = Array<InputValue>
@@ -248,6 +255,8 @@ export type FxValue =
   | { type: "revived"; x: number; y: number; slot: number; name: string }
   | { type: "turret"; x: number; y: number }
   | { type: "hallucination"; x: number; y: number }
+  | { type: "breakpointSet"; x: number; y: number }
+  | { type: "breakpoint"; x: number; y: number }
 export const Fx = Descriptor.Event<FxValue>()("BugKiller/Fx")
 
 export type ChatValue =
@@ -275,7 +284,7 @@ export const Presentation = Descriptor.Service<{
 
 export const Game = Schema.bind(
   Schema.fragment({
-    components: { Position, Velocity, Body, Player, Bug, Boss, Shot, HostileShot, Pickup, Turret },
+    components: { Position, Velocity, Body, Player, Bug, Boss, Shot, HostileShot, Pickup, Turret, Breakpoint },
     requires: [
       Schema.requires(Player, Position, Velocity, Body),
       Schema.requires(Bug, Position, Velocity, Body),
@@ -283,7 +292,8 @@ export const Game = Schema.bind(
       Schema.requires(Shot, Position, Velocity, Body),
       Schema.requires(HostileShot, Position, Velocity, Body),
       Schema.requires(Pickup, Position, Body),
-      Schema.requires(Turret, Position, Body)
+      Schema.requires(Turret, Position, Body),
+      Schema.requires(Breakpoint, Position, Body)
     ],
     resources: { Input, Party, LevelSpec, Language, Tiers, Rng, Run, Missions, Interruptions, Calls },
     events: { Fx, Chat, BugFixed, PlayerHurt, BombBlast }

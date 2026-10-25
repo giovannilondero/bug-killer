@@ -41,6 +41,7 @@ export interface TouchSnapshot {
   readonly fire: boolean
   readonly dash: boolean
   readonly bomb: boolean
+  readonly breakpoint: boolean
 }
 
 const el = (tag: string, className: string, text = ""): HTMLElement => {
@@ -89,7 +90,7 @@ const latch = (button: HTMLElement) => {
 
 /**
  * Twin-stick controls: left thumb moves, right thumb aims and fires
- * (held still, it fires at the nearest bug), plus dash and `git reset`.
+ * (held still, it fires at the nearest bug), plus dash, `git reset` and Breakpoint.
  */
 export const makeTouchControls = (root: HTMLElement, actions: { pause: () => void; mute: () => void; fullscreen: () => void }) => {
   root.replaceChildren()
@@ -97,6 +98,7 @@ export const makeTouchControls = (root: HTMLElement, actions: { pause: () => voi
   const right = el("div", "stick-zone right")
   const dashButton = el("button", "touch-btn dash")
   const bombButton = el("button", "touch-btn bomb", "⏪")
+  const breakpointButton = el("button", "touch-btn breakpoint", "🔴")
   const bar = el("div", "touch-bar")
   const pauseButton = el("button", "touch-small", "⏸")
   const muteButton = el("button", "touch-small", "🔊")
@@ -112,7 +114,7 @@ export const makeTouchControls = (root: HTMLElement, actions: { pause: () => voi
     fullscreenButton.addEventListener("click", actions.fullscreen)
     bar.append(fullscreenButton)
   }
-  root.append(left, right, dashButton, bombButton, bar)
+  root.append(left, right, dashButton, bombButton, breakpointButton, bar)
 
   // A zone's rect relative to the overlay: the CSS stays where the sticks live.
   const regionOf = (zone: HTMLElement): Touch.Rect => {
@@ -143,6 +145,7 @@ export const makeTouchControls = (root: HTMLElement, actions: { pause: () => voi
   }
   const dash = latch(dashButton)
   const bomb = latch(bombButton)
+  const breakpoint = latch(breakpointButton)
   // The bar sits over the right zone: its taps are not the aim stick.
   bar.addEventListener("pointerdown", (event) => event.stopPropagation())
   pauseButton.addEventListener("click", actions.pause)
@@ -158,7 +161,8 @@ export const makeTouchControls = (root: HTMLElement, actions: { pause: () => voi
         aim: magnitude < DEADZONE ? null : { x: a.x / magnitude, y: a.y / magnitude },
         fire: a.active,
         dash: dash(),
-        bomb: bomb()
+        bomb: bomb(),
+        breakpoint: breakpoint()
       }
     },
     setVisible: (visible: boolean) => {
@@ -171,6 +175,7 @@ export const makeTouchControls = (root: HTMLElement, actions: { pause: () => voi
       dashButton.textContent = t().touch.dash
       dashButton.setAttribute("aria-label", t().touch.dash)
       bombButton.setAttribute("aria-label", "git reset --hard")
+      breakpointButton.setAttribute("aria-label", t().touch.breakpoint)
     },
     setMuted: (muted: boolean) => {
       muteButton.textContent = muted ? "🔇" : "🔊"

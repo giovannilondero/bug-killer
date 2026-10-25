@@ -1,5 +1,5 @@
 // Plays every level headless with two autopilots and saves views worth drawing:
-// crowds, each boss, both kinds of call, power-ups, turrets, zombies, a teammate down.
+// crowds, each boss, both kinds of call, power-ups, turrets, Breakpoints, zombies, a teammate down.
 // `node bench/fixtures.ts` writes bench/fixtures.json, read by the bench's `?scene=` mode.
 import { writeFileSync } from "node:fs"
 
@@ -33,7 +33,8 @@ const pilot = (view: View | null, slot: number, tick: number): InputValue => {
     aim: nearest,
     fire: true,
     dash: best < 60,
-    bomb: false
+    bomb: false,
+    breakpoint: best < 140 && me.breakpoints > 0
   }
 }
 
@@ -43,6 +44,7 @@ const want: Record<string, (v: View) => boolean> = {
   meet: (v) => v.calls.active?.kind === "meet" && v.calls.active.progress > 0,
   slack: (v) => v.calls.active?.kind === "slack",
   turret: (v) => v.turrets.length > 0 && v.bugs.length > 5,
+  breakpoint: (v) => v.breakpoints.length > 0 && v.bugs.length > 3,
   zombie: (v) => v.bugs.some((b) => b.resurrectedBy !== null),
   hostile: (v) => v.hostile.length > 3,
   down: (v) => v.players.some((p) => p.hp <= 0) && v.players.some((p) => p.hp > 0),

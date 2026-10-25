@@ -12,7 +12,10 @@ import { contentTiers, isUnlocked, tierOf } from "../src/sim/tiers.ts"
 import { Boss, Bug, Game, Pickup, pickupKinds } from "../src/sim/schema.ts"
 import type { ChatValue, FxValue, InputValue, PickupKind } from "../src/sim/schema.ts"
 
-/** A bot that kites the nearest bug and shoots at it: the same intents a player sends. */
+/** How close the autopilot lets a bug come before it backs off. */
+const strafeRange = 220
+
+/** A bot that kites the nearest bug and shoots at it, and drops a Breakpoint when one gets close: the same intents a player sends. */
 const autopilot = (view: () => View | null, tick: () => number) => ({
   snapshot: (): InputValue => {
     const v = view()
@@ -31,13 +34,15 @@ const autopilot = (view: () => View | null, tick: () => number) => ({
     if (!nearest) return { ...idleInput, move: { x: Math.sin(tick() / 40), y: 0 } }
     const away = { x: me.x - nearest.x, y: me.y - nearest.y }
     const length = Math.hypot(away.x, away.y) || 1
-    const strafe = best < 220 ? 1 : -0.4
+    const strafe = best < strafeRange ? 1 : -0.4
     return {
       move: { x: (away.x / length) * strafe + (-away.y / length) * 0.6, y: (away.y / length) * strafe + (away.x / length) * 0.6 },
       aim: nearest,
       fire: true,
       dash: best < 60,
-      bomb: v.bugs.length > 12
+      bomb: v.bugs.length > 12,
+      // Dropped as it starts to back off, one per spot: whatever chases it walks onto the trap.
+      breakpoint: best < strafeRange && v.player.breakpoints > 0 && !v.breakpoints.some((b) => Math.hypot(b.position.x - me.x, b.position.y - me.y) < 200)
     }
   }
 })
@@ -615,4 +620,119 @@ test("Code freeze: a boss is only slowed, never stopped", () => {
 test("Code freeze arrives with sprint 3 (Keystone) and not before", () => {
   assert.equal(isUnlocked("codeFreeze", levels[1]!.tier), false)
   assert.equal(isUnlocked("codeFreeze", levels[2]!.tier), true)
+})
+
+// --- Breakpoints -------------------------------------------------------------
+
+/**
+ * A party on Keystone (where Breakpoints arrive). Seat `placer` presses F once
+ * on the first frame and nobody moves after that; then the bugs are spawned
+ * to the right of the trap and walk onto it.
+ */
+const breakpointScene = (bugs: ReadonlyArray<{ seed: BugSeed; dx: number; dy: number }>, names: ReadonlyArray<string> = [""], placer = 0) => {
+  const fx: Array<FxValue> = []
+  let pressed = false
+  const made = createSimulation({
+    level: levels[2]!,
+    seed: 4,
+    locale: "en",
+    party: names.map((name, slot) => ({ slot, name, color: "#3a6df0" })),
+    inputs: {
+      snapshot: () =>
+        names.map((_, slot) => {
+          const press = slot === placer && !pressed
+          if (press) pressed = true
+          return { ...idleInput, breakpoint: press }
+        })
+    },
+    presentation: { fx: (e) => fx.push(e), chat: () => undefined }
+  })
+  if (!made.ok) throw new Error(JSON.stringify(made.error))
+  const sim = made.value
+  const trap = { ...sim.view().players[placer]!.position }
+  assert.ok(sim.step().ok)
+  assert.equal(sim.view().breakpoints.length, 1, "the Breakpoint is down")
+  assert.equal(sim.view().players[placer]!.breakpoints, 1, "one charge spent")
+  const Spawn = Game.System("Test/Spawn", { commands: Game.System.commands(Game.System.spawns(Bug)) }, ({ commands }) => {
+    for (const bug of bugs) commands.spawn(makeBug(bug.seed, { x: trap.x + bug.dx, y: trap.y + bug.dy }))
+  })
+  assert.ok(sim.runtime.tick(Game.Schedule(Spawn, Game.Schedule.applyDeferred())).ok)
+  return { sim, fx, trap }
+}
+
+test("Breakpoint: a bug walking onto it sets it off, fixing the weak and freezing the survivors", () => {
+  const { sim, fx } = breakpointScene([
+    { seed: { key: "BP-1", summary: "Weak", priority: "Lowest", status: "Open" }, dx: 150, dy: -20 },
+    { seed: { key: "BP-2", summary: "Tough", priority: "High", status: "Open" }, dx: 170, dy: 20 }
+  ])
+  for (let frame = 0; frame < 180 && sim.view().breakpoints.length > 0; frame++) assert.ok(sim.step().ok)
+  assert.equal(sim.view().breakpoints.length, 0, "it went off")
+  assert.ok(fx.some((e) => e.type === "breakpoint"), "with its own effect")
+  const view = sim.view()
+  assert.ok(view.run.fixed.some((f) => f.key === "BP-1"), "the Lowest bug is fixed")
+  const tough = view.bugs.find((b) => b.key === "BP-2")
+  assert.ok(tough, "the High bug survives")
+  assert.ok(tough.hp < tough.maxHp, "but takes damage")
+  assert.ok(tough.statuses.some((s) => s.kind === "freeze"), "and is frozen")
+  const at = { ...tough.position }
+  for (let frame = 0; frame < 60; frame++) assert.ok(sim.step().ok)
+  const later = sim.view().bugs.find((b) => b.key === "BP-2")!.position
+  assert.ok(Math.hypot(later.x - at.x, later.y - at.y) < 0.5, "it stays put while frozen")
+})
+
+test("Breakpoint: it never hurts a developer, and the points go to whoever set it", () => {
+  const { sim } = breakpointScene(
+    [{ seed: { key: "BP-1", summary: "Weak", priority: "Lowest", status: "Open" }, dx: 120, dy: 0 }],
+    ["Ada", "Bob"],
+    1
+  )
+  for (let frame = 0; frame < 180 && sim.view().breakpoints.length > 0; frame++) assert.ok(sim.step().ok)
+  assert.equal(sim.view().breakpoints.length, 0, "it went off")
+  const [ada, bob] = sim.view().players
+  assert.equal(bob!.hp, bob!.maxHp, "standing on it hurts nobody")
+  assert.equal(ada!.hp, ada!.maxHp)
+  assert.equal(bob!.fixed, 1, "Bob set it: Bob fixed the bug")
+  assert.ok(bob!.points > 0)
+  assert.equal(ada!.points, 0, "Ada gets nothing for Bob's trap")
+})
+
+test("Breakpoint: two charges from sprint 3 (Keystone) on, none before, and a drop adds one", () => {
+  assert.equal(isUnlocked("breakpoint", levels[1]!.tier), false)
+  assert.equal(isUnlocked("breakpoint", levels[2]!.tier), true)
+
+  const pressing = (level: Level) => {
+    const made = createSimulation({
+      level,
+      seed: 4,
+      input: { snapshot: () => ({ ...idleInput, breakpoint: true }) },
+      presentation: { fx: () => undefined, chat: () => undefined }
+    })
+    if (!made.ok) throw new Error(JSON.stringify(made.error))
+    return made.value
+  }
+
+  const early = pressing(levels[1]!)
+  assert.equal(early.view().player!.breakpoints, 0, "Side Quests starts with none")
+  for (let frame = 0; frame < 10; frame++) assert.ok(early.step().ok)
+  assert.equal(early.view().breakpoints.length, 0, "pressing F does nothing before the tier")
+
+  const sim = pressing(levels[2]!)
+  assert.equal(sim.view().player!.breakpoints, 2, "Keystone starts with two")
+  for (let frame = 0; frame < 10; frame++) assert.ok(sim.step().ok)
+  assert.equal(sim.view().breakpoints.length, 2, "both placed, no more")
+  assert.equal(sim.view().player!.breakpoints, 0)
+
+  const me = sim.view().player!.position
+  const Drop = Game.System("Test/Drop", { commands: Game.System.commands(Game.System.spawns(Pickup)) }, ({ commands }) => {
+    commands.spawn(makePickup("breakpoint", { x: me.x, y: me.y }))
+  })
+  assert.ok(sim.runtime.tick(Game.Schedule(Drop, Game.Schedule.applyDeferred())).ok)
+  for (let frame = 0; frame < 10; frame++) assert.ok(sim.step().ok)
+  assert.equal(sim.view().breakpoints.length, 3, "the dropped charge is picked up and placed too")
+})
+
+test("Breakpoint: the autopilot sets them down when bugs close in, and they go off", () => {
+  const { fx } = play(levels[2]!, 90)
+  assert.ok(fx.some((e) => e.type === "breakpointSet"), "it placed one")
+  assert.ok(fx.some((e) => e.type === "breakpoint"), "and a bug walked onto it")
 })

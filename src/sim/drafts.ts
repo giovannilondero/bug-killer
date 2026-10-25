@@ -2,13 +2,14 @@ import { bugKinds, traitOf } from "../content/bugs.ts"
 import type { Priority } from "../content/bugs.ts"
 import type { Boss as BossContent } from "../content/levels.ts"
 import type { ClientId } from "../content/clients.ts"
-import { HOSTILE_SHOT, PLAYER, RESURRECT, SHOT, TURRET } from "./constants.ts"
-import { Body, Boss, Bug, Game, HostileShot, Pickup, Player, Position, Shot, Turret, Velocity } from "./schema.ts"
+import { BREAKPOINT, HOSTILE_SHOT, PLAYER, RESURRECT, SHOT, TURRET } from "./constants.ts"
+import { Body, Boss, Breakpoint, Bug, Game, HostileShot, Pickup, Player, Position, Shot, Turret, Velocity } from "./schema.ts"
 import type { PickupKind, TeammateValue, Vec } from "./schema.ts"
 import { basicGun } from "./weapons.ts"
 import { Ops } from "@typeonce/ritmo-math"
 
-export const makePlayer = (at: Vec, teammate: TeammateValue) =>
+/** A developer at `at`; `breakpoints` is how many they start with (none before the tier that brings them). */
+export const makePlayer = (at: Vec, teammate: TeammateValue, breakpoints = 0) =>
   Game.Command.spawn(
     Game.Command.entry(Position, at),
     Game.Command.entry(Velocity, { x: 0, y: 0 }),
@@ -26,8 +27,9 @@ export const makePlayer = (at: Vec, teammate: TeammateValue) =>
       dashDirection: { x: 1, y: 0 },
       aim: { x: at.x + 100, y: at.y },
       bombs: PLAYER.bombs,
+      breakpoints,
       weapon: basicGun,
-      buffs: { hotfix: 0, refactor: 0, coffee: 0, unitTest: 0, revert: 0, pizza: 0, tools: 0, ai: 0, pairProgramming: 0, codeFreeze: 0 },
+      buffs: { hotfix: 0, refactor: 0, coffee: 0, unitTest: 0, revert: 0, pizza: 0, tools: 0, ai: 0, pairProgramming: 0, codeFreeze: 0, breakpoint: 0 },
       revive: 0,
       points: 0,
       fixed: 0
@@ -127,4 +129,11 @@ export const makeTurret = (at: Vec, owner: number) =>
     Game.Command.entry(Position, at),
     Game.Command.entry(Body, { radius: TURRET.radius }),
     Game.Command.entry(Turret, { owner, life: TURRET.seconds, cooldown: 0.4, aim: -Math.PI / 2, hallucinateIn: TURRET.hallucinateMax })
+  )
+
+export const makeBreakpoint = (at: Vec, owner: number) =>
+  Game.Command.spawn(
+    Game.Command.entry(Position, at),
+    Game.Command.entry(Body, { radius: BREAKPOINT.radius }),
+    Game.Command.entry(Breakpoint, { owner })
   )

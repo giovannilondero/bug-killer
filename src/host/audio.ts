@@ -112,6 +112,13 @@ export const makeAudio = () => {
       tone(90, 0.8, { type: "sawtooth", volume: 0.25, slide: 0.3 })
     },
     dash: () => noise(0.12, 0.12, 4000, 800),
+    /** A Breakpoint set down: the editor's click in the gutter. */
+    breakpointSet: () => tone(1320, 0.04, { type: "square", volume: 0.06, slide: 0.8 }),
+    /** A Breakpoint hit: everything in reach stops, with a cold glassy chime. */
+    breakpoint: () => {
+      noise(0.3, 0.25, 6000, 1500)
+      ;[1568, 1175, 784].forEach((f, i) => tone(f, 0.16, { type: "sine", volume: 0.1, delay: i * 0.05 }))
+    },
     reopen: () => [400, 300, 200].forEach((f, i) => tone(f, 0.12, { type: "sawtooth", volume: 0.08, delay: i * 0.08 })),
     chat: (angry: boolean) => {
       const notes = angry ? [988, 988, 988] : [784, 1175]

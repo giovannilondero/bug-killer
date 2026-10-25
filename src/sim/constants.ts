@@ -31,6 +31,12 @@ export const SHOT = { speed: 820, life: 0.85, radius: 5, damage: 1 } as const
 export const HOSTILE_SHOT = { radius: 9, life: 5 } as const
 
 export const BOMB_RADIUS = 520
+
+/**
+ * Breakpoints: traps a developer drops where they stand. One goes off when a
+ * bug comes within `trigger` of it, hurting and freezing everything within `blast`.
+ */
+export const BREAKPOINT = { charges: 2, max: 5, radius: 12, trigger: 60, blast: 170, damage: 4 } as const
 export const COMBO_WINDOW = 2.6
 export const WAVE_INTERVAL = 15
 export const SPAWN_SAFE_DISTANCE = 380
@@ -45,7 +51,7 @@ export const TOBIA = { idle: 11, pileUp: 2, cooldown: 30, firstCooldown: 12 } as
 export const HOMING = { range: 520, turnRate: 9 } as const
 
 /** Seconds each timed power-up lasts. Weapons time themselves (`weapons.ts`). */
-export const BUFF_SECONDS = { hotfix: 8, refactor: 10, coffee: 8, unitTest: 6, revert: 0, pizza: 0, tools: 10, ai: 0, pairProgramming: 0, codeFreeze: 8 } as const
+export const BUFF_SECONDS = { hotfix: 8, refactor: 10, coffee: 8, unitTest: 6, revert: 0, pizza: 0, tools: 10, ai: 0, pairProgramming: 0, codeFreeze: 8, breakpoint: 0 } as const
 
 /** The "AI" turret: how long it lasts, how far it sees, how fast it shoots, and how often it makes things up. */
 export const TURRET = { seconds: 12, range: 560, cooldown: 0.2, radius: 18, hallucinateMin: 3, hallucinateMax: 6 } as const

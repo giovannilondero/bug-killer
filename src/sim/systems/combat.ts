@@ -3,13 +3,14 @@ import * as Random from "@typeonce/ritmo-math/Random"
 import { arenaOf } from "../../content/arenas.ts"
 import { bugKinds } from "../../content/bugs.ts"
 import { text } from "../../content/i18n.ts"
-import { BOMB_RADIUS, BUFF_SECONDS, COMBO_WINDOW, DT, PLAYER } from "../constants.ts"
+import { BOMB_RADIUS, BREAKPOINT, BUFF_SECONDS, COMBO_WINDOW, DT, PLAYER } from "../constants.ts"
 import { makeBug, makePickup, makeTurret } from "../drafts.ts"
 import { clampToArena, distanceSquared, overlaps } from "../math.ts"
 import { BossWrite, BugWrite, HostileShotWrite, PickupWrite, PlayerWrite, ShotWrite } from "../queries.ts"
 import {
   BombBlast,
   Boss,
+  Breakpoint,
   Bug,
   BugFixed,
   Fx,
@@ -19,6 +20,7 @@ import {
   LevelSpec,
   Pickup,
   PlayerHurt,
+  Position,
   Rng,
   Run,
   Shot,
@@ -41,7 +43,7 @@ export const comboMultiplier = (combo: number): number => Math.min(4, 1 + Math.f
 const dropChance = { Lowest: 0.05, Low: 0.07, Medium: 0.09, High: 0.2, Highest: 1 } as const satisfies Record<BugValue["priority"], number>
 
 /** Pickups that drop from bugs; reverts and pizza are rarer, the AI turret rarest, and only Tobia hands out the _strumenti_. */
-const dropWeights = { hotfix: 3, refactor: 3, coffee: 2, unitTest: 2, revert: 1, pizza: 1.5, tools: 0, ai: 0.5, pairProgramming: 1, codeFreeze: 2 } as const satisfies Record<PickupKind, number>
+const dropWeights = { hotfix: 3, refactor: 3, coffee: 2, unitTest: 2, revert: 1, pizza: 1.5, tools: 0, ai: 0.5, pairProgramming: 1, codeFreeze: 2, breakpoint: 1 } as const satisfies Record<PickupKind, number>
 
 /**
  * How a hit lands: the statuses it applies (Code freeze from the hitter's
@@ -70,7 +72,8 @@ export const CombatSystem = Game.System(
       bosses: BossWrite,
       shots: ShotWrite,
       hostile: HostileShotWrite,
-      pickups: PickupWrite
+      pickups: PickupWrite,
+      breakpoints: Game.Query({ selection: { position: Game.Query.read(Position), breakpoint: Game.Query.read(Breakpoint) } })
     },
     resources: {
       run: Game.System.writeResource(Run),
@@ -87,7 +90,7 @@ export const CombatSystem = Game.System(
     },
     commands: Game.System.commands(
       Game.System.spawns(Bug, Pickup, Turret),
-      Game.System.despawns(Bug, Boss, Shot, HostileShot, Pickup)
+      Game.System.despawns(Bug, Boss, Shot, HostileShot, Pickup, Breakpoint)
     )
   },
   ({ queries, resources, events, commands }) => {
@@ -243,6 +246,31 @@ export const CombatSystem = Game.System(
       }
     }
 
+    /** Hurts every bug and boss within `radius` of `at`, for `by`, landing `hit` on each. */
+    const blast = (at: Vec, radius: number, damage: number, by: number, hit: Hit): void => {
+      for (const match of bugs) {
+        if (!gone.has(match.entity.id) && distanceSquared(match.data.position.get(), at) < (radius + match.data.body.get().radius) ** 2) {
+          damageBug(match, damage, by, hit)
+        }
+      }
+      for (const match of bosses) {
+        if (!gone.has(match.entity.id) && distanceSquared(match.data.position.get(), at) < (radius + match.data.body.get().radius) ** 2) {
+          damageBoss(match, damage, by, hit)
+        }
+      }
+    }
+
+    // A Breakpoint goes off when a bug or a boss comes close, for whoever set it. Developers walk over it safely.
+    for (const trap of queries.breakpoints.each()) {
+      const at = trap.data.position.get()
+      const near = (match: (typeof bugs)[number] | (typeof bosses)[number]) =>
+        !gone.has(match.entity.id) && distanceSquared(match.data.position.get(), at) < (BREAKPOINT.trigger + match.data.body.get().radius) ** 2
+      if (!bugs.some(near) && !bosses.some(near)) continue
+      commands.despawn(trap.entity)
+      events.fx.emit({ type: "breakpoint", x: at.x, y: at.y })
+      blast(at, BREAKPOINT.blast, BREAKPOINT.damage, trap.data.breakpoint.get().owner, { inflict: ["freeze"] })
+    }
+
     // Shots against bugs and bosses.
     for (const shot of queries.shots.each()) {
       if (gone.has(shot.entity.id)) continue
@@ -333,6 +361,8 @@ export const CombatSystem = Game.System(
           events.fx.emit({ type: "turret", x: pickupAt.x, y: pickupAt.y })
         } else if (kind === "revert") {
           player = { ...player, bombs: Math.min(5, player.bombs + 1) }
+        } else if (kind === "breakpoint") {
+          player = { ...player, breakpoints: Math.min(BREAKPOINT.max, player.breakpoints + 1) }
         } else if (kind === "pizza") {
           player = { ...player, hp: Math.min(player.maxHp, player.hp + 2) }
         } else if (isWeapon(kind)) {

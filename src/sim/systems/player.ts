@@ -1,14 +1,16 @@
+import { arenaOf } from "../../content/arenas.ts"
+import { breakpointSpot } from "../breakpoints.ts"
 import { DT, PARTY, PLAYER } from "../constants.ts"
-import { makeShot } from "../drafts.ts"
+import { makeBreakpoint, makeShot } from "../drafts.ts"
 import { distanceSquared, length, normalize } from "../math.ts"
 import { PlayerWrite } from "../queries.ts"
-import { BombBlast, Fx, Game, Input, Run, Shot, pickupKinds } from "../schema.ts"
+import { BombBlast, Breakpoint, Fx, Game, Input, LevelSpec, Run, Shot, pickupKinds } from "../schema.ts"
 import type { InputValue, Vec } from "../schema.ts"
 import { HOTFIX_COOLDOWN, WEAPONS, basicGun } from "../weapons.ts"
 import type { WeaponKind } from "../weapons.ts"
 import { Ops } from "@typeonce/ritmo-math"
 
-const still: InputValue = { move: { x: 0, y: 0 }, aim: { x: 0, y: 0 }, fire: false, dash: false, bomb: false }
+const still: InputValue = { move: { x: 0, y: 0 }, aim: { x: 0, y: 0 }, fire: false, dash: false, bomb: false, breakpoint: false }
 
 /**
  * One pull of the trigger, whatever the weapon: where it fires from and
@@ -44,16 +46,18 @@ export const PlayerControlSystem = Game.System(
     queries: { player: PlayerWrite },
     resources: {
       input: Game.System.readResource(Input),
-      run: Game.System.readResource(Run)
+      run: Game.System.readResource(Run),
+      level: Game.System.readResource(LevelSpec)
     },
     events: {
       fx: Game.System.writeEvent(Fx),
       bomb: Game.System.writeEvent(BombBlast)
     },
-    commands: Game.System.commands(Game.System.spawns(Shot))
+    commands: Game.System.commands(Game.System.spawns(Shot, Breakpoint))
   },
   ({ queries, resources, events, commands }) => {
     const phase = resources.run.get().phase
+    const arena = arenaOf(resources.level.get())
     const inputs = resources.input.get()
     const team = queries.player.each()
     const up = team.filter((match) => match.data.player.get().hp > 0).map((match) => match.data.position.get())
@@ -109,7 +113,7 @@ export const PlayerControlSystem = Game.System(
       const left = state.weapon.seconds - DT
       const weapon = state.weapon.kind === "gun" || left > 0 ? { ...state.weapon, seconds: Math.max(0, left) } : basicGun
 
-      let { fireCooldown, dashCooldown, dashTime, dashDirection, invulnerable, bombs } = state
+      let { fireCooldown, dashCooldown, dashTime, dashDirection, invulnerable, bombs, breakpoints } = state
       fireCooldown = Math.max(0, fireCooldown - DT)
       dashCooldown = Math.max(0, dashCooldown - DT)
       dashTime = Math.max(0, dashTime - DT)
@@ -153,6 +157,13 @@ export const PlayerControlSystem = Game.System(
         events.fx.emit({ type: "bomb", x: position.x, y: position.y })
       }
 
+      const spot = input.breakpoint && breakpoints > 0 ? breakpointSpot(position, arena) : null
+      if (spot) {
+        breakpoints -= 1
+        commands.spawn(makeBreakpoint(spot, state.slot))
+        events.fx.emit({ type: "breakpointSet", x: spot.x, y: spot.y })
+      }
+
       data.player.set({
         ...state,
         buffs,
@@ -163,6 +174,7 @@ export const PlayerControlSystem = Game.System(
         dashDirection,
         invulnerable,
         bombs,
+        breakpoints,
         aim: input.aim
       })
     }

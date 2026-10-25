@@ -186,3 +186,29 @@ test("when the run ends the room goes back to the lobby, and the host starts the
   assert.equal(ada.last("started")?.level, "sidequests")
   assert.equal(ada.last("frame")!.view.run.phase, "waves")
 })
+
+test("a Breakpoint press reaches the server and is placed for whoever sent it; malformed ones are not", () => {
+  const rooms = makeRooms({ random: seeded() })
+  const ada = browser()
+  const bob = browser()
+  send(rooms, ada, { t: "create", name: "Ada", level: "keystone", locale: "en" })
+  const code = ada.last("room")!.room.code
+  send(rooms, bob, { t: "join", code, name: "Bob" })
+  send(rooms, ada, { t: "start" })
+  const idle = { move: { x: 0, y: 0 }, aim: { x: 0, y: 0 }, fire: false, dash: false, bomb: false }
+
+  for (const breakpoint of ["yes", 1, {}, null]) {
+    send(rooms, bob, { t: "input", input: { ...idle, breakpoint } })
+    for (let i = 0; i < 4; i++) rooms.advance(1 / 60)
+  }
+  assert.deepEqual(bob.last("frame")!.view.breakpoints, [], "only `true` sets one down")
+
+  // Pressed and released between two steps: the press still counts, once.
+  send(rooms, bob, { t: "input", input: { ...idle, breakpoint: true } })
+  send(rooms, bob, { t: "input", input: { ...idle, breakpoint: false } })
+  for (let i = 0; i < 4; i++) rooms.advance(1 / 60)
+  const view = ada.last("frame")!.view
+  assert.deepEqual(view.breakpoints.map((b) => b.owner), [1], "Bob's Breakpoint, seen by Ada too")
+  assert.equal(view.players.find((p) => p.slot === 1)!.breakpoints, 1)
+  assert.equal(view.players.find((p) => p.slot === 0)!.breakpoints, 2, "Ada keeps hers")
+})

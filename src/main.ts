@@ -78,7 +78,7 @@ let remote: Remote | null = null
 /** Input goes to the run server every other step, 30 times a second: half the messages, same feel. */
 const INPUT_EVERY = 2
 let inputSteps = 0
-/** Snapshots taken since the last message: a dash or bomb pressed in between rides along with the next one. */
+/** Snapshots taken since the last message: a dash, bomb or Breakpoint pressed in between rides along with the next one. */
 let unsent: InputValue | null = null
 const levelById = (id: LevelId): Level => playable.find((level) => level.id === id) ?? endlessLevel
 
@@ -118,6 +118,8 @@ const playFx = (event: FxValue) => {
     case "hallucination": audio.hallucination(); break
     case "bomb": audio.bomb(); break
     case "dash": audio.dash(); break
+    case "breakpointSet": audio.breakpointSet(); break
+    case "breakpoint": audio.breakpoint(); break
     case "reopen": audio.reopen(); break
     case "teleport": audio.teleport(); break
     case "resurrect": break
@@ -742,7 +744,9 @@ const loop = FixedLoop.start({
       if (remote.running && mode === "playing") {
         // Every step still snapshots, so the cursor keeps following the mouse at 60 Hz.
         const latest = input.snapshot()
-        unsent = unsent ? { ...latest, dash: unsent.dash || latest.dash, bomb: unsent.bomb || latest.bomb } : latest
+        unsent = unsent
+          ? { ...latest, dash: unsent.dash || latest.dash, bomb: unsent.bomb || latest.bomb, breakpoint: unsent.breakpoint || latest.breakpoint }
+          : latest
         inputSteps += 1
         if (inputSteps % INPUT_EVERY === 0) {
           remote.connection.send({ t: "input", input: unsent })

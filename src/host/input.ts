@@ -11,7 +11,8 @@ export const keyBindings = {
   right: ["ArrowRight", Keyboard.code("KeyD")],
   dash: [" ", "Shift"],
   bomb: [Keyboard.code("KeyQ"), Keyboard.code("KeyE")],
-  fire: [Keyboard.code("KeyJ")]
+  fire: [Keyboard.code("KeyJ")],
+  breakpoint: [Keyboard.code("KeyF")]
 } as const
 
 /** Typing a name or a run code is not a shortcut: M, P and Escape typed into a form field stay in the field. (Ritmo's `Keyboard` already leaves form fields alone for movement.) */
@@ -90,7 +91,8 @@ export const makeInput = (canvas: HTMLCanvasElement, camera: Camera, touch: Touc
       aim,
       fire: keyboard.fire || sticks.fire,
       dash: keyboard.dash || sticks.dash,
-      bomb: keyboard.bomb || sticks.bomb
+      bomb: keyboard.bomb || sticks.bomb,
+      breakpoint: keyboard.breakpoint || sticks.breakpoint
     }
   }
 
@@ -106,7 +108,8 @@ export const makeInput = (canvas: HTMLCanvasElement, camera: Camera, touch: Touc
         aim: camera.toWorld(p.position),
         fire: p.buttons.primary.held || k.fire.held,
         dash: k.dash.pressed,
-        bomb: k.bomb.pressed || p.buttons.secondary.pressed
+        bomb: k.bomb.pressed || p.buttons.secondary.pressed,
+        breakpoint: k.breakpoint.pressed || p.buttons.middle.pressed
       }
       if (touchMode()) return snapshotTouch(keyboard)
       cursor = p.position

@@ -20,7 +20,8 @@ export const pickupIcons = {
   tools: "🤖",
   ai: "🧠",
   pairProgramming: "👥",
-  codeFreeze: "❄️"
+  codeFreeze: "❄️",
+  breakpoint: "🔴"
 } as const satisfies Record<PickupKind, string>
 
 export const pickupInfo = (kind: PickupKind) => ({ icon: pickupIcons[kind], ...t().pickups[kind] })
@@ -208,6 +209,20 @@ export const paintPickup = (ctx: CanvasRenderingContext2D, kind: PickupKind) => 
   ctx.font = `bold 10px ${MONO}`
   ctx.fillStyle = "#9dffb0"
   ctx.fillText(pickupInfo(kind).label, 0, 32)
+}
+
+/** A Breakpoint on the floor, centred on the origin: the editor's red dot, ringed in its owner's colour. */
+export const paintBreakpoint = (ctx: CanvasRenderingContext2D, color: string) => {
+  ctx.strokeStyle = color
+  ctx.lineWidth = 3
+  ctx.beginPath(); ctx.arc(0, 0, 15, 0, Math.PI * 2); ctx.stroke()
+  ctx.fillStyle = "#e5484d"
+  ctx.strokeStyle = "#ffffff"
+  ctx.lineWidth = 2
+  ctx.shadowColor = "#ff4d6d"
+  ctx.shadowBlur = 12
+  ctx.beginPath(); ctx.arc(0, 0, 9, 0, Math.PI * 2); ctx.fill(); ctx.stroke()
+  ctx.shadowBlur = 0
 }
 
 /** A Slack message bubble whose tail tip sits 25 below the origin. */
