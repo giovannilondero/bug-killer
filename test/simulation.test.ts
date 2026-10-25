@@ -414,22 +414,11 @@ test("drops, mission rewards and call rewards never offer a pickup above the lev
 
 // --- Ticket types ----------------------------------------------------------
 
-/** Stands still and shoots the nearest ticket. */
-const gunner: Pilot = (view) => ({
-  snapshot: () => {
-    const v = view()
-    const me = v?.player?.position
-    const targets = v ? [...v.bugs, ...v.bosses].map((t) => t.position) : []
-    if (!me || targets.length === 0) return idleInput
-    const nearest = [...targets].sort((a, b) => Math.hypot(a.x - me.x, a.y - me.y) - Math.hypot(b.x - me.x, b.y - me.y))[0]!
-    return { ...idleInput, aim: nearest, fire: true }
-  }
-})
-
-/** A level with no backlog of its own: only the tickets a test drops in, 200 px above the developer. */
+/** A level with no backlog of its own: only the tickets a test drops in, 200 px above the autopilot. */
 const range = (tickets: ReadonlyArray<BugSeed>, level: Level = levels[1]!) => {
   let current: View | null = null
-  const made = createSimulation({ level: { ...level, bugs: [] }, seed: 4, locale: "en", input: gunner(() => current, () => 0), presentation: { fx: () => undefined, chat: () => undefined } })
+  let frame = 0
+  const made = createSimulation({ level: { ...level, bugs: [] }, seed: 4, locale: "en", input: autopilot(() => current, () => frame), presentation: { fx: () => undefined, chat: () => undefined } })
   if (!made.ok) throw new Error(JSON.stringify(made.error))
   const sim = made.value
   const me = sim.view().player!.position
@@ -442,7 +431,7 @@ const range = (tickets: ReadonlyArray<BugSeed>, level: Level = levels[1]!) => {
     view: () => current!,
     /** Steps until `done` holds (or the seconds run out), handing every view to `see`. */
     until: (done: (view: View) => boolean, seconds = 30, see: (view: View) => void = () => undefined) => {
-      for (let frame = 0; frame < seconds * 60 && !done(current!); frame++) {
+      for (const end = frame + seconds * 60; frame < end && !done(current!); frame++) {
         assert.ok(sim.step().ok)
         current = sim.view()
         see(current)
@@ -469,5 +458,18 @@ test("a closed Story splits into 2 smaller, faster sub-tasks keyed after it; the
 
   const done = shooting.until((v) => v.bugs.length === 0)
   assert.deepEqual(done.run.fixed.map((f) => [f.key, f.type]), [["MEOW-900", "story"]])
+  assert.equal(done.run.subtasks, 2)
+})
+
+test("a Highest bug still leaves its 3 regressions, a Story its 2 sub-tasks", () => {
+  const shooting = range([
+    { key: "QUIZ-901", summary: "Leaderboard shows negative scores", priority: "Highest", status: "To Do" },
+    { key: "QUIZ-902", summary: "As a host I want timed rounds", priority: "High", status: "To Do", type: "story" }
+  ])
+  const keys = new Set<string>()
+  const done = shooting.until((v) => v.bugs.length === 0, 60, (v) => v.bugs.forEach((bug) => keys.add(bug.key)))
+  assert.equal(done.run.phase, "waves", "closed by the developer, not lost")
+  assert.deepEqual([...keys].sort(), ["QUIZ-901", "QUIZ-901-REG1", "QUIZ-901-REG2", "QUIZ-901-REG3", "QUIZ-902", "QUIZ-902-1", "QUIZ-902-2"])
+  assert.deepEqual(done.run.fixed.map((f) => f.key).sort(), ["QUIZ-901", "QUIZ-902"])
   assert.equal(done.run.subtasks, 2)
 })
