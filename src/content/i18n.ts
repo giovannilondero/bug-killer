@@ -1,4 +1,4 @@
-import type { Priority, StatusTrait } from "./bugs.ts"
+import type { Priority, StatusTrait, TicketType } from "./bugs.ts"
 import type { CallKind, ClientId, MissionKind } from "./clients.ts"
 import type { LevelId } from "./levels.ts"
 import type { Voice } from "./text/voice.ts"
@@ -36,6 +36,8 @@ export interface Strings {
   /** What clients add to the backlog when a mission fails. */
   readonly scopeCreep: ReadonlyArray<string>
   readonly regression: (key: string) => string
+  /** The summary of one of a Story's sub-tasks. */
+  readonly subtask: (summary: string) => string
   readonly minions: { readonly crash: string; readonly null: string }
   readonly calls: {
     readonly meetTitles: ReadonlyArray<string>
@@ -55,6 +57,8 @@ export interface Strings {
 
   // --- What the host draws --------------------------------------------------
   readonly traits: Record<StatusTrait, string>
+  /** The ticket type in the tooltip, and what it does (empty for a plain bug). */
+  readonly ticketTypes: Record<TicketType, { readonly label: string; readonly hint: string }>
   readonly taglines: Record<LevelId, string>
   readonly pickups: Record<Pickups, { readonly label: string; readonly hint: string }>
   /** Code scrawled on the arena floor. */
@@ -117,6 +121,7 @@ export interface Strings {
     readonly title: string
     readonly scopeCreep: (n: number) => string
     readonly resurrections: (n: number) => string
+    readonly subtasks: (n: number) => string
   }
   readonly cleared: {
     readonly allTitle: string

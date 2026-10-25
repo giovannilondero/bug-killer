@@ -1,5 +1,5 @@
-import { bugKinds, traitOf } from "../content/bugs.ts"
-import type { Priority } from "../content/bugs.ts"
+import { bugKinds, ticketScales, traitOf } from "../content/bugs.ts"
+import type { Priority, TicketType } from "../content/bugs.ts"
 import type { Boss as BossContent } from "../content/levels.ts"
 import type { ClientId } from "../content/clients.ts"
 import { HOSTILE_SHOT, PLAYER, RESURRECT, SHOT, TURRET } from "./constants.ts"
@@ -39,6 +39,8 @@ export interface BugSeed {
   readonly summary: string
   readonly priority: Priority
   readonly status: string
+  /** Bug when absent. */
+  readonly type?: TicketType
 }
 
 export const makeBug = (
@@ -47,16 +49,18 @@ export const makeBug = (
   options: { reopened?: boolean; regression?: boolean; resurrectedBy?: ClientId; toughness?: { hp: number; speed: number } } = {}
 ) => {
   const kind = bugKinds[seed.priority]
+  const type = seed.type ?? "bug"
+  const scale = ticketScales[type]
   const reopened = options.reopened ?? false
   const resurrectedBy = options.resurrectedBy ?? null
   // A resurrected bug comes back angrier than it left.
   const toughness = options.toughness ?? { hp: 1, speed: 1 }
-  const hp = Math.ceil((resurrectedBy ? kind.hp * RESURRECT.hpFactor : reopened ? kind.hp * 0.6 : kind.hp) * toughness.hp)
-  const speed = kind.speed * (resurrectedBy ? RESURRECT.speedFactor : reopened ? 1.25 : 1) * toughness.speed
+  const hp = Math.ceil((resurrectedBy ? kind.hp * RESURRECT.hpFactor : reopened ? kind.hp * 0.6 : kind.hp) * toughness.hp * scale.hp)
+  const speed = kind.speed * (resurrectedBy ? RESURRECT.speedFactor : reopened ? 1.25 : 1) * toughness.speed * scale.speed
   return Game.Command.spawn(
     Game.Command.entry(Position, at),
     Game.Command.entry(Velocity, { x: 0, y: 0 }),
-    Game.Command.entry(Body, { radius: kind.radius }),
+    Game.Command.entry(Body, { radius: Math.round(kind.radius * scale.radius) }),
     Game.Command.entry(Bug, {
       key: seed.key,
       summary: seed.summary,
@@ -71,7 +75,8 @@ export const makeBug = (
       reopened,
       resurrectedBy,
       regression: options.regression ?? false,
-      statuses: []
+      statuses: [],
+      type
     })
   )
 }

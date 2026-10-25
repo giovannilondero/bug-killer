@@ -8,7 +8,41 @@ export interface BacklogBug {
   readonly summary: string
   readonly priority: Priority
   readonly status: string
+  /** Bug when absent. */
+  readonly type?: BacklogType
 }
+
+/**
+ * What kind of ticket it is. A Story splits into sub-tasks when it is closed;
+ * sub-tasks only ever come from a Story, never from the backlog.
+ */
+export const ticketTypes = ["bug", "story", "subtask"] as const
+export type TicketType = (typeof ticketTypes)[number]
+/** The types a backlog row may have. */
+export type BacklogType = Exclude<TicketType, "subtask">
+
+/** How a ticket's type scales its priority's stats. */
+export interface TicketScale {
+  readonly hp: number
+  readonly speed: number
+  readonly radius: number
+  readonly points: number
+}
+
+export const ticketScales = {
+  bug: { hp: 1, speed: 1, radius: 1, points: 1 },
+  story: { hp: 1.5, speed: 0.9, radius: 1.2, points: 1.5 },
+  subtask: { hp: 0.5, speed: 1.4, radius: 0.7, points: 0.5 }
+} as const satisfies Record<TicketType, TicketScale>
+
+/** Jira's own colours: a Story is a green bookmark, a sub-task a blue pair of boxes. */
+export const ticketColors = { story: "#63ba3c", subtask: "#4bade8" } as const satisfies Record<Exclude<TicketType, "bug">, string>
+
+/** How many sub-tasks a closed Story splits into. */
+export const STORY_SUBTASKS = 2
+
+/** A sub-task's key derives from its parent's: `KEY-123-1`, `KEY-123-2`. */
+export const subtaskKey = (parent: string, index: number): string => `${parent}-${index + 1}`
 
 /** How each priority fights. */
 export interface BugKind {

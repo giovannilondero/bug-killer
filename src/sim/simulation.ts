@@ -167,6 +167,7 @@ export const initialResources = (
     escalations: 0,
     hitsTaken: 0,
     fixed: [],
+    subtasks: 0,
     missionsWon: 0,
     missionsLost: 0,
     phaseTime: 0,
