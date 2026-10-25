@@ -142,6 +142,38 @@ code { font-family: var(--mono); color: #ffd84a; }
 .group-title::after { content: ""; flex: 1; height: 1px; background: var(--line); order: 1; }
 .group-progress { order: 2; letter-spacing: 0.04em; text-transform: none; font-weight: 500; }
 .levels.extras { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+/* Endless's arena picker, under its card: locked arenas say what opens them. */
+.arena-picker { --gold: #ffd84a; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; font: 12px var(--mono); }
+.arena-label { color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+.arena-picker button {
+  padding: 5px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--muted);
+  font: 700 12px var(--mono);
+  cursor: pointer;
+}
+.arena-picker button[aria-pressed="true"] { border-color: var(--gold); background: color-mix(in oklch, var(--gold) 14%, transparent); color: var(--text); }
+.arena-picker button:disabled { cursor: not-allowed; opacity: 0.6; }
+.arena-picker button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+@media (hover: hover) and (pointer: fine) {
+  .arena-picker button:not(:disabled):hover { color: var(--text); }
+}
+.arena-locked { font-weight: 400; }
+/* Bonus levels: outside the campaign, so a dashed card with a corner tag. */
+.level.bonus { position: relative; border-style: dashed; border-width: 2px; }
+.level-tag {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font: 800 10px var(--mono);
+  letter-spacing: 0.14em;
+  color: #0b0b10;
+  background: var(--accent);
+}
 .level-name { font: 800 24px var(--sans); color: var(--accent); }
 .level-tagline { flex: 1; font-size: 13px; line-height: 1.4; color: var(--text); text-wrap: pretty; }
 .level-meta { font-size: 13px; color: var(--muted); }
@@ -256,6 +288,7 @@ code { font-family: var(--mono); color: #ffd84a; }
 }
 .field input:focus, .field select:focus { outline: 2px solid #3a6df0; outline-offset: 1px; }
 .field input[name="code"] { font-family: var(--mono); letter-spacing: 0.08em; }
+.field[hidden] { display: none; }
 
 .multi-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 6px; }
 .multi-box { display: flex; flex-direction: column; justify-content: space-between; gap: 12px; padding: 4px 14px 14px; border-radius: 12px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--line); }
@@ -571,6 +604,8 @@ body.touch .text { min-width: 0; margin: 0; font-size: 11px; white-space: nowrap
   .levels.extras .level { flex-direction: row; flex-wrap: wrap; align-items: baseline; column-gap: 10px; row-gap: 2px; }
   .levels.extras .level-tagline, .levels.extras .level-clients { display: none; }
   .levels.extras .level-best { margin-top: 0; }
+  .levels.bonus .level-tagline, .levels.bonus .level-clients { display: none; }
+  .level-tag { top: 6px; right: 6px; font-size: 8px; }
   .level-tagline, .level-meta { font-size: 11px; }
   .level-clients .avatar { width: 18px; height: 18px; font-size: 10px; }
   .legend { display: none; }
@@ -587,3 +622,43 @@ body.touch .text { min-width: 0; margin: 0; font-size: 11px; white-space: nowrap
 
 .touch-small.active { background: rgba(127, 220, 255, 0.25); border-color: rgba(127, 220, 255, 0.6); }
 .home-hint { margin-top: 6px; color: #7fdcff; }
+
+/* ---------- Hardcore ---------- */
+
+.hardcore-toggle {
+  --hardcore: oklch(70% 0.19 15);
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px 10px;
+  margin: 0 0 22px;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: oklch(100% 0 none / 0.04);
+  font: 12px var(--mono);
+  color: var(--muted);
+  cursor: pointer;
+}
+.hardcore-toggle[aria-pressed="true"] {
+  border-color: var(--hardcore);
+  background: color-mix(in oklch, var(--hardcore) 14%, transparent);
+  color: var(--text);
+}
+@media (hover: hover) and (pointer: fine) {
+  .hardcore-toggle:hover { color: var(--text); border-color: color-mix(in oklch, var(--hardcore) 60%, transparent); }
+}
+.hardcore-toggle:active { background: color-mix(in oklch, var(--hardcore) 22%, transparent); }
+.hardcore-toggle:focus-visible { outline: 2px solid var(--hardcore); outline-offset: 2px; }
+.hardcore-state { padding: 1px 7px; border-radius: 6px; background: oklch(100% 0 none / 0.08); font-weight: 700; text-transform: uppercase; }
+.hardcore-toggle[aria-pressed="true"] .hardcore-state { background: var(--hardcore); color: oklch(15% 0 none); }
+.hardcore-name { font: 700 12px var(--mono); color: oklch(70% 0.19 15); text-transform: uppercase; letter-spacing: 0.08em; }
+.hardcore-rules { font: 12px var(--mono); color: var(--muted); }
+.hardcore-badge { font-size: 0.7em; vertical-align: 0.15em; color: oklch(70% 0.19 15); }
+.hardcore-check { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin: 14px 0 0; cursor: pointer; }
+p.hardcore-check { cursor: auto; }
+.hardcore-check input { accent-color: oklch(70% 0.19 15); }
+.hardcore-check input:focus-visible { outline: 2px solid oklch(70% 0.19 15); outline-offset: 2px; }
+.intro-hardcore { display: flex; justify-content: center; flex-wrap: wrap; gap: 4px 10px; margin: -8px 0 18px; }
+.hardcore-run { margin: 0 0 12px; font: 700 13px var(--mono); color: oklch(70% 0.19 15); letter-spacing: 0.06em; }

@@ -105,7 +105,7 @@ export const PlayerControlSystem = Game.System(
         const helped = up.some((other) => distanceSquared(other, position) <= PARTY.reviveRadius ** 2)
         const revive = helped ? state.revive + DT : Math.max(0, state.revive - DT)
         if (revive >= PARTY.reviveSeconds) {
-          data.player.set({ ...state, hp: PARTY.reviveHp, revive: 0, invulnerable: 2 })
+          data.player.set({ ...state, hp: Math.min(PARTY.reviveHp, state.maxHp), revive: 0, invulnerable: 2 })
           events.fx.emit({ type: "revived", x: position.x, y: position.y, slot: state.slot, name: state.name })
         } else {
           data.player.set({ ...state, revive })

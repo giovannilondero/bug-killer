@@ -9,8 +9,11 @@ import type { BossValue, PickupKind, TeammateValue, Vec } from "./schema.ts"
 import { basicGun } from "./weapons.ts"
 import { Ops } from "@typeonce/ritmo-math"
 
-/** A developer at `at`; `breakpoints` is how many they start with (none before the tier that brings them). */
-export const makePlayer = (at: Vec, teammate: TeammateValue, breakpoints = 0) =>
+/**
+ * A developer at `at`; `breakpoints` is how many they start with (none before
+ * the tier that brings them), `maxHp` their sanity (one in hardcore).
+ */
+export const makePlayer = (at: Vec, teammate: TeammateValue, breakpoints = 0, maxHp: number = PLAYER.maxHp) =>
   Game.Command.spawn(
     Game.Command.entry(Position, at),
     Game.Command.entry(Velocity, { x: 0, y: 0 }),
@@ -19,8 +22,8 @@ export const makePlayer = (at: Vec, teammate: TeammateValue, breakpoints = 0) =>
       slot: teammate.slot,
       name: teammate.name,
       color: teammate.color,
-      hp: PLAYER.maxHp,
-      maxHp: PLAYER.maxHp,
+      hp: maxHp,
+      maxHp,
       invulnerable: 1.5,
       fireCooldown: 0,
       dashCooldown: 0,

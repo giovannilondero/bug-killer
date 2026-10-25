@@ -6,6 +6,7 @@ import { text } from "../../content/i18n.ts"
 import { BOMB_RADIUS, BREAKPOINT, BUFF_SECONDS, COMBO_WINDOW, DEPLOY, DT, PLAYER, ROCKET, STORY_SUBTASKS, ticketScales } from "../constants.ts"
 import { bossRules } from "../bosses.ts"
 import { makeBug, makePickup, makeTurret, spawnBoss, subtaskOf } from "../drafts.ts"
+import { allowedPickups } from "../hardcore.ts"
 import { clampToArena, distanceSquared, nearest, overlaps } from "../math.ts"
 import { BossWrite, BugWrite, HostileShotWrite, PickupWrite, PlayerWrite, ShotWrite } from "../queries.ts"
 import {
@@ -18,6 +19,7 @@ import {
   FlameBurst,
   Fx,
   Game,
+  Hardcore,
   HostileShot,
   Language,
   LevelSpec,
@@ -96,7 +98,8 @@ export const CombatSystem = Game.System(
       rng: Game.System.writeResource(Rng),
       language: Game.System.readResource(Language),
       level: Game.System.readResource(LevelSpec),
-      tiers: Game.System.readResource(Tiers)
+      tiers: Game.System.readResource(Tiers),
+      hardcore: Game.System.readResource(Hardcore)
     },
     events: {
       bombs: Game.System.readEvent(BombBlast),
@@ -115,6 +118,7 @@ export const CombatSystem = Game.System(
     const random = Random.draw(resources.rng)
     const strings = text[resources.language.get()]
     const arena = arenaOf(resources.level.get())
+    const drops = allowedPickups(pickupKinds, resources.hardcore.get())
     const gone = new Set<number>()
     // Where Deploying bugs went off this tick: developers in the radius lose sanity below.
     const blasts: Array<Vec> = []
@@ -194,9 +198,9 @@ export const CombatSystem = Game.System(
       if (bug.trait === "deploying") deploy(at, by)
 
       if (random.next() < dropChance[bug.priority]) {
-        // Only what the level has unlocked so far can drop.
+        // Only what the level has unlocked so far can drop, and no Pizza in hardcore.
         const tier = tierOf(resources.level.get(), run.wave)
-        const kindDropped = random.weighted(pickupKinds, (k) => (isUnlocked(k, tier, resources.tiers.get()) ? dropWeights[k] : 0))
+        const kindDropped = random.weighted(drops, (k) => (isUnlocked(k, tier, resources.tiers.get()) ? dropWeights[k] : 0))
         if (kindDropped) commands.spawn(makePickup(kindDropped, at))
       }
     }

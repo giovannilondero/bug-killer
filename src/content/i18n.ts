@@ -1,3 +1,4 @@
+import type { ArenaId } from "./arenas.ts"
 import type { Priority, StatusTrait, TicketType } from "./bugs.ts"
 import type { CallKind, ClientId, MissionKind } from "./clients.ts"
 import type { ConflictSide, LevelId, RaceThread } from "./levels.ts"
@@ -139,6 +140,11 @@ export interface Strings {
     readonly campaign: string
     readonly campaignProgress: (cleared: number, total: number) => string
     readonly extras: string
+    /** The bonus levels' group, a card's corner tag, its draw, and what opens it. */
+    readonly bonus: string
+    readonly bonusTag: string
+    readonly bonusMeta: (tickets: number) => string
+    readonly bonusLocked: (sprint: number) => string
   }
   readonly intro: { readonly clientsOnline: string; readonly start: string; readonly startTouch: string }
   readonly touch: { readonly dash: string; readonly breakpoint: string; readonly rotate: string; readonly fullscreen: string; readonly homeScreen: string }
@@ -201,6 +207,26 @@ export interface Strings {
     readonly unreachable: string
     readonly pauseBody: string
     readonly errors: Record<"notFound" | "full" | "started" | "nameTaken" | "badName" | "badLevel" | "notHost" | "busy", string>
+  }
+  /** One sanity, no Pizza: the menu toggle, the lobby, the HUD, the badges and the end screens. */
+  readonly hardcore: {
+    readonly name: string
+    readonly rules: string
+    readonly on: string
+    readonly off: string
+    /** Next to sanity in the HUD. */
+    readonly hud: string
+    /** On a sprint card cleared in hardcore. */
+    readonly badge: string
+    /** On the end-of-run screen. */
+    readonly run: string
+  }
+  /** Endless's arena picker, in the menu and the lobby. */
+  readonly arena: {
+    readonly label: string
+    readonly names: Record<ArenaId, string>
+    /** On a locked arena: the bonus level that opens it. */
+    readonly locked: (bonus: string) => string
   }
 }
 

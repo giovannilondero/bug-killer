@@ -1,8 +1,9 @@
-import { levels } from "./content/levels.ts"
-import type { LevelId } from "./content/levels.ts"
+import type { ArenaId } from "./content/arenas.ts"
+import { bonusLevels, endlessArenas, levels } from "./content/levels.ts"
+import type { Level, LevelId } from "./content/levels.ts"
 
 /**
- * What this browser has achieved: sprints unlocked and best scores.
+ * What this browser has achieved: sprints unlocked, best scores and hardcore badges.
  * Pure data: the host reads and writes it to local storage as JSON.
  */
 export interface Progress {
@@ -10,9 +11,11 @@ export interface Progress {
   readonly unlocked: number
   /** Best solo score per level. */
   readonly best: Readonly<Partial<Record<string, number>>>
+  /** Levels cleared in hardcore at least once: a badge on their card. */
+  readonly badges: ReadonlyArray<string>
 }
 
-export const emptyProgress: Progress = { unlocked: 1, best: {} }
+export const emptyProgress: Progress = { unlocked: 1, best: {}, badges: [] }
 
 const isScore = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value) && value > 0
 
@@ -25,17 +28,21 @@ export const loadProgress = (saved: string | null): Progress => {
     return emptyProgress
   }
   if (typeof raw !== "object" || raw === null) return emptyProgress
-  const { unlocked, best } = raw as { unlocked?: unknown; best?: unknown }
+  const { unlocked, best, badges } = raw as { unlocked?: unknown; best?: unknown; badges?: unknown }
   return {
     unlocked: typeof unlocked === "number" && Number.isInteger(unlocked) && unlocked >= 1 ? unlocked : 1,
     best: typeof best === "object" && best !== null
       ? Object.fromEntries(Object.entries(best).filter(([, score]) => isScore(score)))
-      : {}
+      : {},
+    badges: Array.isArray(badges) ? badges.filter((id): id is string => typeof id === "string") : []
   }
 }
 
-/** The JSON the host stores: the same shape older versions wrote, so they keep loading it. */
-export const saveProgress = (progress: Progress): string => JSON.stringify(progress)
+/** The JSON the host stores: the same shape older versions wrote, so they keep loading it; badges only once there are some. */
+export const saveProgress = (progress: Progress): string => {
+  const { badges, ...rest } = progress
+  return JSON.stringify(badges.length > 0 ? progress : rest)
+}
 
 export const sprintUnlocked = (progress: Progress, index: number): boolean => index < progress.unlocked
 
@@ -43,26 +50,74 @@ export const sprintsCleared = (progress: Progress): number => Math.min(levels.le
 
 export const bestScore = (progress: Progress, level: LevelId): number | undefined => progress.best[level]
 
-/** How a run ended, as far as progress cares. Only solo runs set records. */
+export const hardcoreBadge = (progress: Progress, level: LevelId): boolean => progress.badges.includes(level)
+
+/** Which Endless a record belongs to: each combination keeps its own. */
+export interface EndlessMode {
+  readonly hardcore: boolean
+  /** The normal arena when left out. */
+  readonly arena?: ArenaId
+}
+
+/**
+ * Where an Endless record is kept in `best`: plain `endless` for the normal
+ * arena without hardcore, as older versions saved it; `endless/small/hardcore` and so on otherwise.
+ */
+const endlessKey = (mode: EndlessMode): string =>
+  ["endless", ...(mode.arena === undefined || mode.arena === "normal" ? [] : [mode.arena]), ...(mode.hardcore ? ["hardcore"] : [])].join("/")
+
+export const endlessBest = (progress: Progress, mode: EndlessMode): number | undefined => progress.best[endlessKey(mode)]
+
+/** How a run ended, as far as progress cares. Only solo runs set records; hardcore is off unless said. */
 export interface RunResult {
   readonly score: number
   readonly solo: boolean
+  readonly hardcore?: boolean
+  /** The arena an Endless run was played in; the normal one unless said. */
+  readonly arena?: ArenaId
 }
 
-const withBest = (progress: Progress, level: LevelId, score: number): Progress =>
-  score > (progress.best[level] ?? 0) ? { ...progress, best: { ...progress.best, [level]: score } } : progress
+const withBest = (progress: Progress, key: string, score: number): Progress =>
+  score > (progress.best[key] ?? 0) ? { ...progress, best: { ...progress.best, [key]: score } } : progress
 
-/** Clearing sprint `index` unlocks the next one, solo or together; a solo clear may set the sprint's best score. */
+const withBadge = (progress: Progress, level: LevelId): Progress =>
+  progress.badges.includes(level) ? progress : { ...progress, badges: [...progress.badges, level] }
+
+/**
+ * Clearing sprint `index` unlocks the next one, solo or together; a solo clear may set the sprint's best score.
+ * A hardcore clear also earns the sprint's badge, and unlocks nothing more.
+ */
 export const clearSprint = (progress: Progress, index: number, run: RunResult): Progress => {
   const unlocked = { ...progress, unlocked: Math.max(progress.unlocked, index + 2) }
   const level = levels[index]
-  return run.solo && level ? withBest(unlocked, level.id, run.score) : unlocked
+  if (!level) return unlocked
+  const badged = run.hardcore === true ? withBadge(unlocked, level.id) : unlocked
+  return run.solo ? withBest(badged, level.id, run.score) : badged
 }
 
-/** An Endless run only ends in defeat: a solo run that beats the best score is a new record. */
+/** A bonus level opens once the sprint it follows is cleared; it is never needed to go on. */
+export const bonusUnlocked = (progress: Progress, level: Level): boolean =>
+  level.bonus !== undefined && sprintsCleared(progress) >= level.bonus.after
+
+/** An Endless arena can be picked once the bonus level that opens it is unlocked; the normal one always. */
+export const endlessArenaUnlocked = (progress: Progress, arena: ArenaId): boolean => {
+  const entry = endlessArenas.find((candidate) => candidate.id === arena)
+  if (!entry) return false
+  const bonus = bonusLevels.find((level) => level.id === entry.unlockedBy)
+  return entry.unlockedBy === undefined || (bonus !== undefined && bonusUnlocked(progress, bonus))
+}
+
+/** Clearing a bonus level unlocks nothing: a hardcore clear earns its badge, a solo clear may set its best score. */
+export const clearBonus = (progress: Progress, level: Level, run: RunResult): Progress => {
+  const badged = run.hardcore === true ? withBadge(progress, level.id) : progress
+  return run.solo ? withBest(badged, level.id, run.score) : badged
+}
+
+/** An Endless run only ends in defeat: a solo run that beats the best score of its mode is a new record. */
 export const endEndless = (progress: Progress, run: RunResult): { readonly progress: Progress; readonly record: boolean } => {
-  const record = run.solo && run.score > (progress.best.endless ?? 0)
-  return { progress: record ? withBest(progress, "endless", run.score) : progress, record }
+  const key = endlessKey({ hardcore: run.hardcore === true, ...(run.arena === undefined ? {} : { arena: run.arena }) })
+  const record = run.solo && run.score > (progress.best[key] ?? 0)
+  return { progress: record ? withBest(progress, key, run.score) : progress, record }
 }
 
 /** Every sprint playable, scores untouched: the `?tutti` shortcut for demos and playtests. */

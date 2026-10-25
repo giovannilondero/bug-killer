@@ -5,6 +5,7 @@
 import { Application, CanvasSource, Container, Graphics, Sprite, Texture } from "pixi.js"
 
 import { arenaOf } from "../content/arenas.ts"
+import { ticketsOf } from "../content/levels.ts"
 import type { Arena } from "../content/arenas.ts"
 import { bugKinds } from "../content/bugs.ts"
 import { clients } from "../content/clients.ts"
@@ -1033,6 +1034,8 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
         const color = i < player.hp ? "#ff4d6d" : "rgba(255,255,255,0.15)"
         S.sprite(bakery.bake(`heart|${color}`, res, { left: -6, top: -4, right: 24, bottom: 19 }, (g) => paintHeart(g, 0, 0, color)), 20 + i * 24, 58)
       }
+      // Hardcore: said right of the single heart, in its colour.
+      if (view.hardcore) text(S, res, `☠ ${t().hardcore.hud}`, `bold 11px ${MONO}`, "#ff4d6d", 26 + player.maxHp * 24, 71, "left")
       text(S, res, "GIT RESET --HARD  [Q]", `11px ${MONO}`, "#9aa4b8", 20, 100, "left")
       for (let i = 0; i < player.bombs; i++) text(S, res, "⏪", `16px ${SANS}`, "#9aa4b8", 20 + i * 24, 122, "left")
       if (isUnlocked("breakpoint", view.tier)) {
@@ -1096,7 +1099,7 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
       text(S, res, t().hud.endless(run.wave, bossIn), `bold 12px ${MONO}`, "#e8ecf4", width / 2, 28)
       bar(width / 2 - w / 2, 38, w, 8, 4, Math.min(1, (every - bossIn) / every), accent)
     } else if (run.phase === "waves") {
-      const total = view.level.bugs.length
+      const total = ticketsOf(view.level)
       const released = Math.min(total, run.nextBug)
       const open = total - released + view.bugs.length
       const w = Math.min(360, width - 460)

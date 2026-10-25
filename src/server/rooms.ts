@@ -3,9 +3,10 @@
  * lobby, and the simulation each running room steps. The WebSocket layer
  * (`socket.ts`) feeds it messages and a clock; tests drive it directly.
  */
+import type { ArenaId } from "../content/arenas.ts"
 import { isLocale } from "../content/i18n.ts"
 import type { Locale } from "../content/i18n.ts"
-import { endlessLevel, levelIds, levels } from "../content/levels.ts"
+import { bonusLevels, endlessIn, endlessLevel, levelIds, levels } from "../content/levels.ts"
 import type { Level, LevelId } from "../content/levels.ts"
 import { cleanName, readClientMessage } from "../net/protocol.ts"
 import type { ErrorCode, Member, RoomInfo, ServerMessage } from "../net/protocol.ts"
@@ -25,9 +26,13 @@ export const MAX_ROOMS = 10
 /** So that one address cannot hold every run, while an office still fits two teams. */
 export const MAX_ROOMS_PER_ADDRESS = 2
 
-const playable: ReadonlyArray<Level> = [...levels, endlessLevel]
+const playable: ReadonlyArray<Level> = [...levels, endlessLevel, ...bonusLevels]
 export const isLevelId = (id: unknown): id is LevelId => (levelIds as ReadonlyArray<unknown>).includes(id)
-const levelOf = (id: LevelId): Level => playable.find((level) => level.id === id) ?? endlessLevel
+/** The level a run plays: Endless in the host's arena, anything else in its own. */
+const levelOf = (id: LevelId, arena: ArenaId): Level => {
+  const level = playable.find((candidate) => candidate.id === id) ?? endlessLevel
+  return level.endless ? endlessIn(arena) : level
+}
 
 /** One browser connection, as the rooms see it. */
 export interface Peer {
@@ -46,6 +51,8 @@ interface Room {
   readonly code: string
   level: LevelId
   locale: Locale
+  hardcore: boolean
+  arena: ArenaId
   host: number
   seats: Array<Seat>
   sim: Simulation | null
@@ -78,6 +85,8 @@ export const makeRooms = (options: RoomsOptions = {}) => {
     code: room.code,
     state: room.sim && !over(room) ? "playing" : "lobby",
     level: room.level,
+    hardcore: room.hardcore,
+    arena: room.arena,
     host: room.host,
     members: room.seats.map((seat): Member => ({ slot: seat.slot, name: seat.name, color: colorOf(seat.slot), connected: seat.peer !== null }))
   })
@@ -153,19 +162,22 @@ export const makeRooms = (options: RoomsOptions = {}) => {
     announce(room)
   }
 
-  const start = (room: Room, level: LevelId) => {
+  const start = (room: Room, level: LevelId, hardcore: boolean, arena: ArenaId) => {
     // Whoever left between runs does not get a seat in the next one.
     room.seats = room.seats.filter((seat) => seat.peer !== null)
     room.level = level
+    room.hardcore = hardcore
+    room.arena = arena
     const party = room.seats.map((seat) => ({ slot: seat.slot, name: seat.name, color: colorOf(seat.slot) }))
     room.inputs = []
     for (const seat of room.seats) room.inputs[seat.slot] = idleInput
     room.fx = []
     room.chat = []
     const made = createSimulation({
-      level: levelOf(level),
+      level: levelOf(level, arena),
       seed: Math.floor(random() * 2 ** 31),
       locale: room.locale,
+      hardcore,
       party,
       inputs: { snapshot: () => room.inputs.map((input) => input ?? idleInput) },
       presentation: { fx: (event) => room.fx.push(event), chat: (event) => room.chat.push(event) }
@@ -177,7 +189,7 @@ export const makeRooms = (options: RoomsOptions = {}) => {
     room.sim = made.value
     room.pending = 0
     room.steps = 0
-    broadcast(room, (seat) => ({ t: "started", level, locale: room.locale, you: seat.slot }))
+    broadcast(room, (seat) => ({ t: "started", level, arena, locale: room.locale, you: seat.slot }))
     announce(room)
     sendFrame(room)
   }
@@ -207,6 +219,8 @@ export const makeRooms = (options: RoomsOptions = {}) => {
           code: newCode(),
           level: message.level,
           locale: message.locale,
+          hardcore: message.hardcore === true,
+          arena: message.arena ?? "normal",
           host: 0,
           seats: [],
           sim: null,
@@ -238,7 +252,7 @@ export const makeRooms = (options: RoomsOptions = {}) => {
           seatPeer(room, namesake, peer)
           announce(room)
           if (running) {
-            peer.send({ t: "started", level: room.level, locale: room.locale, you: namesake.slot })
+            peer.send({ t: "started", level: room.level, arena: room.arena, locale: room.locale, you: namesake.slot })
           }
           return
         }
@@ -258,7 +272,7 @@ export const makeRooms = (options: RoomsOptions = {}) => {
         if (!at) return
         if (at.room.host !== at.slot) return fail(peer, "notHost")
         if (at.room.sim && !over(at.room)) return
-        start(at.room, message.level ?? at.room.level)
+        start(at.room, message.level ?? at.room.level, message.hardcore ?? at.room.hardcore, message.arena ?? at.room.arena)
         return
       }
       case "input": {
