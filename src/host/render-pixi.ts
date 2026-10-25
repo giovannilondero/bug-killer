@@ -9,13 +9,14 @@ import type { Arena } from "../content/arenas.ts"
 import { bugKinds } from "../content/bugs.ts"
 import { clients } from "../content/clients.ts"
 import { comboMultiplier } from "../sim/systems/combat.ts"
-import { BUFF_SECONDS, PARTY, PLAYER, TURRET } from "../sim/constants.ts"
+import { BREAKPOINT, BUFF_SECONDS, PARTY, PLAYER, TURRET } from "../sim/constants.ts"
+import { isUnlocked } from "../sim/tiers.ts"
 import { hasStatus } from "../sim/statuses.ts"
 import { WEAPONS } from "../sim/weapons.ts"
 import type { FxValue, PickupKind, Vec } from "../sim/schema.ts"
 import type { View } from "../sim/simulation.ts"
 import { formatNumber, locale, t } from "./language.ts"
-import { floorKey, MONO, paintBug, paintFloor, paintHeart, paintHostile, paintLabel, paintPickup, paintPing, paintPlayer, paintTooltip, pickupIcons, pickupInfo, SANS, shade, tooltipHeight, TOOLTIP_WIDTH, truncate } from "./paint.ts"
+import { floorKey, MONO, paintBreakpoint, paintBug, paintFloor, paintHeart, paintHostile, paintLabel, paintPickup, paintPing, paintPlayer, paintTooltip, pickupIcons, pickupInfo, SANS, shade, tooltipHeight, TOOLTIP_WIDTH, truncate } from "./paint.ts"
 import type { BugLook, TooltipBug } from "./paint.ts"
 import type { Camera, Renderer } from "./render.ts"
 import { touchMode } from "./touch.ts"
@@ -343,6 +344,19 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
       case "hallucination":
         floaters.push({ x: event.x, y: event.y - 30, life: 1.2, max: 1.2, text: t().hud.hallucination, sub: "", color: "#c792ff", big: false })
         break
+      case "breakpointSet":
+        burst(event.x, event.y, "#ff4d6d", 10, 120, 2)
+        break
+      case "breakpoint":
+        // Execution paused: an icy ring, and everything caught in it stops.
+        shake = Math.max(shake, 12)
+        for (let i = 0; i < 40; i++) {
+          const a = (i / 40) * Math.PI * 2
+          particles.push({ x: event.x, y: event.y, vx: Math.cos(a) * 420, vy: Math.sin(a) * 420, life: 0.4, max: 0.4, color: "#9be7ff", size: 3 })
+        }
+        burst(event.x, event.y, "#ff4d6d", 16, 200, 3)
+        floaters.push({ x: event.x, y: event.y - 30, life: 1.3, max: 1.3, text: t().hud.breakpointHit, sub: "", color: "#9be7ff", big: false })
+        break
       case "shoot":
         break
     }
@@ -625,6 +639,14 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
       }), x, y, { alpha })
     }
 
+    // Breakpoints: the editor's red dot, and the reach that sets it off, breathing.
+    for (const trap of view.breakpoints) {
+      const { x, y } = trap.position
+      W.graphics(0.2 + 0.15 * Math.sin(time * 4)).circle(x, y, BREAKPOINT.trigger).stroke({ width: 2, color: "#ff4d6d" })
+      const color = view.players.find((p) => p.slot === trap.owner)?.color ?? "#ffffff"
+      W.sprite(bakery.bake(`breakpoint|${color}`, wres, around(22), (g) => paintBreakpoint(g, color)), x, y)
+    }
+
     // Pickups
     for (const pickup of view.pickups) {
       const { x, y } = pickup.position
@@ -898,6 +920,10 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
       }
       text(S, res, "GIT RESET --HARD  [Q]", `11px ${MONO}`, "#9aa4b8", 20, 100, "left")
       for (let i = 0; i < player.bombs; i++) text(S, res, "⏪", `16px ${SANS}`, "#9aa4b8", 20 + i * 24, 122, "left")
+      if (isUnlocked("breakpoint", view.tier)) {
+        text(S, res, t().hud.breakpoints, `11px ${MONO}`, "#9aa4b8", 210, 100, "left")
+        for (let i = 0; i < player.breakpoints; i++) text(S, res, pickupIcons.breakpoint, `16px ${SANS}`, "#9aa4b8", 210 + i * 24, 122, "left")
+      }
       let row = 0
       const weapon = player.weapon
       if (weapon.kind !== "gun") {
