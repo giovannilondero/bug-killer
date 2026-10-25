@@ -432,6 +432,40 @@ test("drops, mission rewards and call rewards never offer a pickup above the lev
   assert.ok(open.kinds.some((kind) => !kept.includes(kind)), "a level offers what its tier unlocks")
 })
 
+test("missions and calls can reward Flame war and a Breakpoint", () => {
+  // Only those two are in at Keystone's tier, so every reward has to be one of them.
+  const only = ["flameWar", "breakpoint"]
+  const tiers = { ...contentTiers, ...Object.fromEntries(pickupKinds.map((kind) => [kind, only.includes(kind) ? 0 : 5])) }
+  let current: View | null = null
+  let frame = 0
+  let won = 0
+  const made = createSimulation({
+    level: levels[2]!,
+    seed: 5,
+    tiers,
+    input: answeringPilot(() => current, () => frame),
+    presentation: { fx: () => undefined, chat: (e) => { if (e.type === "outcome" && e.success) won += 1 } }
+  })
+  if (!made.ok) throw new Error(JSON.stringify(made.error))
+  const sim = made.value
+  const seen = new Set<number>()
+  const rewards: Array<string> = []
+  for (; frame < 150 * 60; frame++) {
+    const before = won
+    assert.ok(sim.step().ok)
+    current = sim.view()
+    const fresh = current.pickups.filter((pickup) => !seen.has(pickup.id))
+    for (const pickup of fresh) seen.add(pickup.id)
+    // A reward lands on the tick the client says thanks.
+    if (won > before) rewards.push(...fresh.map((pickup) => pickup.kind))
+    if (current.run.phase === "cleared" || current.run.phase === "dead") break
+  }
+  assert.ok(won >= 4, `only ${won} missions and calls won`)
+  assert.ok(rewards.length >= won, `${won} won, rewarded ${rewards.join(", ")}`)
+  assert.deepEqual(rewards.filter((kind) => !only.includes(kind)), [])
+  assert.ok(only.every((kind) => rewards.includes(kind)), `rewarded ${rewards.join(", ")}`)
+})
+
 // --- Weapons ---------------------------------------------------------------
 
 /**
