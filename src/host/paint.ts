@@ -5,8 +5,8 @@ import type { Arena } from "../content/arenas.ts"
 import { ticketColors } from "../content/bugs.ts"
 import type { Priority, StatusTrait, TicketType } from "../content/bugs.ts"
 import type { Level } from "../content/levels.ts"
-import { loopSpot } from "../sim/bosses.ts"
-import { DEPLOY, PLAYER } from "../sim/constants.ts"
+import { loopSpot, stackTop } from "../sim/bosses.ts"
+import { DEPLOY, PLAYER, STACK } from "../sim/constants.ts"
 import type { BossValue, PickupKind } from "../sim/schema.ts"
 import { locale, t } from "./language.ts"
 
@@ -547,6 +547,33 @@ export const paintCircuit = (ctx: CanvasRenderingContext2D, arena: Arena, color:
   ctx.setLineDash([])
   ctx.globalAlpha = 1
 }
+
+/**
+ * A stack overflow's tower, centred on the boss: the `frames - 1` frames still
+ * stacked on top of it, the top one where it drops from.
+ */
+export const paintStack = (ctx: CanvasRenderingContext2D, radius: number, frames: number, color: string) => {
+  ctx.font = `bold 10px ${MONO}`
+  ctx.textAlign = "center"
+  ctx.textBaseline = "middle"
+  for (let depth = 2; depth <= frames; depth++) {
+    const { y } = stackTop({ x: 0, y: 0 }, radius, depth)
+    const w = radius * 1.5 - depth * 6
+    ctx.fillStyle = shade(color, -0.65)
+    ctx.strokeStyle = color
+    ctx.lineWidth = 2
+    roundRect(ctx, -w / 2, y - (STACK.frameHeight - 2) / 2, w, STACK.frameHeight - 2, 3)
+    ctx.fill()
+    ctx.stroke()
+    ctx.fillStyle = color
+    ctx.fillText(`at f() :${depth}`, 0, y + 1)
+  }
+  ctx.textBaseline = "alphabetic"
+}
+
+/** What a shielded boss says over its shield ring. */
+export const shieldLabel = (boss: Pick<BossValue, "pattern" | "frames">): string =>
+  boss.pattern === "twoFactor" ? "🔐 OTP ******" : boss.pattern === "stackOverflow" && boss.frames < STACK.frames ? t().hud.stackGuard : t().hud.booting
 
 /**
  * What the boss bar shows: how much of the boss called `key` is left, counting

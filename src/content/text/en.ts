@@ -92,7 +92,7 @@ export const en: Strings = {
   ],
   regression: (key) => `Regression introduced by the fix for ${key}`,
   subtask: (summary) => `Sub-task: ${summary}`,
-  minions: { crash: "Crash report without a stack trace", null: "Cannot read properties of null" },
+  minions: { crash: "Crash report without a stack trace", null: "Cannot read properties of null", frame: (depth) => `at recurse (index.js:${depth})` },
   calls: {
     meetTitles: [
       "Quick sync (5 min)",
@@ -135,6 +135,7 @@ export const en: Strings = {
     halfResolved: "one side resolved, one to go",
     threadDown: "one thread down: fix the other, fast",
     faster: "GOTO 10: one more lap, faster",
+    frameDropped: "a frame popped off the stack: catch it first",
     restarted: "race lost: the thread restarted"
   },
 
@@ -159,6 +160,7 @@ export const en: Strings = {
     monorepo: "One repo for everything, and everyone on it. Fabrizio says +1.",
     microservices: "Forty services, one bug in each. Debora wants it more pop by Friday.",
     legacy: "A green screen, COBOL and a loop nobody dares to touch. Harder than ever.",
+    production: "It's live, it's Friday, and the stack is overflowing. The last sprint, and the hardest.",
     endless: "Every bug from every project, forever. How long can you last?",
     hotdesk: "No assigned desks and no elbow room. The 2FA boss has booked the meeting room.",
     cubicles: "An open space cut into cubicles: walls stop your shots and theirs. The crash boss reboots behind every one."
@@ -212,6 +214,8 @@ export const en: Strings = {
     sides: { ours: "<<<<<<< ours", theirs: ">>>>>>> theirs" },
     threads: { main: "thread: main", worker: "thread: worker" },
     lap: (lap) => `LAP ${lap}`,
+    depth: (frames) => `STACK DEPTH ${frames}`,
+    stackGuard: "🧱 close the dropped frames first",
     restarting: (seconds) => `⟳ restarting in ${seconds.toFixed(1)}s`,
     startBanner: "Close the backlog before the client shows up",
     audioOn: "🔊 AUDIO ON",

@@ -5,7 +5,7 @@ import { bugKinds } from "../content/bugs.ts"
 import { clients } from "../content/clients.ts"
 import type { BossPattern } from "../content/levels.ts"
 import { comboMultiplier } from "../sim/systems/combat.ts"
-import { lapOf, raceSpot } from "../sim/bosses.ts"
+import { lapOf, otherThread, raceSpot } from "../sim/bosses.ts"
 import { BREAKPOINT, BUFF_SECONDS, DEPLOY, PARTY, PLAYER, ROCKET, TURRET } from "../sim/constants.ts"
 import { isUnlocked } from "../sim/tiers.ts"
 import { hasStatus } from "../sim/statuses.ts"
@@ -13,7 +13,7 @@ import { WEAPONS } from "../sim/weapons.ts"
 import type { FxValue, Vec } from "../sim/schema.ts"
 import type { View } from "../sim/simulation.ts"
 import { formatNumber, t } from "./language.ts"
-import { bossHealth, conflictMarkerColors, conflictMarkers, floorKey, fuseBlink, fuseProgress, MONO, paintBreakpoint, paintBug, paintFloor, paintFuseRing, paintHeart, paintHostile, paintLabel, paintNest, paintPickup, paintPing, paintPlayer, paintCircuit, paintRestartGhost, paintRocket, paintRocketTarget, paintMinimapWalls, paintTooltip, pickupIcons, pickupInfo, roundRect, SANS, shade, tooltipHeight, TOOLTIP_WIDTH, truncate } from "./paint.ts"
+import { bossHealth, conflictMarkerColors, conflictMarkers, floorKey, fuseBlink, fuseProgress, MONO, paintBreakpoint, paintBug, paintFloor, paintFuseRing, paintHeart, paintHostile, paintLabel, paintNest, paintPickup, paintPing, paintPlayer, paintCircuit, paintRestartGhost, paintRocket, paintRocketTarget, paintMinimapWalls, paintStack, paintTooltip, pickupIcons, pickupInfo, roundRect, SANS, shade, shieldLabel, tooltipHeight, TOOLTIP_WIDTH, truncate } from "./paint.ts"
 import type { BugLook } from "./paint.ts"
 import { touchMode } from "./touch.ts"
 
@@ -452,7 +452,7 @@ export const makeRenderer = (canvas: HTMLCanvasElement) => {
         ctx.fillText(t().hud.threads[boss.thread], boss.position.x, boss.position.y + boss.radius * 1.6)
         if (boss.revive <= 0) return
         // Its twin was fixed: a ghost where it restarts, and the seconds left to stop it.
-        const spot = raceSpot(arena, boss.age, boss.thread === "main" ? "worker" : "main")
+        const spot = raceSpot(arena, boss.age, otherThread(boss.thread))
         ctx.save()
         ctx.translate(spot.x, spot.y)
         ctx.rotate(time * 1.5)
@@ -471,6 +471,21 @@ export const makeRenderer = (canvas: HTMLCanvasElement) => {
         ctx.textAlign = "center"
         ctx.fillStyle = boss.color
         ctx.fillText(t().hud.lap(lapOf(boss.course) + 1), boss.position.x, boss.position.y + boss.radius * 1.6)
+      }
+    },
+    stackOverflow: {
+      // The frames still stacked on it, and how deep the stack is.
+      under: (boss) => {
+        ctx.save()
+        ctx.translate(boss.position.x, boss.position.y)
+        paintStack(ctx, boss.radius, boss.frames, boss.color)
+        ctx.restore()
+      },
+      over: (boss) => {
+        ctx.font = `bold 13px ${MONO}`
+        ctx.textAlign = "center"
+        ctx.fillStyle = boss.color
+        ctx.fillText(t().hud.depth(boss.frames), boss.position.x, boss.position.y + boss.radius * 1.6)
       }
     }
   }
@@ -491,7 +506,7 @@ export const makeRenderer = (canvas: HTMLCanvasElement) => {
       ctx.font = `bold 14px ${MONO}`
       ctx.fillStyle = "#ffffff"
       ctx.textAlign = "center"
-      ctx.fillText(boss.pattern === "twoFactor" ? "🔐 OTP ******" : t().hud.booting, x, y - boss.radius * 1.5)
+      ctx.fillText(shieldLabel(boss), x, y - boss.radius * 1.5)
     }
     marks.over?.(boss, arena)
     ctx.font = `bold 14px ${MONO}`

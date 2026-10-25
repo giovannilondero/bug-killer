@@ -5,9 +5,9 @@ import { arenas } from "../content/arenas.ts"
 import type { Arena } from "../content/arenas.ts"
 import type { Strings } from "../content/i18n.ts"
 import type { BossPattern, ConflictSide, RaceThread } from "../content/levels.ts"
-import { DT, LOOP, RACE } from "./constants.ts"
+import { DT, LOOP, RACE, STACK } from "./constants.ts"
 import type { BugSeed } from "./drafts.ts"
-import { clamp, normalize, openPoint } from "./math.ts"
+import { clamp, clampToArena, normalize, openPoint } from "./math.ts"
 import type { BossValue, Vec } from "./schema.ts"
 
 /** What a boss knows, and can do, on one tick of its fight. */
@@ -27,6 +27,8 @@ export interface Brain {
   readonly strings: Strings
   /** Bugs in the arena, so minions don't pile up forever. */
   readonly minions: number
+  /** Bugs in the arena whose key starts with `prefix`: the minions it dropped that are still running. */
+  readonly spawned: (prefix: string) => number
   /** Other bosses with the same key still fighting: the rest of a boss that split. */
   readonly kin: number
   readonly fire: (angle: number, speed: number) => void
@@ -36,7 +38,8 @@ export interface Brain {
   /** A velocity toward `goal`. */
   readonly steer: (goal: Vec, speed: number) => Vec
   readonly teleport: (to: Vec) => void
-  readonly spawnMinion: (seed: BugSeed, at: Vec) => void
+  /** A bug of its own; `toughness` scales its health and speed. */
+  readonly spawnMinion: (seed: BugSeed, at: Vec, toughness?: { hp: number; speed: number }) => void
   /** Puts another boss in the arena, `shape.offset` away from this one. */
   readonly fork: (shape: BossShape) => void
   readonly announce: (text: string) => void
@@ -91,7 +94,8 @@ const raceLooks = {
   worker: { color: "#ff9bd2", shotText: "412" }
 } as const satisfies Record<RaceThread, { color: string; shotText: string }>
 
-const otherThread = (thread: RaceThread): RaceThread => (thread === "main" ? "worker" : "main")
+/** The twin that isn't `thread`. */
+export const otherThread = (thread: RaceThread): RaceThread => (thread === "main" ? "worker" : "main")
 
 /**
  * Where a race condition's `thread` runs at `age`: both twins share one lap
@@ -111,6 +115,21 @@ export const loopSpot = (arena: Arena, course: number): Vec => ({
   x: arena.width / 2 + Ops.cos(course) * 600 * (arena.width / arenas.normal.width),
   y: arena.height / 2 + Ops.sin(course * 2) * 300 * (arena.height / arenas.normal.height)
 })
+
+/** Where the top of a stack overflow's tower of `frames` frames stands, on top of the boss. */
+export const stackTop = (position: Vec, radius: number, frames: number): Vec => ({
+  x: position.x,
+  y: position.y - radius * 0.8 - (frames - 1) * STACK.frameHeight
+})
+
+/** The key every bug a crash drops as it restarts starts with. */
+export const CRASH_PREFIX = "CRASH-"
+/** The key every bug an `undefined` spreads around starts with. */
+export const NULL_PREFIX = "NULL-"
+/** The key every frame a stack overflow drops starts with. */
+export const FRAME_PREFIX = "FRAME-"
+/** What every boss's minions' keys start with: a boss's own bugs, never the sprint's tickets. */
+export const minionPrefixes = [CRASH_PREFIX, NULL_PREFIX, FRAME_PREFIX] as const
 
 /**
  * Every boss pattern, in one table: each is one of the level's worst tickets
@@ -150,7 +169,7 @@ export const bossRules: Record<BossPattern, BossRules> = {
       ring(12 + Math.round(rage * 8), 230, random.range(0, Math.PI))
       if (boss.volley % 2 === 0 && minions < 8) {
         for (let i = 0; i < 2; i++) {
-          spawnMinion(minion(`CRASH-${boss.volley}${i}`, strings.minions.crash, "Low"), { x: to.x + (i ? 50 : -50), y: to.y })
+          spawnMinion(minion(`${CRASH_PREFIX}${boss.volley}${i}`, strings.minions.crash, "Low"), { x: to.x + (i ? 50 : -50), y: to.y })
         }
       }
       return { x: 0, y: 0 }
@@ -192,7 +211,7 @@ export const bossRules: Record<BossPattern, BossRules> = {
           for (let i = 0; i < 3; i++) {
             const angle = (i / 3) * Math.PI * 2 + boss.age
             spawnMinion(
-              minion(`NULL-${boss.volley}${i}`, strings.minions.null, rage > 0.5 ? "High" : "Medium"),
+              minion(`${NULL_PREFIX}${boss.volley}${i}`, strings.minions.null, rage > 0.5 ? "High" : "Medium"),
               { x: clamp(position.x + Ops.cos(angle) * 90, 40, arena.width - 40), y: clamp(position.y + Ops.sin(angle) * 90, 40, arena.height - 40) }
             )
           }
@@ -317,6 +336,41 @@ export const bossRules: Record<BossPattern, BossRules> = {
       // Stays on the circuit: straight to where it should be, but never in a blink.
       const gap = Ops.hypot(goal.x - position.x, goal.y - position.y)
       return toward(position, goal, Math.min(gap / DT, 700))
+    },
+    turn: () => null
+  },
+
+  // RangeError: a tower of stack frames. Every share of health lost pops the top
+  // frame off as a bug that runs for the developers, faster the shorter the
+  // stack; while one runs, the tower is shielded and shots bounce off.
+  stackOverflow: {
+    fight: ({ boss, position, radius, aim, rage, arena, strings, fire, ring, chase, spawned, spawnMinion, announce }) => {
+      const standing = Math.max(1, Math.ceil((Math.max(0, boss.hp) / boss.maxHp) * STACK.frames))
+      while (boss.frames > standing) {
+        const gone = STACK.frames - boss.frames + 1
+        spawnMinion(
+          minion(`${FRAME_PREFIX}${boss.frames}`, strings.minions.frame(boss.frames), "Medium"),
+          clampToArena(stackTop(position, radius, boss.frames), 20, arena),
+          { hp: STACK.frameHp, speed: 1 + STACK.speedup * gone }
+        )
+        boss.frames -= 1
+        boss.shield = Math.max(boss.shield, STACK.linger)
+        announce(strings.bossPhase.frameDropped)
+      }
+      if (spawned(FRAME_PREFIX) > 0) boss.shield = Math.max(boss.shield, STACK.linger)
+      if (boss.timer <= 0) {
+        boss.volley += 1
+        if (boss.volley % 3 === 0) {
+          ring(12 + Math.round(rage * 8), 210, boss.age)
+        } else {
+          // A stack trace: the same call, again and again, one after the other.
+          for (let i = 0; i < 4; i++) fire(aim + (boss.volley % 2 ? 0.2 : -0.2), 200 + i * 40)
+          fire(aim, 300)
+        }
+        boss.timer = 1.4 - rage * 0.5
+      }
+      // A shorter stack is a lighter one.
+      return chase(30 + (STACK.frames - boss.frames) * 12)
     },
     turn: () => null
   }

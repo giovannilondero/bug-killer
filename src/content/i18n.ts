@@ -39,7 +39,12 @@ export interface Strings {
   readonly regression: (key: string) => string
   /** The summary of one of a Story's sub-tasks. */
   readonly subtask: (summary: string) => string
-  readonly minions: { readonly crash: string; readonly null: string }
+  readonly minions: {
+    readonly crash: string
+    readonly null: string
+    /** A frame that dropped off a stack overflow's tower, `depth` frames up the stack. */
+    readonly frame: (depth: number) => string
+  }
   readonly calls: {
     readonly meetTitles: ReadonlyArray<string>
     readonly meetInvite: (title: string, seconds: number) => string
@@ -67,6 +72,8 @@ export interface Strings {
     readonly restarted: string
     /** An infinite loop starts another lap, faster. */
     readonly faster: string
+    /** A stack overflow drops its top frame, and shields itself while the frame runs. */
+    readonly frameDropped: string
   }
 
   // --- What the host draws --------------------------------------------------
@@ -104,6 +111,10 @@ export interface Strings {
     readonly restarting: (seconds: number) => string
     /** Under an infinite loop: the lap it is running. */
     readonly lap: (lap: number) => string
+    /** Under a stack overflow: how many frames its tower has left. */
+    readonly depth: (frames: number) => string
+    /** Over a stack overflow shielded while its dropped frames run. */
+    readonly stackGuard: string
     readonly startBanner: string
     readonly audioOn: string
     readonly audioOff: string

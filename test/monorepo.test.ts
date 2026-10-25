@@ -6,78 +6,14 @@ import { clients } from "../src/content/clients.ts"
 import { locales, text } from "../src/content/i18n.ts"
 import { endlessLevel, levels } from "../src/content/levels.ts"
 import type { Level } from "../src/content/levels.ts"
-import { createSimulation, idleInput } from "../src/sim/simulation.ts"
-import type { View } from "../src/sim/simulation.ts"
-import { Boss, Bug, Game, Player } from "../src/sim/schema.ts"
-import type { BossValue, ChatValue, InputValue, Vec } from "../src/sim/schema.ts"
+import { idleInput } from "../src/sim/simulation.ts"
 import { contentTiers } from "../src/sim/tiers.ts"
+import { gunner, nearest, scene, shooter } from "./scene.ts"
 
 const monorepo = levels.find((level) => level.id === "monorepo")!
 
-/** A run of `level` with a hand on every knob: the developer can't be hurt, and bosses can be set by hand. */
-const scene = (level: Level, input: (view: View) => InputValue = () => idleInput) => {
-  let current: View | null = null
-  const chat: Array<ChatValue> = []
-  const made = createSimulation({
-    level,
-    seed: 5,
-    locale: "en",
-    input: { snapshot: () => input(current!) },
-    presentation: { fx: () => undefined, chat: (e) => chat.push(e) }
-  })
-  if (!made.ok) throw new Error(JSON.stringify(made.error))
-  const sim = made.value
-  current = sim.view()
-  const refresh = () => {
-    current = sim.view()
-  }
-  const Untouchable = Game.System("Test/Untouchable", { queries: { player: Game.Query({ selection: { player: Game.Query.write(Player) } }) } }, ({ queries }) => {
-    for (const match of queries.player.each()) match.data.player.update((p) => ({ ...p, invulnerable: 999 }))
-  })
-  assert.ok(sim.runtime.tick(Game.Schedule(Untouchable)).ok)
-  /** Rewrites every boss `pick` chooses. */
-  const setBoss = (pick: (boss: BossValue) => boolean, change: (boss: BossValue) => Partial<BossValue>) => {
-    const SetBoss = Game.System("Test/SetBoss", { queries: { bosses: Game.Query({ selection: { boss: Game.Query.write(Boss) } }) } }, ({ queries }) => {
-      for (const match of queries.bosses.each()) if (pick(match.data.boss.get())) match.data.boss.update((boss) => ({ ...boss, ...change(boss) }))
-    })
-    assert.ok(sim.runtime.tick(Game.Schedule(SetBoss)).ok)
-    refresh()
-  }
-  /** Takes every ticket and boss out of the arena, as if they had been closed. */
-  const closeAll = () => {
-    const CloseAll = Game.System(
-      "Test/CloseAll",
-      {
-        queries: { bugs: Game.Query({ selection: { bug: Game.Query.read(Bug) } }), bosses: Game.Query({ selection: { boss: Game.Query.read(Boss) } }) },
-        commands: Game.System.commands(Game.System.despawns(Bug, Boss))
-      },
-      ({ queries, commands }) => {
-        for (const match of queries.bugs.each()) commands.despawn(match.entity)
-        for (const match of queries.bosses.each()) commands.despawn(match.entity)
-      }
-    )
-    assert.ok(sim.runtime.tick(Game.Schedule(CloseAll, Game.Schedule.applyDeferred())).ok)
-    refresh()
-  }
-  /** Steps until `done` holds or the seconds run out. */
-  const until = (done: (view: View) => boolean, seconds: number, each: (view: View) => void = () => undefined) => {
-    for (let i = 0; i < seconds * 60 && !done(current!); i++) {
-      assert.ok(sim.step().ok)
-      current = sim.view()
-      each(current)
-    }
-    return current!
-  }
-  return { setBoss, closeAll, until, view: () => current!, chat }
-}
-
-/** Stands its ground and shoots the nearest boss. */
-const gunner = (view: View): InputValue => {
-  const me = view.player!.position
-  const target = [...view.bosses].sort((a, b) => dist(a.position, me) - dist(b.position, me))[0]
-  return target ? { ...idleInput, aim: target.position, fire: true } : idleInput
-}
-const dist = (a: Vec, b: Vec) => Math.hypot(a.x - b.x, a.y - b.y)
+/** Monorepo with an empty backlog and a boss weak enough to fight in a few seconds. */
+const fight = { ...monorepo, bugs: [], boss: { ...monorepo.boss, hp: 40 } }
 
 test("Monorepo is the 5th sprint, right after Foundry, and brings in Epics and git push --force", () => {
   assert.equal(levels.indexOf(monorepo), 4)
@@ -100,35 +36,37 @@ test("Monorepo is the 5th sprint, right after Foundry, and brings in Epics and g
 })
 
 test("Merge conflict splits into ours and theirs at half health; the level clears only when both halves are fixed", () => {
-  const { setBoss, until, view } = scene({ ...monorepo, bugs: [] }, gunner)
-  const whole = until((v) => v.bosses.length === 1 && v.bosses[0]!.shield === 0, 10).bosses[0]!
+  let prey: ((side: string | null) => boolean) | null = () => true
+  const { until, view } = scene(fight, { input: shooter((v) => (prey ? nearest(v.bosses.filter((b) => prey!(b.side)), v.player!.position) : null)) })
+  const whole = until((v) => v.bosses.length === 1, 10).bosses[0]!
   assert.equal(whole.side, null)
-  setBoss(() => true, (boss) => ({ hp: Math.floor(boss.maxHp / 2) + 2 }))
 
-  const split = until((v) => v.bosses.length === 2, 10)
+  const split = until((v) => v.bosses.length === 2, 20)
   assert.deepEqual(split.bosses.map((b) => b.side).sort(), ["ours", "theirs"])
   for (const half of split.bosses) assert.equal(half.key, monorepo.boss.key)
+  assert.ok(split.bosses.every((half) => half.maxHp === Math.ceil(fight.boss.hp / 2)), "each half has half the health")
   assert.equal(split.run.phase, "boss")
 
   // Ours goes first: theirs is still a conflict.
-  setBoss((boss) => boss.side === "ours", () => ({ hp: 1, shield: 0 }))
-  const one = until((v) => v.bosses.length === 1, 10)
+  prey = (side) => side === "ours"
+  const one = until((v) => v.bosses.length === 1, 20)
   assert.equal(one.bosses[0]!.side, "theirs")
+  prey = null
   const later = until(() => false, 2)
   assert.equal(later.run.phase, "boss", "one half left: not cleared")
   assert.ok(!later.run.fixed.some((fixed) => fixed.key === monorepo.boss.key), "not in the release notes yet")
 
-  setBoss(() => true, () => ({ hp: 1, shield: 0 }))
-  const done = until((v) => v.run.phase === "cleared", 10)
+  prey = () => true
+  const done = until((v) => v.run.phase === "cleared", 20)
   assert.equal(done.run.phase, "cleared")
   assert.equal(view().run.fixed.filter((fixed) => fixed.key === monorepo.boss.key).length, 1, "the conflict is listed once")
 })
 
 test("ours and theirs move and fire in mirror across the arena's middle", () => {
-  const { setBoss, until } = scene({ ...monorepo, bugs: [] }, gunner)
-  until((v) => v.bosses.length === 1 && v.bosses[0]!.shield === 0, 10)
-  setBoss(() => true, (boss) => ({ hp: Math.floor(boss.maxHp / 2) + 1 }))
-  until((v) => v.bosses.length === 2, 10)
+  let firing = true
+  const { until } = scene(fight, { input: (v) => (firing ? gunner(v) : idleInput) })
+  until((v) => v.bosses.length === 2, 20)
+  firing = false
   // Left alone for a while, the halves settle into their mirrored orbits.
   const settled = until(() => false, 4)
   const ours = settled.bosses.find((b) => b.side === "ours")!
@@ -167,15 +105,19 @@ test("Endless rotates every sprint's boss in campaign order, then starts over", 
   assert.ok(endlessLevel.clients.includes("fabrizio"), "Fabrizio joins Endless's clients")
   assert.ok(endlessLevel.bugs.some((bug) => bug.key.startsWith("MONO-")), "and Monorepo's tickets its pool")
 
-  const quick: Level = { ...endlessLevel, waveSize: 1, endless: { ...endlessLevel.endless!, every: 1 } }
-  const { closeAll, until, view } = scene(quick)
-  const seen: Array<string> = []
-  for (let i = 0; i < 60 * 60 && seen.length <= levels.length; i++) {
-    until(() => false, 1 / 60)
-    const boss = view().bosses[0]
-    if (boss && seen.at(-1) !== boss.key) seen.push(boss.key)
-    closeAll()
+  // One round a wave, a bug a wave, and bosses that go down in a shot or two.
+  const quick: Level = {
+    ...endlessLevel,
+    waveSize: 1,
+    bugs: endlessLevel.bugs.filter((bug) => bug.priority === "Low" && (bug.type ?? "bug") === "bug").slice(0, 1),
+    endless: { ...endlessLevel.endless!, every: 1, bosses: endlessLevel.endless!.bosses.map((boss) => ({ ...boss, hp: 1 })) }
   }
+  const { until } = scene(quick, { input: shooter((v) => nearest([...v.bosses, ...v.bugs], v.player!.position), { keepAway: 160 }) })
+  const seen: Array<string> = []
+  until(() => seen.length > levels.length, 240, (v) => {
+    const boss = v.bosses[0]
+    if (boss && seen.at(-1) !== boss.key) seen.push(boss.key)
+  })
   assert.deepEqual(seen, [...levels.map((l) => l.boss.key), levels[0]!.boss.key])
   assert.ok(levels.length >= 5)
 })

@@ -7,7 +7,7 @@ import type { ClientId } from "./clients.ts"
 import type { Tier } from "../sim/tiers.ts"
 
 /** How a boss fights; each pattern is one branch of the boss system. */
-export const bossPatterns = ["dispenser", "crash", "twoFactor", "undefined", "mergeConflict", "raceCondition", "infiniteLoop"] as const
+export const bossPatterns = ["dispenser", "crash", "twoFactor", "undefined", "mergeConflict", "raceCondition", "infiniteLoop", "stackOverflow"] as const
 export type BossPattern = (typeof bossPatterns)[number]
 
 /** The two halves a merge conflict splits into. */
@@ -29,7 +29,7 @@ export interface Boss {
   readonly shotText: string
 }
 
-export const levelIds = ["glacier", "sidequests", "keystone", "foundry", "monorepo", "microservices", "legacy", "endless", "hotdesk", "cubicles"] as const
+export const levelIds = ["glacier", "sidequests", "keystone", "foundry", "monorepo", "microservices", "legacy", "production", "endless", "hotdesk", "cubicles"] as const
 export type LevelId = (typeof levelIds)[number]
 
 export interface Level {
@@ -44,6 +44,8 @@ export interface Level {
   readonly clientEvery: number
   /** Bugs released per wave. */
   readonly waveSize: number
+  /** How much tougher than usual its tickets come in: their health ×; 1 when left out. */
+  readonly bugHp?: number
   /** The highest content tier this level offers (see `src/sim/tiers.ts`); Endless climbs to it. */
   readonly tier: Tier
   readonly boss: Boss
@@ -197,6 +199,7 @@ export const levels: ReadonlyArray<Level> = [
     clients: ["gualtiero", "ugo", "ornella", "debora", "fabrizio"],
     clientEvery: 9,
     waveSize: 8,
+    bugHp: 1.15,
     tier: 5,
     boss: {
       key: "LGC-1983",
@@ -206,6 +209,27 @@ export const levels: ReadonlyArray<Level> = [
       radius: 48,
       color: "#33ff66",
       shotText: "GOTO"
+    }
+  }),
+  level({
+    id: "production",
+    sprint: "Sprint 8",
+    name: "Production",
+    projects: ["PROD"],
+    theme: { background: "#170909", grid: "#311212", accent: "#ff5a4f" },
+    clients: ["ugo", "debora", "fabrizio", "gualtiero", "ornella", "kevin"],
+    clientEvery: 8,
+    waveSize: 9,
+    bugHp: 1.3,
+    tier: 5,
+    boss: {
+      key: "PROD-404",
+      title: "RangeError: Maximum call stack size exceeded",
+      pattern: "stackOverflow",
+      hp: 200,
+      radius: 54,
+      color: "#f48024",
+      shotText: "f()"
     }
   })
 ]
