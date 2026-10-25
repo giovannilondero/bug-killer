@@ -13,7 +13,7 @@ export type Tier = number
 export const WAVES_PER_TIER = 3
 
 /** What can be gated by tier: pickups, and the ticket kinds still to come. */
-export type Unlockable = PickupKind
+export type Unlockable = PickupKind | "deploying"
 
 /**
  * The one table both the campaign and Endless read. New content adds one entry
@@ -27,7 +27,8 @@ export const contentTiers = {
   revert: 0,
   pizza: 0,
   tools: 0,
-  ai: 0
+  ai: 0,
+  deploying: 3
 } as const satisfies Record<Unlockable, Tier>
 
 export type TierTable = Readonly<Record<Unlockable, Tier>>

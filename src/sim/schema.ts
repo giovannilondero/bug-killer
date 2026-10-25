@@ -57,6 +57,8 @@ export interface BugValue {
   resurrectedBy: ClientId | null
   /** A regression spawned by a Highest bug's death. */
   regression: boolean
+  /** Seconds left before a Deploying bug goes off; `null` until its fuse is lit. */
+  fuse: number | null
 }
 export const Bug = Descriptor.Component<BugValue>()("BugKiller/Bug")
 
@@ -240,6 +242,8 @@ export type FxValue =
   | { type: "revived"; x: number; y: number; slot: number; name: string }
   | { type: "turret"; x: number; y: number }
   | { type: "hallucination"; x: number; y: number }
+  | { type: "fuse"; x: number; y: number }
+  | { type: "deploy"; x: number; y: number }
 export const Fx = Descriptor.Event<FxValue>()("BugKiller/Fx")
 
 export type ChatValue =

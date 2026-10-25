@@ -2,10 +2,10 @@ import * as Random from "@typeonce/ritmo-math/Random"
 
 import { arenaOf } from "../../content/arenas.ts"
 import type { Arena } from "../../content/arenas.ts"
-import { DT, HOMING } from "../constants.ts"
-import { centreOf, clampToArena, nearest, normalize } from "../math.ts"
+import { DEPLOY, DT, HOMING, PLAYER } from "../constants.ts"
+import { centreOf, clampToArena, distanceSquared, nearest, normalize } from "../math.ts"
 import { BossRead, BugRead, BugWrite, HostileShotWrite, Moving, PickupWrite, PlayerRead, ShotWrite, standing } from "../queries.ts"
-import { Body, Game, HostileShot, LevelSpec, Pickup, Position, Rng, Run, Shot, Velocity } from "../schema.ts"
+import { Body, Fx, Game, HostileShot, LevelSpec, Pickup, Position, Rng, Run, Shot, Velocity } from "../schema.ts"
 import { Ops } from "@typeonce/ritmo-math"
 
 /** Bugs crawl toward the nearest developer still standing; each workflow status moves differently. */
@@ -17,9 +17,10 @@ export const BugBrainSystem = Game.System(
       rng: Game.System.writeResource(Rng),
       run: Game.System.readResource(Run),
       level: Game.System.readResource(LevelSpec)
-    }
+    },
+    events: { fx: Game.System.writeEvent(Fx) }
   },
-  ({ queries, resources }) => {
+  ({ queries, resources, events }) => {
     const team = standing(queries.player.each())
     const centre = centreOf(arenaOf(resources.level.get()))
     const dead = resources.run.get().phase === "dead"
@@ -32,6 +33,21 @@ export const BugBrainSystem = Game.System(
       const position = positions[index]!
       const age = bug.age + DT
       const target = nearest(position, team) ?? centre
+
+      if (bug.trait === "deploying") {
+        // Next to a developer it stops and lights the fuse; once lit, nothing calls it off.
+        let fuse = bug.fuse
+        const reach = match.data.body.get().radius + PLAYER.radius + DEPLOY.reach
+        if (fuse === null && !dead && team.length > 0 && distanceSquared(position, target) < reach ** 2) {
+          fuse = DEPLOY.fuse
+          events.fx.emit({ type: "fuse", x: position.x, y: position.y })
+        }
+        if (fuse !== null) {
+          match.data.velocity.set({ x: 0, y: 0 })
+          match.data.bug.set({ ...bug, age, hitFlash: Math.max(0, bug.hitFlash - DT), fuse: Math.max(0, fuse - DT) })
+          return
+        }
+      }
       const toPlayer = normalize({ x: target.x - position.x, y: target.y - position.y })
       // Once the developer is gone the bugs wander off: nobody is fixing them anyway.
       const heading = dead ? { x: -toPlayer.x, y: -toPlayer.y } : toPlayer

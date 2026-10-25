@@ -42,7 +42,7 @@ export interface BugSeed {
 export const makeBug = (
   seed: BugSeed,
   at: Vec,
-  options: { reopened?: boolean; regression?: boolean; resurrectedBy?: ClientId; toughness?: { hp: number; speed: number } } = {}
+  options: { reopened?: boolean; regression?: boolean; resurrectedBy?: ClientId; toughness?: { hp: number; speed: number }; deploys?: boolean } = {}
 ) => {
   const kind = bugKinds[seed.priority]
   const reopened = options.reopened ?? false
@@ -51,6 +51,9 @@ export const makeBug = (
   const toughness = options.toughness ?? { hp: 1, speed: 1 }
   const hp = Math.ceil((resurrectedBy ? kind.hp * RESURRECT.hpFactor : reopened ? kind.hp * 0.6 : kind.hp) * toughness.hp)
   const speed = kind.speed * (resurrectedBy ? RESURRECT.speedFactor : reopened ? 1.25 : 1) * toughness.speed
+  const status = traitOf(seed.status)
+  // Before its tier a Deploying ticket is just a bug.
+  const trait = status === "deploying" && options.deploys === false ? "plain" : status
   return Game.Command.spawn(
     Game.Command.entry(Position, at),
     Game.Command.entry(Velocity, { x: 0, y: 0 }),
@@ -60,7 +63,7 @@ export const makeBug = (
       summary: seed.summary,
       priority: seed.priority,
       // A reopened or resurrected bug has already been through QA once: it stays dead next time.
-      trait: reopened || resurrectedBy ? "plain" : traitOf(seed.status),
+      trait: reopened || resurrectedBy ? "plain" : trait,
       hp,
       maxHp: hp,
       speed,
@@ -68,7 +71,8 @@ export const makeBug = (
       hitFlash: 0,
       reopened,
       resurrectedBy,
-      regression: options.regression ?? false
+      regression: options.regression ?? false,
+      fuse: null
     })
   )
 }

@@ -126,6 +126,7 @@ export const en: Strings = {
     armored: "BLOCKED: takes half damage",
     reopens: "IN QA: may reopen",
     jittery: "IN DEVELOPMENT: moves erratically",
+    deploying: "DEPLOYING: stops next to you and blows up",
     plain: ""
   },
   taglines: {
