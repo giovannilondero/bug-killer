@@ -1,8 +1,9 @@
 // Canvas 2D painters shared by the renderers: the Canvas renderer draws with them every frame,
 // the Pixi renderer bakes them into textures once. Each paints in its own local coordinates.
+import { arenaOf } from "../content/arenas.ts"
 import type { Priority, StatusTrait } from "../content/bugs.ts"
 import type { Level } from "../content/levels.ts"
-import { ARENA, PLAYER } from "../sim/constants.ts"
+import { PLAYER } from "../sim/constants.ts"
 import type { PickupKind } from "../sim/schema.ts"
 import { locale, t } from "./language.ts"
 
@@ -43,19 +44,20 @@ const codeLines = [
 
 /** The arena floor, grid and faded code included, at one pixel per world unit. */
 export const paintFloor = (level: Level): HTMLCanvasElement => {
+  const arena = arenaOf(level)
   const c = document.createElement("canvas")
-  c.width = ARENA.width
-  c.height = ARENA.height
+  c.width = arena.width
+  c.height = arena.height
   const g = c.getContext("2d")!
   g.fillStyle = level.theme.background
-  g.fillRect(0, 0, ARENA.width, ARENA.height)
+  g.fillRect(0, 0, arena.width, arena.height)
   g.strokeStyle = level.theme.grid
   g.lineWidth = 1
-  for (let x = 0; x <= ARENA.width; x += 60) {
-    g.beginPath(); g.moveTo(x, 0); g.lineTo(x, ARENA.height); g.stroke()
+  for (let x = 0; x <= arena.width; x += 60) {
+    g.beginPath(); g.moveTo(x, 0); g.lineTo(x, arena.height); g.stroke()
   }
-  for (let y = 0; y <= ARENA.height; y += 60) {
-    g.beginPath(); g.moveTo(0, y); g.lineTo(ARENA.width, y); g.stroke()
+  for (let y = 0; y <= arena.height; y += 60) {
+    g.beginPath(); g.moveTo(0, y); g.lineTo(arena.width, y); g.stroke()
   }
   // Faded code on the floor: the codebase you are standing on.
   g.font = `16px ${MONO}`
@@ -66,19 +68,19 @@ export const paintFloor = (level: Level): HTMLCanvasElement => {
     g.globalAlpha = 0.35 + rand() * 0.35
     const lines = [...codeLines, ...t().floorCode]
     const line = lines[Math.floor(rand() * lines.length)] ?? ""
-    g.fillText(`${String(Math.floor(rand() * 900) + 10).padStart(4, " ")}  ${line}`, rand() * (ARENA.width - 300), 30 + rand() * (ARENA.height - 40))
+    g.fillText(`${String(Math.floor(rand() * 900) + 10).padStart(4, " ")}  ${line}`, rand() * (arena.width - 300), 30 + rand() * (arena.height - 40))
   }
   g.globalAlpha = 1
   g.strokeStyle = level.theme.accent
   g.lineWidth = 4
   g.shadowColor = level.theme.accent
   g.shadowBlur = 20
-  g.strokeRect(2, 2, ARENA.width - 4, ARENA.height - 4)
+  g.strokeRect(2, 2, arena.width - 4, arena.height - 4)
   return c
 }
 
-/** Which floor a level has in the current language, to know when to repaint it. */
-export const floorKey = (level: Level) => `${level.id}:${locale()}`
+/** Which floor a level has, in its arena and the current language, to know when to repaint it. */
+export const floorKey = (level: Level) => `${level.id}:${arenaOf(level).width}x${arenaOf(level).height}:${locale()}`
 
 export interface BugLook {
   flash: number

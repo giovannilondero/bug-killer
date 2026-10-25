@@ -1,7 +1,9 @@
+import { arenaOf } from "../content/arenas.ts"
+import type { Arena } from "../content/arenas.ts"
 import { bugKinds } from "../content/bugs.ts"
 import { clients } from "../content/clients.ts"
 import { comboMultiplier } from "../sim/systems/combat.ts"
-import { ARENA, BUFF_SECONDS, PARTY, PLAYER, TURRET } from "../sim/constants.ts"
+import { BUFF_SECONDS, PARTY, PLAYER, TURRET } from "../sim/constants.ts"
 import type { FxValue, Vec } from "../sim/schema.ts"
 import type { View } from "../sim/simulation.ts"
 import { formatNumber, t } from "./language.ts"
@@ -373,9 +375,10 @@ export const makeRenderer = (canvas: HTMLCanvasElement) => {
     camera.scale = Math.max(0.5, Math.min(1.2, Math.min(width / 1150, height / 760)))
     const viewW = width / camera.scale
     const viewH = height / camera.scale
-    const focus = view.player?.position ?? { x: ARENA.width / 2, y: ARENA.height / 2 }
-    const targetX = viewW >= ARENA.width ? (ARENA.width - viewW) / 2 : Math.max(0, Math.min(ARENA.width - viewW, focus.x - viewW / 2))
-    const targetY = viewH >= ARENA.height ? (ARENA.height - viewH) / 2 : Math.max(0, Math.min(ARENA.height - viewH, focus.y - viewH / 2))
+    const arena = arenaOf(view.level)
+    const focus = view.player?.position ?? { x: arena.width / 2, y: arena.height / 2 }
+    const targetX = viewW >= arena.width ? (arena.width - viewW) / 2 : Math.max(0, Math.min(arena.width - viewW, focus.x - viewW / 2))
+    const targetY = viewH >= arena.height ? (arena.height - viewH) / 2 : Math.max(0, Math.min(arena.height - viewH, focus.y - viewH / 2))
     camera.x += (targetX - camera.x) * Math.min(1, dt * 8)
     camera.y += (targetY - camera.y) * Math.min(1, dt * 8)
 
@@ -811,17 +814,18 @@ export const makeRenderer = (canvas: HTMLCanvasElement) => {
   }
 
   /** Bottom-centre, where the eye reaches it on a wide screen and between the two thumbs on a phone. */
-  const minimapRect = (width: number, height: number) => {
+  const minimapRect = (width: number, height: number, arena: Arena) => {
     const w = Math.round(Math.max(105, Math.min(180, width * 0.14)))
-    const h = Math.round((w * ARENA.height) / ARENA.width)
+    const h = Math.round((w * arena.height) / arena.width)
     return { x: Math.round(width / 2 - w / 2), y: height - h - 10, w, h }
   }
 
   /** The whole arena at a glance: bugs, bosses, power-ups, the call to answer, and what the camera sees. */
   const drawMinimap = (view: View, width: number, height: number, viewW: number, viewH: number) => {
     if (!view.player || (view.run.phase !== "waves" && view.run.phase !== "boss")) return
-    const { x, y, w, h } = minimapRect(width, height)
-    const k = w / ARENA.width
+    const arena = arenaOf(view.level)
+    const { x, y, w, h } = minimapRect(width, height, arena)
+    const k = w / arena.width
     const at = (p: Vec) => ({ x: x + p.x * k, y: y + p.y * k })
     const dot = (p: Vec, r: number, color: string) => {
       const m = at(p)
