@@ -113,3 +113,11 @@ export const RACE = { window: 4, rebootShield: 1 } as const
  * radians, `drift` px/s slow.
  */
 export const LOOP = { speed: 0.36, speedup: 0.15, maxSpeed: 0.9, trail: (Math.PI * 2) / 44, drift: 18 } as const
+
+/**
+ * A stack overflow's tower: `frames` frames, `frameHeight` px each. It drops the
+ * top one for every `1 / frames` of its health lost, as a bug `frameHp` times
+ * tougher than a Medium one and `speedup` faster for every frame already gone.
+ * While a dropped frame is alive it stays shielded, and `linger` seconds after.
+ */
+export const STACK = { frames: 6, frameHeight: 13, frameHp: 2, speedup: 0.3, linger: 0.25 } as const

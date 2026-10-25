@@ -3,7 +3,7 @@ import type { Priority, TicketType } from "../content/bugs.ts"
 import type { Boss as BossContent } from "../content/levels.ts"
 import type { ClientId } from "../content/clients.ts"
 import type { Strings } from "../content/i18n.ts"
-import { BREAKPOINT, EPIC, HOSTILE_SHOT, PLAYER, RESURRECT, ROCKET, SHOT, TURRET, ticketScales } from "./constants.ts"
+import { BREAKPOINT, EPIC, HOSTILE_SHOT, PLAYER, RESURRECT, ROCKET, SHOT, STACK, TURRET, ticketScales } from "./constants.ts"
 import { Body, Boss, Breakpoint, Bug, Game, HostileShot, Pickup, Player, Position, Rocket, Shot, Turret, Velocity } from "./schema.ts"
 import type { BossValue, PickupKind, TeammateValue, Vec } from "./schema.ts"
 import { basicGun } from "./weapons.ts"
@@ -123,7 +123,8 @@ export const makeBoss = (boss: BossContent, at: Vec, hpFactor = 1) =>
       side: null,
       thread: null,
       revive: 0,
-      course: 0
+      course: 0,
+      frames: boss.pattern === "stackOverflow" ? STACK.frames : 0
     },
     at,
     boss.radius

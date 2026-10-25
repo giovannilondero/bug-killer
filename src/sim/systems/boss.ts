@@ -56,6 +56,7 @@ export const BossBrainSystem = Game.System(
         random,
         strings,
         minions,
+        spawned: (prefix) => queries.bugs.each().filter((bug) => bug.data.bug.get().key.startsWith(prefix)).length,
         kin: bosses.filter((other) => other !== match && other.data.boss.get().key === boss.key).length,
         fire,
         ring: (count, speed, offset) => {
@@ -68,7 +69,7 @@ export const BossBrainSystem = Game.System(
           match.data.position.set(to)
           events.fx.emit({ type: "teleport", x: to.x, y: to.y })
         },
-        spawnMinion: (seed, at) => commands.spawn(makeBug(seed, at)),
+        spawnMinion: (seed, at, toughness) => commands.spawn(makeBug(seed, at, toughness ? { toughness } : {})),
         fork: (shape) => {
           const at = clampToArena({ x: position.x + shape.offset.x, y: position.y + shape.offset.y }, shape.radius, arena)
           commands.spawn(spawnBoss(shape.boss, at, shape.radius))

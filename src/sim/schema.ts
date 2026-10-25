@@ -101,6 +101,8 @@ export interface BossValue {
   revive: number
   /** How far an infinite loop has run round its circuit, in radians: a lap every 2π. 0 for any other boss. */
   course: number
+  /** How many frames a stack overflow's tower has left, counting the one at the bottom; 0 for any other boss. */
+  frames: number
 }
 export const Boss = Descriptor.Component<BossValue>()("BugKiller/Boss")
 

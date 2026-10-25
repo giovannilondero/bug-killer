@@ -5,9 +5,9 @@ import { arenas } from "../content/arenas.ts"
 import type { Arena } from "../content/arenas.ts"
 import type { Strings } from "../content/i18n.ts"
 import type { BossPattern, ConflictSide, RaceThread } from "../content/levels.ts"
-import { DT, LOOP, RACE } from "./constants.ts"
+import { DT, LOOP, RACE, STACK } from "./constants.ts"
 import type { BugSeed } from "./drafts.ts"
-import { clamp, normalize, openPoint } from "./math.ts"
+import { clamp, clampToArena, normalize, openPoint } from "./math.ts"
 import type { BossValue, Vec } from "./schema.ts"
 
 /** What a boss knows, and can do, on one tick of its fight. */
@@ -27,6 +27,8 @@ export interface Brain {
   readonly strings: Strings
   /** Bugs in the arena, so minions don't pile up forever. */
   readonly minions: number
+  /** Bugs in the arena whose key starts with `prefix`: the minions it dropped that are still running. */
+  readonly spawned: (prefix: string) => number
   /** Other bosses with the same key still fighting: the rest of a boss that split. */
   readonly kin: number
   readonly fire: (angle: number, speed: number) => void
@@ -36,7 +38,8 @@ export interface Brain {
   /** A velocity toward `goal`. */
   readonly steer: (goal: Vec, speed: number) => Vec
   readonly teleport: (to: Vec) => void
-  readonly spawnMinion: (seed: BugSeed, at: Vec) => void
+  /** A bug of its own; `toughness` scales its health and speed. */
+  readonly spawnMinion: (seed: BugSeed, at: Vec, toughness?: { hp: number; speed: number }) => void
   /** Puts another boss in the arena, `shape.offset` away from this one. */
   readonly fork: (shape: BossShape) => void
   readonly announce: (text: string) => void
@@ -111,6 +114,15 @@ export const loopSpot = (arena: Arena, course: number): Vec => ({
   x: arena.width / 2 + Ops.cos(course) * 600 * (arena.width / arenas.normal.width),
   y: arena.height / 2 + Ops.sin(course * 2) * 300 * (arena.height / arenas.normal.height)
 })
+
+/** Where the top of a stack overflow's tower of `frames` frames stands, on top of the boss. */
+export const stackTop = (position: Vec, radius: number, frames: number): Vec => ({
+  x: position.x,
+  y: position.y - radius - (frames - 1) * STACK.frameHeight
+})
+
+/** The key every frame a stack overflow drops starts with. */
+export const FRAME_PREFIX = "FRAME-"
 
 /**
  * Every boss pattern, in one table: each is one of the level's worst tickets
@@ -321,8 +333,38 @@ export const bossRules: Record<BossPattern, BossRules> = {
     turn: () => null
   },
 
+  // RangeError: a tower of stack frames. Every share of health lost pops the top
+  // frame off as a bug that runs for the developers, faster the shorter the
+  // stack; while one runs, the tower is shielded and shots bounce off.
   stackOverflow: {
-    fight: ({ chase }) => chase(30),
+    fight: ({ boss, position, radius, aim, rage, arena, strings, fire, ring, chase, spawned, spawnMinion, announce }) => {
+      const standing = Math.max(1, Math.ceil((Math.max(0, boss.hp) / boss.maxHp) * STACK.frames))
+      while (boss.frames > standing) {
+        const gone = STACK.frames - boss.frames + 1
+        spawnMinion(
+          minion(`${FRAME_PREFIX}${boss.frames}`, strings.minions.frame(boss.frames), "Medium"),
+          clampToArena(stackTop(position, radius, boss.frames), 20, arena),
+          { hp: STACK.frameHp, speed: 1 + STACK.speedup * gone }
+        )
+        boss.frames -= 1
+        boss.shield = Math.max(boss.shield, STACK.linger)
+        announce(strings.bossPhase.frameDropped)
+      }
+      if (spawned(FRAME_PREFIX) > 0) boss.shield = Math.max(boss.shield, STACK.linger)
+      if (boss.timer <= 0) {
+        boss.volley += 1
+        if (boss.volley % 3 === 0) {
+          ring(12 + Math.round(rage * 8), 210, boss.age)
+        } else {
+          // A stack trace: the same call, again and again, one after the other.
+          for (let i = 0; i < 4; i++) fire(aim + (boss.volley % 2 ? 0.2 : -0.2), 200 + i * 40)
+          fire(aim, 300)
+        }
+        boss.timer = 1.4 - rage * 0.5
+      }
+      // A shorter stack is a lighter one.
+      return chase(30 + (STACK.frames - boss.frames) * 12)
+    },
     turn: () => null
   }
 }
