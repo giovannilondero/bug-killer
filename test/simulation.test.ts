@@ -386,6 +386,20 @@ test("endless unlocks one content tier every 3 waves, all of it by wave 18", () 
   )
 })
 
+test("the same seed and input replay the same endless run as it climbs the tiers", () => {
+  const quick = { ...endlessLevel, waveSize: 1, endless: { ...endlessLevel.endless!, every: 100 } }
+  const replay = () => {
+    const tiers: Array<number> = []
+    const view = watch({ level: quick, seed: 11 }, 120, (v) => tiers.push(v.tier))
+    return { view, tiers }
+  }
+  const a = replay()
+  const b = replay()
+  assert.ok(a.view.tier >= 2, `only reached tier ${a.view.tier}`)
+  assert.deepEqual(a.tiers, b.tiers)
+  assert.deepEqual(a.view, b.view)
+})
+
 test("drops, mission rewards and call rewards never offer a pickup above the level's tier", () => {
   // Pretend every pickup but Revert arrives with sprint 2 (Tobia's tools are his own visit, not a drop or a reward).
   const kept = ["revert", "tools"]
