@@ -1,7 +1,8 @@
-import { bugKinds, traitOf } from "../content/bugs.ts"
+import { bugKinds, subtaskKey, traitOf } from "../content/bugs.ts"
 import type { Priority, TicketType } from "../content/bugs.ts"
 import type { Boss as BossContent } from "../content/levels.ts"
 import type { ClientId } from "../content/clients.ts"
+import type { Strings } from "../content/i18n.ts"
 import { BREAKPOINT, EPIC, HOSTILE_SHOT, PLAYER, RESURRECT, ROCKET, SHOT, TURRET, ticketScales } from "./constants.ts"
 import { Body, Boss, Breakpoint, Bug, Game, HostileShot, Pickup, Player, Position, Rocket, Shot, Turret, Velocity } from "./schema.ts"
 import type { PickupKind, TeammateValue, Vec } from "./schema.ts"
@@ -44,6 +45,10 @@ export interface BugSeed {
   /** Bug when absent. */
   readonly type?: TicketType
 }
+
+/** The `index`-th sub-task a Story or an Epic hands out: a smaller piece of the same work. */
+export const subtaskOf = (parent: { readonly key: string; readonly summary: string }, index: number, priority: Priority, strings: Strings): BugSeed =>
+  ({ key: subtaskKey(parent.key, index), summary: strings.subtask(parent.summary), priority, status: "Open", type: "subtask" })
 
 export const makeBug = (
   seed: BugSeed,

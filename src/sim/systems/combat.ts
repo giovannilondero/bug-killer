@@ -1,10 +1,10 @@
 import * as Random from "@typeonce/ritmo-math/Random"
 
 import { arenaOf } from "../../content/arenas.ts"
-import { bugKinds, subtaskKey } from "../../content/bugs.ts"
+import { bugKinds } from "../../content/bugs.ts"
 import { text } from "../../content/i18n.ts"
 import { BOMB_RADIUS, BREAKPOINT, BUFF_SECONDS, COMBO_WINDOW, DEPLOY, DT, PLAYER, ROCKET, STORY_SUBTASKS, ticketScales } from "../constants.ts"
-import { makeBug, makePickup, makeTurret } from "../drafts.ts"
+import { makeBug, makePickup, makeTurret, subtaskOf } from "../drafts.ts"
 import { clampToArena, distanceSquared, nearest, overlaps } from "../math.ts"
 import { BossWrite, BugWrite, HostileShotWrite, PickupWrite, PlayerWrite, ShotWrite } from "../queries.ts"
 import {
@@ -40,6 +40,8 @@ import { FLAME, inCone, isWeapon, pickUp } from "../weapons.ts"
 import { Ops } from "@typeonce/ritmo-math"
 
 const REOPEN_CHANCE = 0.4
+/** Who a fix is credited to when no developer made it, as when a Deploying bug goes off by itself. */
+const NOBODY = -1
 const BOSS_POINTS = 120
 
 export const comboMultiplier = (combo: number): number => Math.min(4, 1 + Math.floor(combo / 5) * 0.5)
@@ -173,10 +175,7 @@ export const CombatSystem = Game.System(
         // A Story is closed by closing its sub-tasks: smaller, faster pieces of the same work.
         for (let i = 0; i < STORY_SUBTASKS; i++) {
           const angle = (i / STORY_SUBTASKS) * Math.PI * 2
-          commands.spawn(makeBug(
-            { key: subtaskKey(bug.key, i), summary: strings.subtask(bug.summary), priority: bug.priority, status: "Open", type: "subtask" },
-            { x: at.x + Ops.cos(angle) * 24, y: at.y + Ops.sin(angle) * 24 }
-          ))
+          commands.spawn(makeBug(subtaskOf(bug, i, bug.priority, strings), { x: at.x + Ops.cos(angle) * 24, y: at.y + Ops.sin(angle) * 24 }))
         }
       }
       // Regressions follow the priority, whatever the type; a sub-task's parent has already left its own.
@@ -240,7 +239,7 @@ export const CombatSystem = Game.System(
       if (gone.has(match.entity.id) || bug.trait !== "deploying" || bug.fuse === null || bug.fuse > 0) continue
       gone.add(match.entity.id)
       commands.despawn(match.entity)
-      deploy(match.data.position.get(), -1)
+      deploy(match.data.position.get(), NOBODY)
     }
 
     const damageBoss = (match: (typeof bosses)[number], damage: number, by: number, hit: Hit = {}): void => {
