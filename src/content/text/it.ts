@@ -133,7 +133,8 @@ export const it: Strings = {
     sidequests: "Sette progetti piccoli, sette clienti grandi.",
     keystone: "Permessi, SSO e CVE. Qualcuno ha detto 2FA?",
     foundry: "Il backlog più grande. Ugo è online.",
-    endless: "Tutti i bug di tutti i progetti, per sempre. Quanto resisti?"
+    endless: "Tutti i bug di tutti i progetti, per sempre. Quanto resisti?",
+    hotdesk: "Niente scrivania fissa, niente spazio per i gomiti. Il boss del 2FA ha prenotato la sala riunioni."
   },
   pickups: {
     hotfix: { label: "Hotfix", hint: "fuoco rapido" },
@@ -211,7 +212,11 @@ export const it: Strings = {
     endless: (every) => `∞ tutti i bug aperti · un boss ogni ${every} ondate`,
     campaign: "Campagna",
     campaignProgress: (cleared, total) => `${cleared}/${total} sprint chiusi`,
-    extras: "Altre modalità"
+    extras: "Altre modalità",
+    bonus: "Livelli bonus",
+    bonusTag: "BONUS",
+    bonusMeta: (tickets) => `${tickets} ticket da tutti i progetti · un boss`,
+    bonusLocked: (sprint) => `🔒 chiudi lo sprint ${sprint}`
   },
   intro: { clientsOnline: "clienti online", start: "Clicca o premi un tasto per iniziare", startTouch: "Tocca per iniziare" },
   touch: {

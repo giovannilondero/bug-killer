@@ -5,7 +5,7 @@ import * as Result from "@typeonce/ritmo/Result"
 import { bugKinds } from "./content/bugs.ts"
 import { clients } from "./content/clients.ts"
 import { locales } from "./content/i18n.ts"
-import { endlessLevel, levels } from "./content/levels.ts"
+import { bonusLevels, endlessLevel, levels, ticketsOf } from "./content/levels.ts"
 import type { Level, LevelId } from "./content/levels.ts"
 import { makeAudio } from "./host/audio.ts"
 import { makeChat } from "./host/chat.ts"
@@ -18,7 +18,7 @@ import { createRenderer } from "./host/renderer.ts"
 import { makeTouchControls, onTouchMode, touchMode } from "./host/touch.ts"
 import { codePattern, NAME_MAX } from "./net/protocol.ts"
 import type { ErrorCode, RoomInfo, ServerMessage } from "./net/protocol.ts"
-import { bestScore, clearSprint, endEndless, endlessBest, hardcoreBadge, loadProgress, saveProgress, sprintsCleared, sprintUnlocked, unlockEverySprint } from "./progress.ts"
+import { bestScore, bonusUnlocked, clearBonus, clearSprint, endEndless, endlessBest, hardcoreBadge, loadProgress, saveProgress, sprintsCleared, sprintUnlocked, unlockEverySprint } from "./progress.ts"
 import type { Progress } from "./progress.ts"
 import { PARTY, STEP } from "./sim/constants.ts"
 import { makePickup } from "./sim/drafts.ts"
@@ -66,8 +66,8 @@ const setHardcore = (on: boolean) => {
 /** The toggle's rules, under its name: the menu and the lobby say the same thing. */
 const hardcoreRules = () => html`<span class="hardcore-name">☠ ${t().hardcore.name}</span><span class="hardcore-rules">${escape(t().hardcore.rules)}</span>`
 
-/** The four sprints, then endless: menu buttons and restarts index into this. */
-const playable = [...levels, endlessLevel]
+/** The four sprints, then endless, then the bonus levels: menu buttons and restarts index into this. */
+const playable = [...levels, endlessLevel, ...bonusLevels]
 
 let sim: Simulation | null = null
 let view: View | null = null
@@ -192,6 +192,20 @@ const showTitle = () => {
       <span class="level-clients">${avatars(endlessLevel.clients)}</span>
       <span class="level-best">${endlessRecord ? t().menu.best(formatNumber(endlessRecord)) : t().menu.fresh}${hardcore ? " ☠" : ""}</span>
     </button>`
+  // Bonus levels: their own group and a tagged, dashed card, so they don't read as one more sprint.
+  const bonusCards = bonusLevels.map((level) => {
+    const locked = !bonusUnlocked(progress, level)
+    const best = bestScore(progress, level.id)
+    return html`
+      <button class="level bonus ${locked ? "locked" : ""}" data-level="${playable.indexOf(level)}" ${locked ? "disabled" : ""} style="--accent:${level.theme.accent}">
+        <span class="level-tag">${t().menu.bonusTag}</span>
+        <span class="level-name">★ ${level.name}${hardcoreBadge(progress, level.id) ? html` <span class="hardcore-badge" title="${t().hardcore.badge}" aria-label="${t().hardcore.badge}">☠</span>` : ""}</span>
+        <span class="level-tagline">${escape(t().taglines[level.id])}</span>
+        <span class="level-meta">${t().menu.bonusMeta(ticketsOf(level))}</span>
+        <span class="level-clients">${avatars(level.clients)}</span>
+        <span class="level-best">${locked ? t().menu.bonusLocked(level.bonus?.after ?? 0) : best ? t().menu.best(formatNumber(best)) : t().menu.fresh}</span>
+      </button>`
+  }).join("")
   const multiCard = html`
     <button class="level together" data-multi style="--accent:#7fdcff">
       <span class="level-name">${t().multi.menuButton}</span>
@@ -213,6 +227,10 @@ const showTitle = () => {
       <section class="group">
         <h3 class="group-title"><span>${t().menu.extras}</span></h3>
         <div class="levels extras">${endlessCard}${multiCard}</div>
+      </section>
+      <section class="group">
+        <h3 class="group-title"><span>${t().menu.bonus}</span></h3>
+        <div class="levels bonus">${bonusCards}</div>
       </section>
       <div class="legend">
         ${Object.entries(bugKinds).map(([p, k]) => html`<span><i style="background:${k.color}"></i>${p}</span>`).join("")}
@@ -254,11 +272,11 @@ const showTitle = () => {
 const loadName = () => localStorage.getItem("bugkiller:name") ?? ""
 const saveName = (name: string) => localStorage.setItem("bugkiller:name", name)
 
-/** The sprints this browser has unlocked, and endless: what a host may pick. */
+/** The sprints and bonus levels this browser has unlocked, and endless: what a host may pick. */
 const levelOptions = (selected: LevelId) =>
   playable
-    .filter((level, i) => level.endless !== undefined || sprintUnlocked(progress, i))
-    .map((level) => html`<option value="${level.id}" ${level.id === selected ? "selected" : ""}>${level.endless ? "∞" : escape(level.sprint)} · ${escape(level.name)}</option>`)
+    .filter((level, i) => level.endless !== undefined || (level.bonus ? bonusUnlocked(progress, level) : sprintUnlocked(progress, i)))
+    .map((level) => html`<option value="${level.id}" ${level.id === selected ? "selected" : ""}>${level.endless ? "∞" : level.bonus ? "★" : escape(level.sprint)} · ${escape(level.name)}</option>`)
     .join("")
 
 const shareLink = (code: string) => `${location.origin}${location.pathname}?run=${code}`
@@ -541,7 +559,7 @@ const startLevel = (index: number) => {
       <div class="intro-name">${level.name}</div>
       <div class="intro-tagline">${escape(t().taglines[level.id])}</div>
       ${hardcore ? html`<div class="intro-hardcore">${hardcoreRules()}</div>` : ""}
-      <div class="intro-meta">${level.endless ? t().menu.endless(level.endless.every) : t().menu.openBugs(level.bugs.length)} · ${t().intro.clientsOnline} ${avatars(level.clients)}</div>
+      <div class="intro-meta">${level.endless ? t().menu.endless(level.endless.every) : level.bonus ? t().menu.bonusMeta(level.bonus.tickets) : t().menu.openBugs(level.bugs.length)} · ${t().intro.clientsOnline} ${avatars(level.clients)}</div>
       <div class="intro-go">${touchMode() ? t().intro.startTouch : t().intro.start}</div>
     </div>`, "intro-overlay")
   const begin = () => {
@@ -620,10 +638,12 @@ const markdownNotes = (v: View) =>
 
 const showCleared = (v: View) => {
   setMode("over")
-  // A sprint cleared together unlocks the next one here too; best scores stay solo.
-  progress = clearSprint(progress, levelIndex, { score: v.run.score, solo: !remote, hardcore: v.hardcore })
+  // A sprint cleared together unlocks the next one here too; best scores stay solo. A bonus level unlocks nothing.
+  const result = { score: v.run.score, solo: !remote, hardcore: v.hardcore }
+  progress = v.level.bonus ? clearBonus(progress, v.level, result) : clearSprint(progress, levelIndex, result)
   writeProgress(progress)
   const last = levelIndex === levels.length - 1
+  const next = !last && !v.level.bonus
   show(html`
     <div class="panel wide">
       ${last
@@ -636,7 +656,7 @@ const showCleared = (v: View) => {
       ${remote
         ? html`<div class="actions" data-over-actions></div>`
         : html`<div class="actions">
-          ${last ? "" : html`<button data-act="next" class="primary">${t().cleared.next}</button>`}
+          ${next ? html`<button data-act="next" class="primary">${t().cleared.next}</button>` : ""}
           <button data-act="copy">${t().cleared.copy}</button>
           <button data-act="restart">${t().cleared.replay}</button>
           <button data-act="menu">${t().pause.menu}</button>
@@ -657,7 +677,7 @@ const showDead = (v: View) => {
   }
   const summary = v.level.endless
     ? html`${escape(t().dead.endless(v.run.wave, v.run.loop))}${record ? html` <b>${t().dead.record}</b>` : ""}`
-    : html`${t().dead.stillOpen} <b>${v.level.bugs.length - Math.min(v.level.bugs.length, v.run.nextBug) + v.bugs.length}</b>${v.bosses[0] ? html` · ${t().dead.bossStillThere(v.bosses[0].key)}` : ""}`
+    : html`${t().dead.stillOpen} <b>${ticketsOf(v.level) - Math.min(ticketsOf(v.level), v.run.nextBug) + v.bugs.length}</b>${v.bosses[0] ? html` · ${t().dead.bossStillThere(v.bosses[0].key)}` : ""}`
   show(html`
     <div class="panel">
       <h2 class="lose">💀 ${t().dead.lines[Math.floor(Math.random() * t().dead.lines.length)]}</h2>

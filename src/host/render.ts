@@ -1,4 +1,5 @@
 import { arenaOf } from "../content/arenas.ts"
+import { ticketsOf } from "../content/levels.ts"
 import type { Arena } from "../content/arenas.ts"
 import { bugKinds } from "../content/bugs.ts"
 import { clients } from "../content/clients.ts"
@@ -794,7 +795,7 @@ export const makeRenderer = (canvas: HTMLCanvasElement) => {
       ctx.fillStyle = accent
       roundRect(ctx, x, 38, w * Math.min(1, (every - bossIn) / every), 8, 4); ctx.fill()
     } else if (run.phase === "waves") {
-      const total = view.level.bugs.length
+      const total = ticketsOf(view.level)
       const released = Math.min(total, run.nextBug)
       const open = total - released + view.bugs.length
       const w = Math.min(360, width - 460)

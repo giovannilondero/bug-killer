@@ -9,7 +9,9 @@ export interface Arena {
 
 export const arenas = {
   /** The open floor every sprint is played on. */
-  normal: { width: 1800, height: 1200 }
+  normal: { width: 1800, height: 1200 },
+  /** A cramped floor, about half the normal one: nowhere to run. */
+  small: { width: 1200, height: 800 }
 } as const satisfies Record<string, Arena>
 
 /** The arena a level is played on: the normal one unless the level says otherwise. */

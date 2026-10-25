@@ -5,7 +5,7 @@
  */
 import { isLocale } from "../content/i18n.ts"
 import type { Locale } from "../content/i18n.ts"
-import { endlessLevel, levelIds, levels } from "../content/levels.ts"
+import { bonusLevels, endlessLevel, levelIds, levels } from "../content/levels.ts"
 import type { Level, LevelId } from "../content/levels.ts"
 import { cleanName, readClientMessage } from "../net/protocol.ts"
 import type { ErrorCode, Member, RoomInfo, ServerMessage } from "../net/protocol.ts"
@@ -25,7 +25,7 @@ export const MAX_ROOMS = 10
 /** So that one address cannot hold every run, while an office still fits two teams. */
 export const MAX_ROOMS_PER_ADDRESS = 2
 
-const playable: ReadonlyArray<Level> = [...levels, endlessLevel]
+const playable: ReadonlyArray<Level> = [...levels, endlessLevel, ...bonusLevels]
 export const isLevelId = (id: unknown): id is LevelId => (levelIds as ReadonlyArray<unknown>).includes(id)
 const levelOf = (id: LevelId): Level => playable.find((level) => level.id === id) ?? endlessLevel
 

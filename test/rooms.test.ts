@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
+import { arenas } from "../src/content/arenas.ts"
 import type { ServerMessage } from "../src/net/protocol.ts"
 import { makeRooms } from "../src/server/rooms.ts"
 import type { Peer } from "../src/server/rooms.ts"
@@ -223,4 +224,23 @@ test("a run is not hardcore unless the host says so, and only a real true counts
   assert.equal(cara.last("room"), undefined, "a malformed flag is refused")
   send(rooms, ada, { t: "start", hardcore: 1 })
   assert.equal(ada.last("started"), undefined, "a malformed flag is refused")
+})
+
+test("the host can pick a bonus level in the lobby, and everyone plays it", () => {
+  const rooms = makeRooms({ random: seeded() })
+  const ada = browser()
+  const bob = browser()
+  send(rooms, ada, { t: "create", name: "Ada", level: "glacier", locale: "en" })
+  send(rooms, bob, { t: "join", code: ada.last("room")!.room.code, name: "Bob" })
+  send(rooms, ada, { t: "start", level: "hotdesk" })
+  assert.equal(ada.last("started")?.level, "hotdesk")
+  assert.equal(bob.last("started")?.level, "hotdesk")
+  assert.equal(bob.last("room")?.room.level, "hotdesk")
+  rooms.advance(1 / 30)
+  const players = bob.last("frame")!.view.players
+  assert.equal(players.length, 2)
+  // The team starts near the middle of the small arena, not of the normal one.
+  for (const p of players) {
+    assert.ok(Math.abs(p.position.x - arenas.small.width / 2) < 200 && Math.abs(p.position.y - arenas.small.height / 2) < 200, JSON.stringify(p.position))
+  }
 })

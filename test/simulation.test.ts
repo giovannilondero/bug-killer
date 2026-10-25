@@ -1,7 +1,9 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { endlessLevel, levels } from "../src/content/levels.ts"
+import { arenas } from "../src/content/arenas.ts"
+import { bonusLevels, endlessLevel, levels, ticketsOf } from "../src/content/levels.ts"
+import { projectOf } from "../src/content/bugs.ts"
 import type { Locale } from "../src/content/i18n.ts"
 import type { Level } from "../src/content/levels.ts"
 import { createSimulation, idleInput } from "../src/sim/simulation.ts"
@@ -168,11 +170,39 @@ test("the same seed and input replay the same run", () => {
 })
 
 test("every level can be finished by the autopilot or kills it fairly", () => {
-  for (const level of levels) {
+  for (const level of [...levels, ...bonusLevels]) {
     const { view } = play(level, 420)
     assert.ok(view.run.phase === "cleared" || view.run.phase === "dead" || view.run.phase === "boss", `${level.id} ends in ${view.run.phase} after ${view.run.time.toFixed(0)}s, ${view.run.fixed.length} fixed`)
-    console.log(`${level.id}: ${view.run.phase} at ${view.run.time.toFixed(0)}s, fixed ${view.run.fixed.length}/${level.bugs.length + 1}, missions ${view.run.missionsWon}/${view.run.missionsWon + view.run.missionsLost}, hits ${view.run.hitsTaken}`)
+    console.log(`${level.id}: ${view.run.phase} at ${view.run.time.toFixed(0)}s, fixed ${view.run.fixed.length}/${ticketsOf(level) + 1}, missions ${view.run.missionsWon}/${view.run.missionsWon + view.run.missionsLost}, hits ${view.run.hitsTaken}`)
   }
+})
+
+test("Hotdesk draws tickets from the whole backlog in a small arena, then calls the 2FA boss", () => {
+  const hotdesk = bonusLevels.find((level) => level.id === "hotdesk")!
+  // A short draw: the rules, not the stamina.
+  const quick = { ...hotdesk, bonus: { ...hotdesk.bonus!, tickets: 12 } }
+  let current: View | null = null
+  let frame = 0
+  let widest = { x: 0, y: 0 }
+  const made = createSimulation({ level: quick, seed: 11, locale: "en", input: autopilot(() => current, () => frame), presentation: { fx: () => {}, chat: () => {} } })
+  if (!made.ok) throw new Error(JSON.stringify(made.error))
+  current = made.value.view()
+  for (; frame < 300 * 60 && current.run.phase === "waves"; frame++) {
+    assert.ok(made.value.step().ok)
+    current = made.value.view()
+    for (const thing of [...current.players, ...current.bugs, ...current.bosses]) {
+      widest = { x: Math.max(widest.x, thing.position.x), y: Math.max(widest.y, thing.position.y) }
+    }
+  }
+  const view = current
+  assert.equal(view.run.phase, "boss", `${view.run.phase} at ${view.run.time.toFixed(0)}s`)
+  assert.deepEqual(view.bosses.map((b) => b.key), ["KEY-3242"])
+  assert.ok(widest.x <= arenas.small.width && widest.y <= arenas.small.height, `reached ${JSON.stringify(widest)}`)
+  assert.ok(arenas.small.width < arenas.normal.width && arenas.small.height < arenas.normal.height)
+  const drawn = view.run.fixed.filter((f) => !/-REG|^(ESC|CRASH|NULL)-/.test(f.key))
+  assert.equal(drawn.length, 12, drawn.map((f) => f.key).join(" "))
+  assert.equal(new Set(drawn.map((f) => f.key)).size, drawn.length, "no ticket is drawn twice")
+  assert.ok(new Set(drawn.map((f) => projectOf(f.key))).size > 1, "tickets come from more than one project")
 })
 
 test("a client calls on Meet or Slack, and answering pays a bonus", () => {

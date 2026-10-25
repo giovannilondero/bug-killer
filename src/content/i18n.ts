@@ -108,6 +108,11 @@ export interface Strings {
     readonly campaign: string
     readonly campaignProgress: (cleared: number, total: number) => string
     readonly extras: string
+    /** The bonus levels' group, a card's corner tag, its draw, and what opens it. */
+    readonly bonus: string
+    readonly bonusTag: string
+    readonly bonusMeta: (tickets: number) => string
+    readonly bonusLocked: (sprint: number) => string
   }
   readonly intro: { readonly clientsOnline: string; readonly start: string; readonly startTouch: string }
   readonly touch: { readonly dash: string; readonly rotate: string; readonly fullscreen: string; readonly homeScreen: string }

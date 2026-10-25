@@ -142,6 +142,19 @@ code { font-family: var(--mono); color: #ffd84a; }
 .group-title::after { content: ""; flex: 1; height: 1px; background: var(--line); order: 1; }
 .group-progress { order: 2; letter-spacing: 0.04em; text-transform: none; font-weight: 500; }
 .levels.extras { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+/* Bonus levels: outside the campaign, so a dashed card with a corner tag. */
+.level.bonus { position: relative; border-style: dashed; border-width: 2px; }
+.level-tag {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font: 800 10px var(--mono);
+  letter-spacing: 0.14em;
+  color: #0b0b10;
+  background: var(--accent);
+}
 .level-name { font: 800 24px var(--sans); color: var(--accent); }
 .level-tagline { flex: 1; font-size: 13px; line-height: 1.4; color: var(--text); text-wrap: pretty; }
 .level-meta { font-size: 13px; color: var(--muted); }
@@ -569,6 +582,8 @@ body.touch .text { min-width: 0; margin: 0; font-size: 11px; white-space: nowrap
   .levels.extras .level { flex-direction: row; flex-wrap: wrap; align-items: baseline; column-gap: 10px; row-gap: 2px; }
   .levels.extras .level-tagline, .levels.extras .level-clients { display: none; }
   .levels.extras .level-best { margin-top: 0; }
+  .levels.bonus .level-tagline, .levels.bonus .level-clients { display: none; }
+  .level-tag { top: 6px; right: 6px; font-size: 8px; }
   .level-tagline, .level-meta { font-size: 11px; }
   .level-clients .avatar { width: 18px; height: 18px; font-size: 10px; }
   .legend { display: none; }

@@ -1,7 +1,8 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { bestScore, clearSprint, emptyProgress, endEndless, endlessBest, hardcoreBadge, loadProgress, unlockEverySprint, saveProgress, sprintsCleared, sprintUnlocked } from "../src/progress.ts"
+import { bonusLevels } from "../src/content/levels.ts"
+import { bestScore, bonusUnlocked, clearBonus, clearSprint, emptyProgress, endEndless, endlessBest, hardcoreBadge, loadProgress, unlockEverySprint, saveProgress, sprintsCleared, sprintUnlocked } from "../src/progress.ts"
 
 test("progress saved by today's version loads unchanged", () => {
   const saved = JSON.stringify({ unlocked: 3, best: { glacier: 12400, sidequests: 8100, endless: 30500 } })
@@ -126,4 +127,37 @@ test("progress saved by today's version has no badges and its Endless best is th
   const broken = loadProgress(JSON.stringify({ unlocked: 2, best: {}, badges: "glacier" }))
   assert.equal(hardcoreBadge(broken, "glacier"), false)
   assert.equal(sprintUnlocked(broken, 1), true)
+})
+
+test("Hotdesk unlocks after sprint 3", () => {
+  const hotdesk = bonusLevels.find((level) => level.id === "hotdesk")!
+  assert.equal(bonusUnlocked(emptyProgress, hotdesk), false)
+  assert.equal(bonusUnlocked(loadProgress(JSON.stringify({ unlocked: 3, best: {} })), hotdesk), false)
+  const third = clearSprint(loadProgress(JSON.stringify({ unlocked: 3, best: {} })), 2, { score: 100, solo: true })
+  assert.equal(bonusUnlocked(third, hotdesk), true)
+})
+
+test("clearing a bonus level keeps its best score and unlocks no sprint", () => {
+  const hotdesk = bonusLevels.find((level) => level.id === "hotdesk")!
+  const before = loadProgress(JSON.stringify({ unlocked: 4, best: {} }))
+  const cleared = clearBonus(before, hotdesk, { score: 7000, solo: true })
+  assert.equal(sprintUnlocked(cleared, 4), false)
+  assert.equal(sprintsCleared(cleared), 3)
+  assert.equal(bestScore(cleared, "hotdesk"), 7000)
+  const together = clearBonus(cleared, hotdesk, { score: 90000, solo: false })
+  assert.equal(bestScore(together, "hotdesk"), 7000)
+  assert.equal(sprintsCleared(together), 3)
+})
+
+test("a bonus level cleared in hardcore gets a badge, solo or together, and still unlocks nothing", () => {
+  const hotdesk = bonusLevels.find((level) => level.id === "hotdesk")!
+  const before = loadProgress(JSON.stringify({ unlocked: 4, best: {} }))
+  assert.equal(hardcoreBadge(clearBonus(before, hotdesk, { score: 7000, solo: true }), "hotdesk"), false)
+  const together = clearBonus(before, hotdesk, { score: 90000, solo: false, hardcore: true })
+  assert.equal(hardcoreBadge(together, "hotdesk"), true)
+  assert.equal(bestScore(together, "hotdesk"), undefined)
+  assert.equal(sprintsCleared(together), 3)
+  const solo = clearBonus(before, hotdesk, { score: 7000, solo: true, hardcore: true })
+  assert.equal(bestScore(solo, "hotdesk"), 7000)
+  assert.equal(hardcoreBadge(loadProgress(saveProgress(solo)), "hotdesk"), true)
 })

@@ -1,5 +1,5 @@
 import { levels } from "./content/levels.ts"
-import type { LevelId } from "./content/levels.ts"
+import type { Level, LevelId } from "./content/levels.ts"
 
 /**
  * What this browser has achieved: sprints unlocked, best scores and hardcore badges.
@@ -83,6 +83,16 @@ export const clearSprint = (progress: Progress, index: number, run: RunResult): 
   const level = levels[index]
   if (!level) return unlocked
   const badged = run.hardcore === true ? withBadge(unlocked, level.id) : unlocked
+  return run.solo ? withBest(badged, level.id, run.score) : badged
+}
+
+/** A bonus level opens once the sprint it follows is cleared; it is never needed to go on. */
+export const bonusUnlocked = (progress: Progress, level: Level): boolean =>
+  level.bonus !== undefined && sprintsCleared(progress) >= level.bonus.after
+
+/** Clearing a bonus level unlocks nothing: a hardcore clear earns its badge, a solo clear may set its best score. */
+export const clearBonus = (progress: Progress, level: Level, run: RunResult): Progress => {
+  const badged = run.hardcore === true ? withBadge(progress, level.id) : progress
   return run.solo ? withBest(badged, level.id, run.score) : badged
 }
 

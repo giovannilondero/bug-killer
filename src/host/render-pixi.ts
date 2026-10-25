@@ -5,6 +5,7 @@
 import { Application, CanvasSource, Container, Graphics, Sprite, Texture } from "pixi.js"
 
 import { arenaOf } from "../content/arenas.ts"
+import { ticketsOf } from "../content/levels.ts"
 import type { Arena } from "../content/arenas.ts"
 import { bugKinds } from "../content/bugs.ts"
 import { clients } from "../content/clients.ts"
@@ -943,7 +944,7 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
       text(S, res, t().hud.endless(run.wave, bossIn), `bold 12px ${MONO}`, "#e8ecf4", width / 2, 28)
       bar(width / 2 - w / 2, 38, w, 8, 4, Math.min(1, (every - bossIn) / every), accent)
     } else if (run.phase === "waves") {
-      const total = view.level.bugs.length
+      const total = ticketsOf(view.level)
       const released = Math.min(total, run.nextBug)
       const open = total - released + view.bugs.length
       const w = Math.min(360, width - 460)
