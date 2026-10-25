@@ -13,7 +13,7 @@ import { Calls, Chat, Fx, Game, Language, LevelSpec, Pickup, Rng, Run, Tiers } f
 import type { CallValue, PickupKind, Vec } from "../schema.ts"
 import { tierOf, unlocked } from "../tiers.ts"
 
-const rewards: ReadonlyArray<PickupKind> = ["hotfix", "refactor", "coffee", "unitTest", "revert", "pizza", "codeFreeze"]
+const rewards: ReadonlyArray<PickupKind> = ["hotfix", "refactor", "coffee", "unitTest", "revert", "pizza", "pairProgramming", "codeFreeze"]
 
 const MARGIN = 140
 

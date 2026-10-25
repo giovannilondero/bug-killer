@@ -5,6 +5,7 @@ import type { ClientId } from "../content/clients.ts"
 import { HOSTILE_SHOT, PLAYER, RESURRECT, SHOT, TURRET } from "./constants.ts"
 import { Body, Boss, Bug, Game, HostileShot, Pickup, Player, Position, Shot, Turret, Velocity } from "./schema.ts"
 import type { PickupKind, TeammateValue, Vec } from "./schema.ts"
+import { basicGun } from "./weapons.ts"
 import { Ops } from "@typeonce/ritmo-math"
 
 export const makePlayer = (at: Vec, teammate: TeammateValue) =>
@@ -25,7 +26,8 @@ export const makePlayer = (at: Vec, teammate: TeammateValue) =>
       dashDirection: { x: 1, y: 0 },
       aim: { x: at.x + 100, y: at.y },
       bombs: PLAYER.bombs,
-      buffs: { hotfix: 0, refactor: 0, coffee: 0, unitTest: 0, revert: 0, pizza: 0, tools: 0, ai: 0, codeFreeze: 0 },
+      weapon: basicGun,
+      buffs: { hotfix: 0, refactor: 0, coffee: 0, unitTest: 0, revert: 0, pizza: 0, tools: 0, ai: 0, pairProgramming: 0, codeFreeze: 0 },
       revive: 0,
       points: 0,
       fixed: 0

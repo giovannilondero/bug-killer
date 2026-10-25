@@ -8,9 +8,9 @@ import { createSimulation, idleInput } from "../src/sim/simulation.ts"
 import type { View } from "../src/sim/simulation.ts"
 import { makeBoss, makeBug, makePickup } from "../src/sim/drafts.ts"
 import type { BugSeed } from "../src/sim/drafts.ts"
-import { contentTiers, isUnlocked } from "../src/sim/tiers.ts"
+import { contentTiers, isUnlocked, tierOf } from "../src/sim/tiers.ts"
 import { Boss, Bug, Game, Pickup, pickupKinds } from "../src/sim/schema.ts"
-import type { ChatValue, FxValue, InputValue } from "../src/sim/schema.ts"
+import type { ChatValue, FxValue, InputValue, PickupKind } from "../src/sim/schema.ts"
 
 /** A bot that kites the nearest bug and shoots at it: the same intents a player sends. */
 const autopilot = (view: () => View | null, tick: () => number) => ({
@@ -380,11 +380,25 @@ test("endless unlocks one content tier every 3 waves, all of it by wave 18", () 
     if (!tierAt.has(v.run.wave)) tierAt.set(v.run.wave, v.tier)
   })
   assert.ok(view.run.wave >= 18, `only reached wave ${view.run.wave}`)
-  // `run.wave` counts the waves released so far: the next wave plays at this tier.
+  // `run.wave` is the wave on the floor (it counts up as each wave is released): waves 1–3 play at tier 0, 16–18 at tier 5.
   assert.deepEqual(
-    [0, 2, 3, 5, 6, 9, 12, 15, 17].map((wave) => tierAt.get(wave)),
-    [0, 0, 1, 1, 2, 3, 4, 5, 5]
+    [0, 1, 3, 4, 6, 7, 9, 10, 13, 15, 16, 18].map((wave) => tierAt.get(wave)),
+    [0, 0, 0, 1, 1, 2, 2, 3, 4, 4, 5, 5]
   )
+})
+
+test("the same seed and input replay the same endless run as it climbs the tiers", () => {
+  const quick = { ...endlessLevel, waveSize: 1, endless: { ...endlessLevel.endless!, every: 100 } }
+  const replay = () => {
+    const tiers: Array<number> = []
+    const view = watch({ level: quick, seed: 11 }, 120, (v) => tiers.push(v.tier))
+    return { view, tiers }
+  }
+  const a = replay()
+  const b = replay()
+  assert.ok(a.view.tier >= 2, `only reached tier ${a.view.tier}`)
+  assert.deepEqual(a.tiers, b.tiers)
+  assert.deepEqual(a.view, b.view)
 })
 
 test("drops, mission rewards and call rewards never offer a pickup above the level's tier", () => {
@@ -410,6 +424,120 @@ test("drops, mission rewards and call rewards never offer a pickup above the lev
   const open = offered(levels[2]!)
   assert.equal(open.view.tier, 2)
   assert.ok(open.kinds.some((kind) => !kept.includes(kind)), "a level offers what its tier unlocks")
+})
+
+// --- Weapons ---------------------------------------------------------------
+
+/**
+ * A firing range: one developer who stands still and fires to the right only
+ * when told, with pickups dropped right under them.
+ */
+const range = (level: Level = levels[1]!) => {
+  const fx: Array<FxValue> = []
+  let fire = false
+  let aim = { x: 0, y: 0 }
+  const made = createSimulation({
+    level,
+    seed: 3,
+    locale: "en",
+    input: { snapshot: () => ({ ...idleInput, fire, aim }) },
+    presentation: { fx: (e) => fx.push(e), chat: () => undefined }
+  })
+  if (!made.ok) throw new Error(JSON.stringify(made.error))
+  const sim = made.value
+  const at = sim.view().player!.position
+  aim = { x: at.x + 400, y: at.y }
+  const wait = (seconds: number) => {
+    for (let frame = 0; frame < Math.round(seconds * 60); frame++) assert.ok(sim.step().ok)
+  }
+  const drop = (...kinds: Array<PickupKind>) => {
+    const Drop = Game.System("Test/Drop", { commands: Game.System.commands(Game.System.spawns(Pickup)) }, ({ commands }) => {
+      for (const kind of kinds) commands.spawn(makePickup(kind, { x: at.x, y: at.y }))
+    })
+    assert.ok(sim.runtime.tick(Game.Schedule(Drop, Game.Schedule.applyDeferred())).ok)
+    wait(1 / 60)
+  }
+  /** Pulls the trigger for one update and returns the shots it fired. */
+  const volley = () => {
+    const before = new Set(sim.view().shots.map((shot) => shot.id))
+    fire = true
+    wait(1 / 60)
+    fire = false
+    return sim.view().shots.filter((shot) => !before.has(shot.id))
+  }
+  /** How many volleys `seconds` of holding the trigger fires. */
+  const hold = (seconds: number) => {
+    const from = fx.filter((e) => e.type === "shoot").length
+    fire = true
+    wait(seconds)
+    fire = false
+    return fx.filter((e) => e.type === "shoot").length - from
+  }
+  return { sim, fx, wait, drop, volley, hold }
+}
+
+test("Pair programming fires two parallel shots until its timer ends, then the basic gun is back", () => {
+  const { sim, fx, wait, drop, volley } = range()
+  assert.equal(volley().length, 1, "the basic gun fires one shot")
+  wait(1)
+
+  drop("pairProgramming")
+  assert.equal(sim.view().player!.weapon.kind, "pairProgramming")
+  const pair = volley()
+  assert.equal(pair.length, 2, "two shots side by side")
+  const [a, b] = pair
+  assert.deepEqual(a!.velocity, b!.velocity, "flying the same way")
+  assert.ok(Math.abs(a!.position.y - b!.position.y) >= 8, "a few pixels apart")
+  assert.ok(fx.some((e) => e.type === "shoot" && e.weapon === "pairProgramming"), "with its own sound cue")
+
+  wait(sim.view().player!.weapon.seconds + 0.1)
+  assert.equal(sim.view().player!.weapon.kind, "gun", "the timer ran out")
+  assert.equal(volley().length, 1, "back to one shot")
+})
+
+test("a new weapon pickup replaces the one in hand, with a full timer", () => {
+  const { sim, wait, drop } = range()
+  drop("pairProgramming")
+  const full = sim.view().player!.weapon.seconds
+  wait(5)
+  assert.ok(sim.view().player!.weapon.seconds < full - 4)
+  drop("pairProgramming")
+  assert.equal(sim.view().player!.weapon.kind, "pairProgramming")
+  assert.ok(sim.view().player!.weapon.seconds > full - 0.1, "the timer starts over")
+})
+
+test("Refactor and Tools upgrade Pair programming, and Hotfix speeds up any weapon", () => {
+  const { wait, drop, volley, hold } = range()
+  const basic = hold(2)
+  wait(1)
+  drop("pairProgramming")
+  assert.equal(hold(2), basic, "Pair programming fires as often as the basic gun")
+  wait(1)
+
+  drop("refactor", "tools")
+  const six = volley()
+  assert.equal(six.length, 6, "two barrels times a three-way spread")
+  assert.ok(six.every((shot) => shot.homing), "every shot homes in")
+  assert.equal(new Set(six.map((shot) => `${shot.velocity.x.toFixed(3)},${shot.velocity.y.toFixed(3)}`)).size, 3, "three directions, two shots each")
+  wait(1)
+
+  drop("hotfix")
+  assert.ok(hold(2) >= basic * 2, "Hotfix more than doubles the fire rate")
+})
+
+test("Pair programming arrives with Side Quests: never in Glacier, in Endless from its tier", () => {
+  assert.equal(contentTiers.pairProgramming, 1)
+  assert.ok(!isUnlocked("pairProgramming", levels[0]!.tier), "not in Glacier")
+  assert.ok(isUnlocked("pairProgramming", levels[1]!.tier), "from Side Quests on")
+  assert.ok(!isUnlocked("pairProgramming", tierOf(endlessLevel, 3)), "not in Endless's first waves")
+  assert.ok(isUnlocked("pairProgramming", tierOf(endlessLevel, 4)))
+
+  const seen = new Set<string>()
+  watch({ level: levels[0]!, seed: 5 }, 240, (v) => {
+    for (const pickup of v.pickups) seen.add(pickup.kind)
+  })
+  assert.ok(seen.size > 0, "Glacier drops something")
+  assert.ok(!seen.has("pairProgramming"), `Glacier dropped ${[...seen].join(", ")}`)
 })
 
 // --- Statuses: Code freeze -------------------------------------------------

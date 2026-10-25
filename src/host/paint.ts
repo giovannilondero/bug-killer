@@ -19,6 +19,7 @@ export const pickupIcons = {
   pizza: "🍕",
   tools: "🤖",
   ai: "🧠",
+  pairProgramming: "👥",
   codeFreeze: "❄️"
 } as const satisfies Record<PickupKind, string>
 
@@ -81,7 +82,10 @@ export const paintFloor = (level: Level): HTMLCanvasElement => {
 }
 
 /** Which floor a level has, in its arena and the current language, to know when to repaint it. */
-export const floorKey = (level: Level) => `${level.id}:${arenaOf(level).width}x${arenaOf(level).height}:${locale()}`
+export const floorKey = (level: Level) => {
+  const arena = arenaOf(level)
+  return `${level.id}:${arena.width}x${arena.height}:${locale()}`
+}
 
 export interface BugLook {
   flash: number

@@ -144,6 +144,7 @@ export const en: Strings = {
     pizza: { label: "Pizza", hint: "+2 sanity" },
     tools: { label: "Tools", hint: "homing shots" },
     ai: { label: "AI", hint: "auto turret" },
+    pairProgramming: { label: "Pair programming", hint: "two shots at once" },
     codeFreeze: { label: "Code freeze", hint: "hits freeze" }
   },
   floorCode: [

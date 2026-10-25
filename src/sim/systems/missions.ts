@@ -19,7 +19,7 @@ import { Ops } from "@typeonce/ritmo-math"
 const MISSION_POINTS = 400
 const ESCALATION_BUGS = 3
 
-const rewards: ReadonlyArray<PickupKind> = ["hotfix", "refactor", "coffee", "unitTest", "revert", "pizza", "codeFreeze"]
+const rewards: ReadonlyArray<PickupKind> = ["hotfix", "refactor", "coffee", "unitTest", "revert", "pizza", "pairProgramming", "codeFreeze"]
 
 const truncate = (text: string, max: number): string => (text.length > max ? `${text.slice(0, max - 1)}…` : text)
 
