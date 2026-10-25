@@ -120,7 +120,7 @@ export const readClientMessage = (raw: string, isLevel: (id: unknown) => id is L
         name: data.name,
         level: data.level,
         locale: data.locale,
-        hardcore: data.hardcore === true,
+        ...(data.hardcore === undefined ? {} : { hardcore: data.hardcore }),
         ...(data.arena === undefined ? {} : { arena: data.arena })
       }
     case "join":
