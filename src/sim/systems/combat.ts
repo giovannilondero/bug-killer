@@ -14,6 +14,7 @@ import {
   Breakpoint,
   Bug,
   BugFixed,
+  FlameBurst,
   Fx,
   Game,
   HostileShot,
@@ -32,10 +33,10 @@ import {
   pickupKinds
 } from "../schema.ts"
 import type { BugValue, PickupKind, PlayerValue, RunValue, Vec } from "../schema.ts"
-import { applyStatus, inflictedBy, tickStatuses } from "../statuses.ts"
+import { applyStatus, hasStatus, inflictedBy, spreads, statusKinds, tickStatuses } from "../statuses.ts"
 import type { StatusKind, StatusValue } from "../statuses.ts"
 import { isUnlocked, tierOf } from "../tiers.ts"
-import { isWeapon, pickUp } from "../weapons.ts"
+import { FLAME, inCone, isWeapon, pickUp } from "../weapons.ts"
 import { Ops } from "@typeonce/ritmo-math"
 
 const REOPEN_CHANCE = 0.4
@@ -46,7 +47,7 @@ export const comboMultiplier = (combo: number): number => Math.min(4, 1 + Math.f
 const dropChance = { Lowest: 0.05, Low: 0.07, Medium: 0.09, High: 0.2, Highest: 1 } as const satisfies Record<BugValue["priority"], number>
 
 /** Pickups that drop from bugs; reverts and pizza are rarer, the AI turret rarest, and only Tobia hands out the _strumenti_. */
-const dropWeights = { hotfix: 3, refactor: 3, coffee: 2, unitTest: 2, revert: 1, pizza: 1.5, tools: 0, ai: 0.5, pairProgramming: 1, codeFreeze: 2, memoryLeak: 2, pushForce: 0.4, breakpoint: 1 } as const satisfies Record<PickupKind, number>
+const dropWeights = { hotfix: 3, refactor: 3, coffee: 2, unitTest: 2, revert: 1, pizza: 1.5, tools: 0, ai: 0.5, pairProgramming: 1, codeFreeze: 2, memoryLeak: 2, pushForce: 0.4, flameWar: 1, breakpoint: 1 } as const satisfies Record<PickupKind, number>
 
 /**
  * How a hit lands: the statuses it applies (Code freeze from the hitter's
@@ -90,6 +91,7 @@ export const CombatSystem = Game.System(
     },
     events: {
       bombs: Game.System.readEvent(BombBlast),
+      flames: Game.System.readEvent(FlameBurst),
       fx: Game.System.writeEvent(Fx),
       fixed: Game.System.writeEvent(BugFixed),
       hurt: Game.System.writeEvent(PlayerHurt)
@@ -239,6 +241,19 @@ export const CombatSystem = Game.System(
         if (!gone.has(match.entity.id)) damageBug(match, damage.amount, damage.by, { overTime: true })
       }
     }
+    // This is fine 🔥: a status that spreads catches on to the bugs touching one that carries it, for the same developer.
+    for (const kind of statusKinds.filter((k) => spreads(k))) {
+      const carriers = bugs.filter((match) => !gone.has(match.entity.id) && hasStatus(match.data.bug.get().statuses, kind))
+      for (const match of bugs) {
+        const bug = match.data.bug.get()
+        if (gone.has(match.entity.id) || hasStatus(bug.statuses, kind)) continue
+        const at = match.data.position.get()
+        const radius = match.data.body.get().radius
+        const source = carriers.find((other) => overlaps(at, radius, other.data.position.get(), other.data.body.get().radius))
+        const by = source?.data.bug.get().statuses.find((status) => status.kind === kind)?.by
+        if (by !== undefined) match.data.bug.set({ ...bug, statuses: applyStatus(bug.statuses, kind, by) })
+      }
+    }
     for (const match of bosses) {
       const ticked = tickStatuses(match.data.boss.get().statuses, DT)
       match.data.boss.set({ ...match.data.boss.get(), statuses: ticked.statuses })
@@ -281,6 +296,17 @@ export const CombatSystem = Game.System(
           gone.add(shot.entity.id)
           commands.despawn(shot.entity)
         }
+      }
+    }
+
+    // Flame war: every bug and boss inside the cone gets a little damage and catches fire.
+    for (const flame of events.flames.all()) {
+      const hit: Hit = { inflict: [...(hitBy(flame.owner).inflict ?? []), "burn"] }
+      for (const match of bugs) {
+        if (!gone.has(match.entity.id) && inCone(flame, match.data.position.get())) damageBug(match, FLAME.damage, flame.owner, hit)
+      }
+      for (const match of bosses) {
+        if (!gone.has(match.entity.id) && inCone(flame, match.data.position.get())) damageBoss(match, FLAME.damage, flame.owner, hit)
       }
     }
 

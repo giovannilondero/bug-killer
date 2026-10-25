@@ -4,9 +4,9 @@ import { DT, PARTY, PLAYER, ROCKET } from "../constants.ts"
 import { makeBreakpoint, makeRocket, makeShot } from "../drafts.ts"
 import { clampToArena, distanceSquared, length, normalize } from "../math.ts"
 import { PlayerWrite } from "../queries.ts"
-import { BombBlast, Breakpoint, Fx, Game, Input, LevelSpec, Rocket, Run, Shot, pickupKinds } from "../schema.ts"
+import { BombBlast, Breakpoint, FlameBurst, Fx, Game, Input, LevelSpec, Rocket, Run, Shot, pickupKinds } from "../schema.ts"
 import type { InputValue, Vec } from "../schema.ts"
-import { HOTFIX_COOLDOWN, WEAPONS, basicGun } from "../weapons.ts"
+import { HOTFIX_COOLDOWN, WEAPONS, basicGun, flameCone } from "../weapons.ts"
 import type { WeaponKind } from "../weapons.ts"
 import { Ops } from "@typeonce/ritmo-math"
 
@@ -51,7 +51,8 @@ export const PlayerControlSystem = Game.System(
     },
     events: {
       fx: Game.System.writeEvent(Fx),
-      bomb: Game.System.writeEvent(BombBlast)
+      bomb: Game.System.writeEvent(BombBlast),
+      flame: Game.System.writeEvent(FlameBurst)
     },
     commands: Game.System.commands(Game.System.spawns(Shot, Rocket, Breakpoint))
   },
@@ -79,7 +80,13 @@ export const PlayerControlSystem = Game.System(
       gun: (trigger) => bullets(trigger, [0]),
       pairProgramming: (trigger) => bullets(trigger, [-8, 8]),
       // One rocket to the crosshair, kept on the floor so the far explosion happens where it can be seen.
-      pushForce: (trigger) => commands.spawn(makeRocket(trigger.muzzle, clampToArena(trigger.target, ROCKET.radius, arena), trigger.owner))
+      pushForce: (trigger) => commands.spawn(makeRocket(trigger.muzzle, clampToArena(trigger.target, ROCKET.radius, arena), trigger.owner)),
+      // No bullets: a puff of fire that burns everything in the cone, resolved in Combat.
+      flameWar: (trigger) => {
+        const cone = flameCone(trigger.muzzle, trigger.aim)
+        events.flame.emit({ ...cone, owner: trigger.owner })
+        events.fx.emit({ type: "flame", x: cone.origin.x, y: cone.origin.y, angle: Ops.atan2(cone.direction.y, cone.direction.x), range: cone.range, spread: cone.halfAngle })
+      }
     }
 
     for (const { data } of team) {

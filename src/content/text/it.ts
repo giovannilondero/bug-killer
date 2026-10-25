@@ -148,6 +148,7 @@ export const it: Strings = {
     codeFreeze: { label: "Code freeze", hint: "i colpi congelano" },
     memoryLeak: { label: "Memory leak", hint: "i colpi avvelenano" },
     pushForce: { label: "git push --force", hint: "un razzo: boom dove miri" },
+    flameWar: { label: "Flame war", hint: "un cono di fuoco: this is fine 🔥" },
     breakpoint: { label: "Breakpoint", hint: "+1 trappola" }
   },
   floorCode: [

@@ -29,7 +29,7 @@ export const makePlayer = (at: Vec, teammate: TeammateValue, breakpoints = 0) =>
       bombs: PLAYER.bombs,
       breakpoints,
       weapon: basicGun,
-      buffs: { hotfix: 0, refactor: 0, coffee: 0, unitTest: 0, revert: 0, pizza: 0, tools: 0, ai: 0, pairProgramming: 0, codeFreeze: 0, memoryLeak: 0, pushForce: 0, breakpoint: 0 },
+      buffs: { hotfix: 0, refactor: 0, coffee: 0, unitTest: 0, revert: 0, pizza: 0, tools: 0, ai: 0, pairProgramming: 0, codeFreeze: 0, memoryLeak: 0, pushForce: 0, flameWar: 0, breakpoint: 0 },
       revive: 0,
       points: 0,
       fixed: 0

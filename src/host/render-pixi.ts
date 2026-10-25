@@ -362,6 +362,17 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
         }
         floaters.push({ x: event.x, y: event.y - 30, life: 1.3, max: 1.3, text: t().hud.breakpointHit, sub: "", color: "#9be7ff", big: false })
         break
+      case "flame":
+        // A puff of fire fanning out along the cone, yellow at the core, red at the edges.
+        for (let i = 0; i < 8; i++) {
+          const a = event.angle + (Math.random() * 2 - 1) * event.spread
+          // Particles slow down by 8% a frame, so they travel about a fifth of their speed.
+          const s = (event.range / 0.21) * (0.35 + Math.random() * 0.65)
+          const life = 0.25 + Math.random() * 0.15
+          const color = ["#fff3a0", "#ffd84a", "#ff9440", "#ff4d2d"][Math.floor(Math.random() * 4)]!
+          particles.push({ x: event.x, y: event.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life, max: life, color, size: 5 + Math.random() * 5 })
+        }
+        break
       case "explosion":
         shake = Math.max(shake, 12)
         flash = Math.max(flash, 0.25)
@@ -405,7 +416,7 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
     const k = options.frozen ? 0 : Math.floor((((age % period) + period) % period) / period * frames) % frames
     const blur = options.boss ? 30 : 12
     const half = Math.max(r * 1.45 + 4, r + blur * 1.6)
-    const look = `${options.flash > 0 ? "f" : ""}${options.reopened ? "r" : ""}${options.trait === "armored" ? "a" : ""}${options.boss ? "b" : ""}${options.frozen ? "i" : ""}${options.poisoned ? "p" : ""}`
+    const look = `${options.flash > 0 ? "f" : ""}${options.reopened ? "r" : ""}${options.trait === "armored" ? "a" : ""}${options.boss ? "b" : ""}${options.frozen ? "i" : ""}${options.poisoned ? "p" : ""}${options.burning ? "n" : ""}`
     return bakery.bake(`bug|${color}|${r}|${look}|${k}`, wres, around(half), (g) => paintBug(g, r, color, (k * period) / frames, options))
   }
 
@@ -424,6 +435,10 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
       body = 1
     }
     W.sprite(bugFrame(full, color, age, options), x, y, { rotation: heading, scale: r / full, alpha: body })
+    if (options.burning) {
+      const size = Math.round(full * 0.9)
+      W.sprite(bakery.text(wres, "🔥", `${size}px ${SANS}`, "#ffffff"), x, y - r * 0.7 + Math.sin(age * 20) * 2, { scale: r / full, alpha })
+    }
     if (options.trait === "armored") {
       const size = Math.round(full * 0.7)
       W.sprite(bakery.text(wres, "🔒", `${size}px ${SANS}`, "#ffffff"), x, y + r * 0.25, { scale: r / full, alpha })
@@ -548,7 +563,7 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
     if (boss.pattern === "crash" && Math.sin(time * 30) > 0.7) {
       drawBug(x + Math.random() * 10 - 5, y, boss.radius, boss.radius, "#ff00ff", heading, boss.age, { flash: 0, trait: "plain", reopened: false, boss: true }, 0.4)
     }
-    drawBug(x, y, boss.radius, boss.radius, boss.color, heading, boss.age, { flash: boss.hitFlash, trait: "plain", reopened: true, boss: true, frozen: hasStatus(boss.statuses, "freeze"), poisoned: hasStatus(boss.statuses, "poison") }, 1)
+    drawBug(x, y, boss.radius, boss.radius, boss.color, heading, boss.age, { flash: boss.hitFlash, trait: "plain", reopened: true, boss: true, frozen: hasStatus(boss.statuses, "freeze"), poisoned: hasStatus(boss.statuses, "poison"), burning: hasStatus(boss.statuses, "burn") }, 1)
     if (boss.shield > 0) {
       const r = boss.radius * 1.35
       W.sprite(bakery.bake(`shield|${r}`, wres, around(r + 34), (g) => {
@@ -704,7 +719,7 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
         }), x, y, { rotation: -time * 3, alpha: appear })
       }
       const color = bug.resurrectedBy ? "#9dff6b" : bugKinds[bug.priority].color
-      drawBug(x, y, bug.radius * (0.4 + appear * 0.6), bug.radius, color, heading, bug.age, { flash: bug.hitFlash, trait: bug.trait, reopened: bug.reopened || bug.resurrectedBy !== null, frozen: hasStatus(bug.statuses, "freeze"), poisoned: hasStatus(bug.statuses, "poison") }, appear)
+      drawBug(x, y, bug.radius * (0.4 + appear * 0.6), bug.radius, color, heading, bug.age, { flash: bug.hitFlash, trait: bug.trait, reopened: bug.reopened || bug.resurrectedBy !== null, frozen: hasStatus(bug.statuses, "freeze"), poisoned: hasStatus(bug.statuses, "poison"), burning: hasStatus(bug.statuses, "burn") }, appear)
       const isTarget = mission?.kind === "killTarget" && mission.target === bug.key
       if (isTarget) {
         const pulse = bug.radius * 1.6 + Math.sin(time * 8) * 4

@@ -7,7 +7,7 @@ import type { Locale } from "../content/i18n.ts"
 import type { BossPattern, Level } from "../content/levels.ts"
 import type { StatusValue } from "./statuses.ts"
 import type { TierTable } from "./tiers.ts"
-import type { WeaponKind, WeaponValue } from "./weapons.ts"
+import type { Cone, WeaponKind, WeaponValue } from "./weapons.ts"
 
 export type Vec = { x: number; y: number }
 
@@ -95,7 +95,7 @@ export const HostileShot = Descriptor.Component<{ damage: number; life: number; 
 /** A slow rocket flying to the point it was aimed at, where it explodes unless a bug or a boss is in the way first. */
 export const Rocket = Descriptor.Component<{ target: Vec; owner: number }>()("BugKiller/Rocket")
 
-export const pickupKinds = ["hotfix", "refactor", "coffee", "unitTest", "revert", "pizza", "tools", "ai", "pairProgramming", "codeFreeze", "memoryLeak", "pushForce", "breakpoint"] as const
+export const pickupKinds = ["hotfix", "refactor", "coffee", "unitTest", "revert", "pizza", "tools", "ai", "pairProgramming", "codeFreeze", "memoryLeak", "pushForce", "flameWar", "breakpoint"] as const
 export type PickupKind = (typeof pickupKinds)[number]
 export const Pickup = Descriptor.Component<{ kind: PickupKind; life: number }>()("BugKiller/Pickup")
 
@@ -259,6 +259,8 @@ export type FxValue =
   | { type: "turret"; x: number; y: number }
   | { type: "hallucination"; x: number; y: number }
   | { type: "explosion"; x: number; y: number; radius: number }
+  /** One puff of Flame war: from `x, y` along `angle`, as far and as wide as the cone it burns. */
+  | { type: "flame"; x: number; y: number; angle: number; range: number; spread: number }
   | { type: "breakpointSet"; x: number; y: number }
   | { type: "breakpoint"; x: number; y: number }
 export const Fx = Descriptor.Event<FxValue>()("BugKiller/Fx")
@@ -276,6 +278,8 @@ export const BugFixed = Descriptor.Event<{ key: string; priority: Priority }>()(
 export const PlayerHurt = Descriptor.Event<{ damage: number; slot: number }>()("BugKiller/PlayerHurt")
 /** `git reset --hard`: a developer's screen-clearing bomb. */
 export const BombBlast = Descriptor.Event<Vec & { slot: number }>()("BugKiller/BombBlast")
+/** Flame war: one puff of fire, burning whatever is inside the cone, for the developer `owner`. */
+export const FlameBurst = Descriptor.Event<Cone & { owner: number }>()("BugKiller/FlameBurst")
 
 /**
  * Where effects and chat leave the simulation: particles, sounds, and the
@@ -301,6 +305,6 @@ export const Game = Schema.bind(
       Schema.requires(Breakpoint, Position, Body)
     ],
     resources: { Input, Party, LevelSpec, Language, Tiers, Rng, Run, Missions, Interruptions, Calls },
-    events: { Fx, Chat, BugFixed, PlayerHurt, BombBlast }
+    events: { Fx, Chat, BugFixed, PlayerHurt, BombBlast, FlameBurst }
   })
 )
