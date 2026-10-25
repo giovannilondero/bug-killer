@@ -118,7 +118,7 @@ export const loopSpot = (arena: Arena, course: number): Vec => ({
 /** Where the top of a stack overflow's tower of `frames` frames stands, on top of the boss. */
 export const stackTop = (position: Vec, radius: number, frames: number): Vec => ({
   x: position.x,
-  y: position.y - radius - (frames - 1) * STACK.frameHeight
+  y: position.y - radius * 0.8 - (frames - 1) * STACK.frameHeight
 })
 
 /** The key every frame a stack overflow drops starts with. */
