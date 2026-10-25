@@ -21,6 +21,7 @@ export const pickupIcons = {
   ai: "🧠",
   pairProgramming: "👥",
   codeFreeze: "❄️",
+  memoryLeak: "🧪",
   flameWar: "🤬"
 } as const satisfies Record<PickupKind, string>
 
@@ -95,6 +96,8 @@ export interface BugLook {
   boss?: boolean
   /** Code freeze: iced over, legs still. */
   frozen?: boolean
+  /** Memory leak: oozing green, with bubbles. */
+  poisoned?: boolean
   /** This is fine 🔥: scorched orange, with a flame on top drawn by the renderer. */
   burning?: boolean
 }
@@ -169,6 +172,15 @@ export const paintBug = (ctx: CanvasRenderingContext2D, r: number, color: string
       ctx.moveTo(gx * r - s, gy * r); ctx.lineTo(gx * r + s, gy * r)
       ctx.moveTo(gx * r, gy * r - s); ctx.lineTo(gx * r, gy * r + s)
       ctx.stroke()
+    }
+  }
+  if (options.poisoned) {
+    // A green ooze over the shell and a few bubbles rising off it.
+    ctx.fillStyle = "rgba(120, 255, 90, 0.3)"
+    ctx.beginPath(); ctx.ellipse(-r * 0.15, 0, r * 0.95, r * 0.8, 0, 0, Math.PI * 2); ctx.fill()
+    ctx.fillStyle = "rgba(150, 255, 110, 0.85)"
+    for (const [bx, by, br] of [[-0.6, -0.75, 0.14], [0.1, -0.95, 0.1], [-0.25, 0.85, 0.12]] as const) {
+      ctx.beginPath(); ctx.arc(bx * r, by * r, Math.max(1.5, br * r), 0, Math.PI * 2); ctx.fill()
     }
   }
 }

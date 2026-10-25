@@ -5,7 +5,7 @@ import type { PickupKind } from "./schema.ts"
  * remembers who applied it, so whatever it does later (damage, a kill)
  * counts for that developer.
  */
-export const statusKinds = ["freeze", "burn"] as const
+export const statusKinds = ["freeze", "poison", "burn"] as const
 export type StatusKind = (typeof statusKinds)[number]
 
 export interface StatusValue {
@@ -35,6 +35,8 @@ export interface StatusEffect {
 export const statusEffects = {
   /** Code freeze: the bug stops dead, a boss is only slowed. */
   freeze: { seconds: 2, bugSpeed: 0, bossSpeed: 0.5, dps: 0, maxStacks: 1 },
+  /** Memory leak: health drains for about 6 s, faster with every hit piled up; it moves on when the bug dies. */
+  poison: { seconds: 6, bugSpeed: 1, bossSpeed: 1, dps: 0.4, maxStacks: 5 },
   /** This is fine 🔥: fast damage for a few seconds, catching on to every bug it touches. */
   burn: { seconds: 3, bugSpeed: 1, bossSpeed: 1, dps: 2.5, maxStacks: 1, spreads: true }
 } as const satisfies Record<StatusKind, StatusEffect>
@@ -42,7 +44,7 @@ export const statusEffects = {
 export type StatusTable = Readonly<Record<StatusKind, StatusEffect>>
 
 /** Timed buffs that make every hit of their holder apply a status, whatever the weapon. */
-export const statusBuffs = [{ buff: "codeFreeze", status: "freeze" }] as const satisfies ReadonlyArray<{ buff: PickupKind; status: StatusKind }>
+export const statusBuffs = [{ buff: "codeFreeze", status: "freeze" }, { buff: "memoryLeak", status: "poison" }] as const satisfies ReadonlyArray<{ buff: PickupKind; status: StatusKind }>
 
 /** The statuses a developer's hits apply right now, from the buffs they hold. */
 export const inflictedBy = (buffs: Readonly<Record<PickupKind, number>>): ReadonlyArray<StatusKind> =>

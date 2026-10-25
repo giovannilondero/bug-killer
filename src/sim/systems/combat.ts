@@ -42,7 +42,7 @@ export const comboMultiplier = (combo: number): number => Math.min(4, 1 + Math.f
 const dropChance = { Lowest: 0.05, Low: 0.07, Medium: 0.09, High: 0.2, Highest: 1 } as const satisfies Record<BugValue["priority"], number>
 
 /** Pickups that drop from bugs; reverts and pizza are rarer, the AI turret rarest, and only Tobia hands out the _strumenti_. */
-const dropWeights = { hotfix: 3, refactor: 3, coffee: 2, unitTest: 2, revert: 1, pizza: 1.5, tools: 0, ai: 0.5, pairProgramming: 1, codeFreeze: 2, flameWar: 1 } as const satisfies Record<PickupKind, number>
+const dropWeights = { hotfix: 3, refactor: 3, coffee: 2, unitTest: 2, revert: 1, pizza: 1.5, tools: 0, ai: 0.5, pairProgramming: 1, codeFreeze: 2, memoryLeak: 2, flameWar: 1 } as const satisfies Record<PickupKind, number>
 
 /**
  * How a hit lands: the statuses it applies (Code freeze from the hitter's
@@ -121,6 +121,19 @@ export const CombatSystem = Game.System(
       run.comboTimer = COMBO_WINDOW
       run.lastProgressAt = run.time
       credit(by, points, 0)
+
+      // Memory leak: the poison moves on to the nearest bug, still owned by whoever applied it.
+      const leak = bug.statuses.find((status) => status.kind === "poison")
+      if (leak) {
+        const heir = bugs
+          .filter((other) => !gone.has(other.entity.id))
+          .reduce<(typeof bugs)[number] | null>((best, other) =>
+            !best || distanceSquared(other.data.position.get(), at) < distanceSquared(best.data.position.get(), at) ? other : best, null)
+        if (heir) {
+          const value = heir.data.bug.get()
+          heir.data.bug.set({ ...value, statuses: applyStatus(value.statuses, "poison", leak.by) })
+        }
+      }
 
       if (bug.trait === "reopens" && !bug.reopened && random.next() < REOPEN_CHANCE) {
         // QA says no: the ticket comes straight back.
