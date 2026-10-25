@@ -5,12 +5,12 @@ import { arenaOf } from "../src/content/arenas.ts"
 import type { BacklogBug } from "../src/content/bugs.ts"
 import { endlessLevel, levels } from "../src/content/levels.ts"
 import type { Level } from "../src/content/levels.ts"
-import { EPIC } from "../src/sim/constants.ts"
+import { EPIC, PLAYER } from "../src/sim/constants.ts"
 import { makeBug } from "../src/sim/drafts.ts"
 import { createSimulation, idleInput } from "../src/sim/simulation.ts"
 import type { View } from "../src/sim/simulation.ts"
-import { Bug, Game, Player } from "../src/sim/schema.ts"
-import type { InputValue, Vec } from "../src/sim/schema.ts"
+import { Bug, Game } from "../src/sim/schema.ts"
+import type { FxValue, InputValue, Vec } from "../src/sim/schema.ts"
 import { contentTiers } from "../src/sim/tiers.ts"
 import type { Tier } from "../src/sim/tiers.ts"
 
@@ -22,37 +22,23 @@ const atEpicTier: Level = { ...levels[3]!, tier: contentTiers.epic, bugs: [] }
 
 const scene = (input: (view: () => View) => InputValue = () => idleInput) => {
   let current: View | null = null
+  const fx: Array<FxValue> = []
   const made = createSimulation({
     level: atEpicTier,
     seed: 3,
     locale: "en",
     input: { snapshot: () => input(() => current!) },
-    presentation: { fx: () => undefined, chat: () => undefined }
+    presentation: { fx: (e) => fx.push(e), chat: () => undefined }
   })
   if (!made.ok) throw new Error(JSON.stringify(made.error))
   const sim = made.value
   current = sim.view()
-  const place = (seed: BacklogBug, at: Vec) => {
+  const place = (seeds: ReadonlyArray<readonly [BacklogBug, Vec]>) => {
     const Place = Game.System("Test/Place", { commands: Game.System.commands(Game.System.spawns(Bug)) }, ({ commands }) => {
-      commands.spawn(makeBug(seed, at))
+      for (const [seed, at] of seeds) commands.spawn(makeBug(seed, at))
     })
     assert.ok(sim.runtime.tick(Game.Schedule(Place, Game.Schedule.applyDeferred())).ok)
     current = sim.view()
-  }
-  /** Takes the ticket out of the arena, as if it had been closed. */
-  const close = (key: string) => {
-    const Close = Game.System("Test/Close", { queries: { bugs: Game.Query({ selection: { bug: Game.Query.read(Bug) } }) }, commands: Game.System.commands(Game.System.despawns(Bug)) }, ({ queries, commands }) => {
-      for (const match of queries.bugs.each()) if (match.data.bug.get().key === key) commands.despawn(match.entity)
-    })
-    assert.ok(sim.runtime.tick(Game.Schedule(Close, Game.Schedule.applyDeferred())).ok)
-    current = sim.view()
-  }
-  /** Nothing hurts the developer for a while: the nest is watched, not fought. */
-  const shield = () => {
-    const Shield = Game.System("Test/Shield", { queries: { player: Game.Query({ selection: { player: Game.Query.write(Player) } }) } }, ({ queries }) => {
-      for (const match of queries.player.each()) match.data.player.update((p) => ({ ...p, invulnerable: 999 }))
-    })
-    assert.ok(sim.runtime.tick(Game.Schedule(Shield)).ok)
   }
   /** Steps until `done` holds (or the seconds run out), handing every view to `see`. */
   const until = (done: (view: View) => boolean, seconds: number, see: (view: View) => void = () => undefined) => {
@@ -63,66 +49,128 @@ const scene = (input: (view: () => View) => InputValue = () => idleInput) => {
     }
     return current!
   }
-  return { place, close, shield, until, view: () => current! }
+  return { place, until, fx, view: () => current! }
 }
 
 const childrenOf = (view: View, key: string) => view.bugs.filter((bug) => bug.key.startsWith(`${key}-`))
 
+const towards = (from: Vec, to: Vec): Vec => {
+  const length = Math.hypot(to.x - from.x, to.y - from.y) || 1
+  return { x: (to.x - from.x) / length, y: (to.y - from.y) / length }
+}
+
+/** The bug nearest to the developer, if any. */
+const nearestBug = (view: View, only: (bug: View["bugs"][number]) => boolean = () => true) => {
+  const me = view.player!.position
+  let best: View["bugs"][number] | null = null
+  for (const bug of view.bugs.filter(only)) {
+    if (!best || Math.hypot(bug.position.x - me.x, bug.position.y - me.y) < Math.hypot(best.position.x - me.x, best.position.y - me.y)) best = bug
+  }
+  return best
+}
+
+/** Stands still and shoots whatever is nearest, sub-tasks first since they come closer. */
+const gunner = (view: () => View): InputValue => {
+  const target = nearestBug(view())
+  return target ? { ...idleInput, aim: target.position, fire: true } : idleInput
+}
+
+/**
+ * Runs circles of `radius` around `centre`, faster than any sub-task, so the brood
+ * trails behind on a smaller circle and never reaches the developer.
+ */
+const orbit = (me: Vec, centre: Vec, radius: number): Vec => {
+  const out = towards(centre, me)
+  const drift = Math.max(-1, Math.min(1, (radius - Math.hypot(me.x - centre.x, me.y - centre.y)) / 40))
+  return { x: -out.y + out.x * drift, y: out.x + out.y * drift }
+}
+
 test("an Epic never moves and releases a Lowest or Low sub-task about every 3 s, never more than 6 alive", () => {
-  const { place, close, shield, until, view } = scene()
-  shield()
-  const at = { x: 300, y: 260 }
-  place(epic("MONO-900"), at)
+  const key = "MONO-900"
+  let at: Vec = { x: 0, y: 0 }
+  /** Once the brood is full, shoot one sub-task down. */
+  let hunting = false
+  const kite = (view: () => View): InputValue => {
+    const v = view()
+    const me = v.player!.position
+    const move = orbit(me, at, 300)
+    const prey = hunting ? nearestBug(v, (bug) => bug.parent === key) : null
+    return prey ? { ...idleInput, move, aim: prey.position, fire: true } : { ...idleInput, move }
+  }
+  const { place, until, view } = scene(kite)
+  const start = view().player!.position
+  at = { x: start.x + 300, y: start.y }
+  place([[epic(key), at]])
   assert.equal(view().bugs[0]!.type, "epic")
 
   /** The second each new child first showed up. */
   const born = new Map<string, number>()
   let most = 0
   let seconds = 0
-  until(() => false, 30, (v) => {
+  const watch = (v: View) => {
     seconds += 1 / 60
-    const nest = v.bugs.find((bug) => bug.key === "MONO-900")!
+    const nest = v.bugs.find((bug) => bug.key === key)!
     assert.deepEqual(nest.position, at, "the Epic stays where it was put")
-    const children = childrenOf(v, "MONO-900")
+    const children = childrenOf(v, key)
     most = Math.max(most, children.length)
     for (const child of children) if (!born.has(child.key)) born.set(child.key, seconds)
-  })
+  }
+  until(() => false, 24, watch)
+  assert.equal(view().player!.hp, PLAYER.maxHp, "kiting kept the developer out of reach")
   assert.equal(most, EPIC.brood, "never more than 6 alive")
   assert.deepEqual([...born.keys()], ["MONO-900-1", "MONO-900-2", "MONO-900-3", "MONO-900-4", "MONO-900-5", "MONO-900-6"])
   const times = [...born.values()]
   for (let i = 1; i < times.length; i++) {
     assert.ok(Math.abs(times[i]! - times[i - 1]! - EPIC.every) < 0.1, `released at ${times.map((t) => t.toFixed(2)).join(", ")} s`)
   }
-  for (const child of childrenOf(view(), "MONO-900")) {
+  for (const child of childrenOf(view(), key)) {
     assert.equal(child.type, "subtask")
     assert.ok(child.priority === "Lowest" || child.priority === "Low", child.priority)
   }
 
-  // One child closed: the nest makes another, and keeps counting.
-  const victim = childrenOf(view(), "MONO-900")[0]!
-  close(victim.key)
-  assert.equal(childrenOf(view(), "MONO-900").length, EPIC.brood - 1)
-  const refilled = until((v) => childrenOf(v, "MONO-900").length === EPIC.brood, EPIC.every + 0.5)
-  assert.ok(childrenOf(refilled, "MONO-900").some((bug) => bug.key === "MONO-900-7"))
+  // A child closed: the nest makes another, and keeps counting.
+  hunting = true
+  until((v) => childrenOf(v, key).length < EPIC.brood, 5, watch)
+  hunting = false
+  assert.ok(childrenOf(view(), key).length < EPIC.brood, "a sub-task was shot down")
+  const refilled = until((v) => childrenOf(v, key).some((bug) => bug.key === "MONO-900-7"), EPIC.every + 0.5, watch)
+  assert.ok(childrenOf(refilled, key).some((bug) => bug.key === "MONO-900-7"))
+})
+
+test("an Epic stays a still nest whatever its status: it never deploys, wanders or reopens", () => {
+  const { place, until, fx, view } = scene(gunner)
+  const me = view().player!.position
+  // A Deploying Epic within a fuse's reach, one In development, and a row of Epics Ready for QA.
+  const rows: Array<readonly [BacklogBug, Vec]> = [
+    [{ ...epic("MONO-910", "Lowest"), status: "Deploying" }, { x: me.x + 90, y: me.y }],
+    [{ ...epic("MONO-911", "Lowest"), status: "In development" }, { x: me.x - 90, y: me.y }],
+    ...[0, 1, 2, 3, 4].map((i) => [{ ...epic(`MONO-92${i}`, "Lowest"), status: "Ready for QA" }, { x: me.x + (i - 2) * 90, y: me.y - 160 }] as const)
+  ]
+  place(rows)
+  for (const bug of view().bugs) assert.equal(bug.trait, "plain", `${bug.key} is a plain nest`)
+
+  const spots = new Map(rows.map(([seed, at]) => [seed.key, at]))
+  const closed = new Set<string>()
+  until((v) => [...spots.keys()].every((key) => closed.has(key)), 60, (v) => {
+    for (const bug of v.bugs) {
+      const at = spots.get(bug.key)
+      if (!at) continue
+      assert.ok(!closed.has(bug.key), `${bug.key} came back`)
+      assert.deepEqual(bug.position, at, `${bug.key} stays where it was put`)
+    }
+    for (const key of spots.keys()) if (!v.bugs.some((bug) => bug.key === key)) closed.add(key)
+  })
+  assert.equal(closed.size, spots.size, "all closed")
+  until(() => false, 1)
+  assert.ok(!view().bugs.some((bug) => spots.has(bug.key)), "none reopened")
+  assert.ok(!fx.some((e) => e.type === "fuse" || e.type === "reopen"), "no fuse, no reopen")
 })
 
 test("the wave doesn't complete while an Epic is open, and does once it is closed; the notes list it and count its sub-tasks", () => {
   const key = "MONO-901"
-  /** Stands still and shoots whatever is nearest, sub-tasks first since they come closer. */
-  const gunner = (view: () => View): InputValue => {
-    const v = view()
-    const me = v.player!.position
-    let best: Vec | null = null
-    let distance = Infinity
-    for (const bug of v.bugs) {
-      const d = (bug.position.x - me.x) ** 2 + (bug.position.y - me.y) ** 2
-      if (d < distance) [best, distance] = [bug.position, d]
-    }
-    return best ? { ...idleInput, aim: best, fire: true } : idleInput
-  }
   const { place, until, view } = scene(gunner)
   const me = view().player!.position
-  place(epic(key, "High"), { x: me.x, y: me.y - 260 })
+  place([[epic(key, "High"), { x: me.x, y: me.y - 260 }]])
 
   let wasOpen = false
   const done = until((v) => v.run.phase !== "waves", 90, (v) => {

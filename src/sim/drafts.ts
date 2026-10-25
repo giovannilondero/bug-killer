@@ -60,8 +60,8 @@ export const makeBug = (
   const hp = Math.ceil((resurrectedBy ? kind.hp * RESURRECT.hpFactor : reopened ? kind.hp * 0.6 : kind.hp) * toughness.hp * scale.hp)
   const speed = kind.speed * (resurrectedBy ? RESURRECT.speedFactor : reopened ? 1.25 : 1) * toughness.speed * scale.speed
   const status = traitOf(seed.status)
-  // Before its tier a Deploying ticket is just a bug.
-  const trait = status === "deploying" && options.deploys === false ? "plain" : status
+  // Before its tier a Deploying ticket is just a bug; an Epic is a still nest whatever its status.
+  const trait = type === "epic" || (status === "deploying" && options.deploys === false) ? "plain" : status
   return Game.Command.spawn(
     Game.Command.entry(Position, at),
     Game.Command.entry(Velocity, { x: 0, y: 0 }),
