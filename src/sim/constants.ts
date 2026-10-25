@@ -33,6 +33,7 @@ export const SHOT = { speed: 820, life: 0.85, radius: 5, damage: 1 } as const
 /** `git push --force`: a slow rocket, and the blast that never hurts a developer. */
 export const ROCKET = { speed: 430, radius: 8, damage: 6, blastRadius: 130, cooldown: 0.9 } as const
 export const HOSTILE_SHOT = { radius: 9, life: 5 } as const
+export const PICKUP_RADIUS = 16
 
 export const BOMB_RADIUS = 520
 

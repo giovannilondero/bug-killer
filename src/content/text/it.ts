@@ -160,7 +160,8 @@ export const it: Strings = {
     microservices: "Quaranta servizi, un bug in ognuno. Debora lo vuole più pop entro venerdì.",
     legacy: "Schermo verde, COBOL e un loop che nessuno osa toccare. Più dura che mai.",
     endless: "Tutti i bug di tutti i progetti, per sempre. Quanto resisti?",
-    hotdesk: "Niente scrivania fissa, niente spazio per i gomiti. Il boss del 2FA ha prenotato la sala riunioni."
+    hotdesk: "Niente scrivania fissa, niente spazio per i gomiti. Il boss del 2FA ha prenotato la sala riunioni.",
+    cubicles: "Un open space diviso in cubicoli: i muri fermano i tuoi colpi e i loro. Il boss del crash si riavvia dietro ognuno."
   },
   pickups: {
     hotfix: { label: "Hotfix", hint: "fuoco rapido" },
@@ -364,7 +365,7 @@ export const it: Strings = {
   },
   arena: {
     label: "Arena",
-    names: { normal: "Normale", small: "Piccola" },
+    names: { normal: "Normale", small: "Piccola", walls: "Muri" },
     locked: (bonus) => `🔒 si apre con ${bonus}`
   }
 }

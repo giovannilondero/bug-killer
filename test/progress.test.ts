@@ -188,3 +188,13 @@ test("an Endless arena can be picked once its bonus level is unlocked", () => {
   const third = clearSprint(loadProgress(JSON.stringify({ unlocked: 3, best: {} })), 2, { score: 100, solo: true })
   assert.equal(endlessArenaUnlocked(third, "small"), true, "Hotdesk opens the small arena")
 })
+
+test("Cubicles unlocks after sprint 5, and opens the Walls arena for Endless", () => {
+  const cubicles = bonusLevels.find((level) => level.id === "cubicles")!
+  const fourCleared = loadProgress(JSON.stringify({ unlocked: 5, best: {} }))
+  assert.equal(bonusUnlocked(fourCleared, cubicles), false)
+  assert.equal(endlessArenaUnlocked(fourCleared, "walls"), false)
+  const fifth = clearSprint(fourCleared, 4, { score: 100, solo: true })
+  assert.equal(bonusUnlocked(fifth, cubicles), true)
+  assert.equal(endlessArenaUnlocked(fifth, "walls"), true, "Cubicles opens the Walls arena")
+})

@@ -1,14 +1,16 @@
 import * as Random from "@typeonce/ritmo-math/Random"
 import { Ops } from "@typeonce/ritmo-math"
 
+import { arenaOf } from "../../content/arenas.ts"
 import { DT, TURRET } from "../constants.ts"
 import { makeShot } from "../drafts.ts"
 import { angleTo, nearest } from "../math.ts"
 import { BossRead, BugRead } from "../queries.ts"
-import { Fx, Game, Position, Rng, Run, Shot, Turret } from "../schema.ts"
+import { Fx, Game, LevelSpec, Position, Rng, Run, Shot, Turret } from "../schema.ts"
+import { blocked } from "../walls.ts"
 
 /**
- * The "AI" turret: turns toward the nearest bug or boss in range and keeps
+ * The "AI" turret: turns toward the nearest bug or boss in range and in sight, and keeps
  * shooting until it runs out. Every few seconds it hallucinates a target
  * and fires at nothing, with full confidence.
  */
@@ -20,7 +22,7 @@ export const TurretSystem = Game.System(
       bugs: BugRead,
       bosses: BossRead
     },
-    resources: { run: Game.System.readResource(Run), rng: Game.System.writeResource(Rng) },
+    resources: { run: Game.System.readResource(Run), rng: Game.System.writeResource(Rng), level: Game.System.readResource(LevelSpec) },
     events: { fx: Game.System.writeEvent(Fx) },
     commands: Game.System.commands(Game.System.spawns(Shot), Game.System.despawns(Turret))
   },
@@ -35,6 +37,7 @@ export const TurretSystem = Game.System(
     }
     const targets = [...queries.bugs.each(), ...queries.bosses.each()].map((match) => match.data.position.get())
     const random = Random.draw(resources.rng)
+    const arena = arenaOf(resources.level.get())
 
     for (const match of turrets) {
       const at = match.data.position.get()
@@ -54,7 +57,8 @@ export const TurretSystem = Game.System(
         turret.cooldown = TURRET.cooldown
       }
 
-      const target = nearest(at, targets)
+      // It only sees what no wall hides.
+      const target = nearest(at, targets.filter((spot) => !blocked(arena, at, spot)))
       const inRange = target !== null && (target.x - at.x) ** 2 + (target.y - at.y) ** 2 <= TURRET.range ** 2
       if (turret.hallucinateIn <= 0 && turret.cooldown === 0) {
         turret.aim = random.range(0, Math.PI * 2)

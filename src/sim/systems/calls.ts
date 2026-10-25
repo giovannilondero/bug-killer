@@ -7,7 +7,7 @@ import type { Arena } from "../../content/arenas.ts"
 import { CALLS, DT } from "../constants.ts"
 import { makePickup } from "../drafts.ts"
 import { allowedPickups } from "../hardcore.ts"
-import { clamp, distanceSquared } from "../math.ts"
+import { clamp, clampToArena, distanceSquared } from "../math.ts"
 import { PlayerRead, standing } from "../queries.ts"
 import { callKinds } from "../../content/clients.ts"
 import { Calls, Chat, Fx, Game, Hardcore, Language, LevelSpec, Pickup, Rng, Run, Tiers } from "../schema.ts"
@@ -17,15 +17,15 @@ import { tierOf, unlocked } from "../tiers.ts"
 const rewards: ReadonlyArray<PickupKind> = ["hotfix", "refactor", "coffee", "unitTest", "revert", "pizza", "pairProgramming", "codeFreeze", "memoryLeak", "pushForce", "flameWar", "breakpoint"]
 
 const MARGIN = 140
+const WALL_MARGIN = 40
 
 /** A point in the arena between `near` and `far` from the player, away from the walls. */
 const somewhere = (random: Random.Random, arena: Arena, from: Vec, near: number, far: number): Vec => {
   const angle = random.range(0, Math.PI * 2)
   const distance = random.range(near, far)
-  return {
-    x: clamp(from.x + Ops.cos(angle) * distance, MARGIN, arena.width - MARGIN),
-    y: clamp(from.y + Ops.sin(angle) * distance, MARGIN, arena.height - MARGIN)
-  }
+  const at = { x: clamp(from.x + Ops.cos(angle) * distance, MARGIN, arena.width - MARGIN), y: clamp(from.y + Ops.sin(angle) * distance, MARGIN, arena.height - MARGIN) }
+  // Never in a wall either: where a developer can stand.
+  return clampToArena(at, WALL_MARGIN, arena)
 }
 
 /**
@@ -139,10 +139,7 @@ export const CallSystem = Game.System(
         events.fx.emit({ type: "callDone", x: me.x, y: me.y, kind: call.kind, points })
         const angle = random.range(0, Math.PI * 2)
         const reward = random.pick(allowedPickups(unlocked(rewards, tierOf(resources.level.get(), run.wave), resources.tiers.get()), resources.hardcore.get()))
-        if (reward) commands.spawn(makePickup(reward, {
-          x: clamp(me.x + Ops.cos(angle) * 90, 40, arena.width - 40),
-          y: clamp(me.y + Ops.sin(angle) * 90, 40, arena.height - 40)
-        }))
+        if (reward) commands.spawn(makePickup(reward, clampToArena({ x: me.x + Ops.cos(angle) * 90, y: me.y + Ops.sin(angle) * 90 }, 40, arena)))
         state.active = null
         state.nextIn = random.range(CALLS.min, CALLS.max)
       } else if (call.timeLeft <= 0) {

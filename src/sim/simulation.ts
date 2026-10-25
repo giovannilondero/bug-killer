@@ -13,9 +13,10 @@ import { defaultLocale } from "../content/i18n.ts"
 import type { Locale } from "../content/i18n.ts"
 import { arenaOf, arenas } from "../content/arenas.ts"
 import type { Level } from "../content/levels.ts"
-import { BREAKPOINT, CALLS, FIRST_CLIENT_DELAY, TOBIA, PARTY, RESURRECT, WAVE_INTERVAL } from "./constants.ts"
+import { BREAKPOINT, CALLS, FIRST_CLIENT_DELAY, TOBIA, PARTY, PLAYER, RESURRECT, WAVE_INTERVAL } from "./constants.ts"
 import { makePlayer } from "./drafts.ts"
 import { HARDCORE } from "./hardcore.ts"
+import { clampToArena } from "./math.ts"
 import { BossRead, BugRead, HostileShotRead, PickupRead, PlayerRead, ShotRead } from "./queries.ts"
 import { Breakpoint, Calls, Chat, Fx, Game, Hardcore, Input, InputSource, Interruptions, Language, LevelSpec, Missions, Party, Player, Position, Presentation, Rocket, Run, Tiers, Turret, Velocity } from "./schema.ts"
 import { contentTiers, isUnlocked, tierOf } from "./tiers.ts"
@@ -58,7 +59,8 @@ const SetupSystem = Game.System(
     const breakpoints = isUnlocked("breakpoint", tierOf(level, 0), resources.tiers.get()) ? BREAKPOINT.charges : 0
     const maxHp = resources.hardcore.get() ? HARDCORE.maxHp : undefined
     party.forEach((teammate, i) => {
-      commands.spawn(makePlayer({ x: arena.width / 2 + (i - (party.length - 1) / 2) * 90, y: arena.height / 2 + 150 }, { ...teammate }, breakpoints, maxHp))
+      const at = clampToArena({ x: arena.width / 2 + (i - (party.length - 1) / 2) * 90, y: arena.height / 2 + 150 }, PLAYER.radius, arena)
+      commands.spawn(makePlayer(at, { ...teammate }, breakpoints, maxHp))
     })
   }
 )

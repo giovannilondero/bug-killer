@@ -29,7 +29,7 @@ export interface Boss {
   readonly shotText: string
 }
 
-export const levelIds = ["glacier", "sidequests", "keystone", "foundry", "monorepo", "microservices", "legacy", "endless", "hotdesk"] as const
+export const levelIds = ["glacier", "sidequests", "keystone", "foundry", "monorepo", "microservices", "legacy", "endless", "hotdesk", "cubicles"] as const
 export type LevelId = (typeof levelIds)[number]
 
 export interface Level {
@@ -261,6 +261,18 @@ export const bonusLevels: ReadonlyArray<Level> = [
     boss: sprintBoss("keystone"),
     arena: arenas.small,
     bonus: { after: 3, tickets: 30 }
+  }),
+  bonus({
+    id: "cubicles",
+    sprint: "Bonus",
+    name: "Cubicles",
+    theme: { background: "#0d1012", grid: "#1d252b", accent: "#9ad1d4" },
+    clients: ["gualtiero", "ugo", "debora"],
+    clientEvery: 12,
+    waveSize: 6,
+    boss: sprintBoss("sidequests"),
+    arena: arenas.walls,
+    bonus: { after: 5, tickets: 30 }
   })
 ]
 
@@ -270,7 +282,8 @@ export const bonusLevels: ReadonlyArray<Level> = [
  */
 export const endlessArenas: ReadonlyArray<{ readonly id: ArenaId; readonly unlockedBy?: LevelId }> = [
   { id: "normal" },
-  { id: "small", unlockedBy: "hotdesk" }
+  { id: "small", unlockedBy: "hotdesk" },
+  { id: "walls", unlockedBy: "cubicles" }
 ]
 
 export const isEndlessArena = (id: unknown): id is ArenaId => endlessArenas.some((arena) => arena.id === id)

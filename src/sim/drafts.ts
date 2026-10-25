@@ -3,7 +3,7 @@ import type { Priority, TicketType } from "../content/bugs.ts"
 import type { Boss as BossContent } from "../content/levels.ts"
 import type { ClientId } from "../content/clients.ts"
 import type { Strings } from "../content/i18n.ts"
-import { BREAKPOINT, EPIC, HOSTILE_SHOT, PLAYER, RESURRECT, ROCKET, SHOT, TURRET, ticketScales } from "./constants.ts"
+import { BREAKPOINT, EPIC, HOSTILE_SHOT, PICKUP_RADIUS, PLAYER, RESURRECT, ROCKET, SHOT, TURRET, ticketScales } from "./constants.ts"
 import { Body, Boss, Breakpoint, Bug, Game, HostileShot, Pickup, Player, Position, Rocket, Shot, Turret, Velocity } from "./schema.ts"
 import type { BossValue, PickupKind, TeammateValue, Vec } from "./schema.ts"
 import { basicGun } from "./weapons.ts"
@@ -53,6 +53,9 @@ export interface BugSeed {
 export const subtaskOf = (parent: { readonly key: string; readonly summary: string }, index: number, priority: Priority, strings: Strings): BugSeed =>
   ({ key: subtaskKey(parent.key, index), summary: strings.subtask(parent.summary), priority, status: "Open", type: "subtask" })
 
+/** How big a ticket's body is: its priority's size, scaled by its type. */
+export const bugRadius = (seed: { readonly priority: Priority; readonly type?: TicketType }): number => Math.round(bugKinds[seed.priority].radius * ticketScales[seed.type ?? "bug"].radius)
+
 export const makeBug = (
   seed: BugSeed,
   at: Vec,
@@ -73,7 +76,7 @@ export const makeBug = (
   return Game.Command.spawn(
     Game.Command.entry(Position, at),
     Game.Command.entry(Velocity, { x: 0, y: 0 }),
-    Game.Command.entry(Body, { radius: Math.round(kind.radius * scale.radius) }),
+    Game.Command.entry(Body, { radius: bugRadius(seed) }),
     Game.Command.entry(Bug, {
       key: seed.key,
       summary: seed.summary,
@@ -164,7 +167,7 @@ export const makeHostileShot = (at: Vec, angle: number, speed: number, text: str
 export const makePickup = (kind: PickupKind, at: Vec) =>
   Game.Command.spawn(
     Game.Command.entry(Position, at),
-    Game.Command.entry(Body, { radius: 16 }),
+    Game.Command.entry(Body, { radius: PICKUP_RADIUS }),
     Game.Command.entry(Pickup, { kind, life: 12 })
   )
 

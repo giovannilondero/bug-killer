@@ -7,6 +7,7 @@ import { centreOf, clampToArena, distanceSquared, nearest, normalize } from "../
 import { BossRead, BugRead, BugWrite, HostileShotWrite, Moving, PickupWrite, PlayerRead, ShotWrite, standing } from "../queries.ts"
 import { Body, Fx, Game, HostileShot, LevelSpec, Pickup, Position, Rng, Rocket, Run, Shot, Velocity } from "../schema.ts"
 import { speedFactor } from "../statuses.ts"
+import { detour } from "../walls.ts"
 import { Ops } from "@typeonce/ritmo-math"
 
 /** Bugs crawl toward the nearest developer still standing; each workflow status moves differently. */
@@ -23,7 +24,8 @@ export const BugBrainSystem = Game.System(
   },
   ({ queries, resources, events }) => {
     const team = standing(queries.player.each())
-    const centre = centreOf(arenaOf(resources.level.get()))
+    const arena = arenaOf(resources.level.get())
+    const centre = centreOf(arena)
     const dead = resources.run.get().phase === "dead"
     const random = Random.draw(resources.rng)
     const bugs = queries.bugs.each()
@@ -49,7 +51,9 @@ export const BugBrainSystem = Game.System(
           return
         }
       }
-      const toPlayer = normalize({ x: target.x - position.x, y: target.y - position.y })
+      // Round the corner of whatever wall stands in the way.
+      const goal = detour(arena, position, target, match.data.body.get().radius)
+      const toPlayer = normalize({ x: goal.x - position.x, y: goal.y - position.y })
       // Once the developer is gone the bugs wander off: nobody is fixing them anyway.
       const heading = dead ? { x: -toPlayer.x, y: -toPlayer.y } : toPlayer
       const side = { x: -heading.y, y: heading.x }

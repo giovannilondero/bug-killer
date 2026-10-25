@@ -4,12 +4,13 @@ import { text } from "../../content/i18n.ts"
 import { arenaOf } from "../../content/arenas.ts"
 import { bossRules, toward } from "../bosses.ts"
 import { DT } from "../constants.ts"
-import { makeBug, makeHostileShot, spawnBoss } from "../drafts.ts"
+import { bugRadius, makeBug, makeHostileShot, spawnBoss } from "../drafts.ts"
 import { angleTo, clampToArena, nearest } from "../math.ts"
 import { BossWrite, BugRead, PlayerRead, standing } from "../queries.ts"
 import { Boss, Bug, Fx, Game, HostileShot, Language, LevelSpec, Rng } from "../schema.ts"
 import type { BossValue } from "../schema.ts"
 import { speedFactor } from "../statuses.ts"
+import { detour } from "../walls.ts"
 
 /**
  * Runs every boss's fight, one tick at a time; how each pattern fights lives
@@ -45,10 +46,11 @@ export const BossBrainSystem = Game.System(
       boss.shield = Math.max(0, boss.shield - DT)
       boss.hitFlash = Math.max(0, boss.hitFlash - DT)
       const fire = (angle: number, speed: number) => commands.spawn(makeHostileShot(position, angle, speed, boss.shotText))
+      const radius = match.data.body.get().radius
       const velocity = bossRules[boss.pattern].fight({
         boss,
         position,
-        radius: match.data.body.get().radius,
+        radius,
         target,
         aim: angleTo(position, target),
         rage: 1 - boss.hp / boss.maxHp,
@@ -61,14 +63,15 @@ export const BossBrainSystem = Game.System(
         ring: (count, speed, offset) => {
           for (let i = 0; i < count; i++) fire(offset + (i / count) * Math.PI * 2, speed)
         },
-        chase: (speed) => toward(position, target, speed),
-        steer: (goal, speed) => toward(position, goal, speed),
+        // Round the walls, like any bug.
+        chase: (speed) => toward(position, detour(arena, position, target, radius), speed),
+        steer: (goal, speed) => toward(position, detour(arena, position, goal, radius), speed),
         teleport: (to) => {
           events.fx.emit({ type: "teleport", x: position.x, y: position.y })
           match.data.position.set(to)
           events.fx.emit({ type: "teleport", x: to.x, y: to.y })
         },
-        spawnMinion: (seed, at) => commands.spawn(makeBug(seed, at)),
+        spawnMinion: (seed, at) => commands.spawn(makeBug(seed, clampToArena(at, bugRadius(seed), arena))),
         fork: (shape) => {
           const at = clampToArena({ x: position.x + shape.offset.x, y: position.y + shape.offset.y }, shape.radius, arena)
           commands.spawn(spawnBoss(shape.boss, at, shape.radius))

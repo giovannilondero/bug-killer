@@ -4,7 +4,7 @@ import { arenaOf } from "../../content/arenas.ts"
 import { ticketsOf } from "../../content/levels.ts"
 import { BREAKPOINT, DT, ENDLESS, PARTY, SPAWN_SAFE_DISTANCE, WAVE_INTERVAL } from "../constants.ts"
 import { makeBoss, makeBug } from "../drafts.ts"
-import { centreOf, edgePoint, openPoint } from "../math.ts"
+import { centreOf, clampToArena, edgePoint, openPoint } from "../math.ts"
 import { BossRead, BugRead, PlayerWrite, standing } from "../queries.ts"
 import { Boss, Bug, Fx, Game, LevelSpec, Rng, Run, Tiers } from "../schema.ts"
 import { isUnlocked, ticketTypeAt, tierOf } from "../tiers.ts"
@@ -106,8 +106,8 @@ export const WavesSystem = Game.System(
       }
       if (backlogLeft === 0 && aliveBugs === 0) {
         setPhase("boss")
-        const at = { x: arena.width / 2, y: Math.min(360, arena.height * 0.3) }
         const boss = endless ? (endless.bosses[run.loop % endless.bosses.length] ?? level.boss) : level.boss
+        const at = clampToArena({ x: arena.width / 2, y: Math.min(360, arena.height * 0.3) }, boss.radius, arena)
         commands.spawn(makeBoss(boss, at, (endless ? 1 + run.loop * ENDLESS.bossHpPerLoop : 1) * (1 + extra * PARTY.bossHpPerPlayer)))
         events.fx.emit({ type: "spawn", x: at.x, y: at.y })
       }
