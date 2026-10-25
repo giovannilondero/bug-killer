@@ -166,6 +166,22 @@ export const paintFuseRing = (ctx: CanvasRenderingContext2D, radius: number) => 
   ctx.setLineDash([])
 }
 
+/** Flame war's fire as a puff burns out: white-hot, yellow, orange, red, then smoke. */
+export const flameColors = ["#fff6c8", "#ffd84a", "#ff9440", "#ff4d2d", "#5a2a20"] as const
+
+/** The colour of a puff of flame `k` of the way through its life, from 0 to 1. */
+export const flameColor = (k: number): string => flameColors[Math.min(flameColors.length - 1, Math.floor(k * flameColors.length))]!
+
+/** A puff of flame centred on the origin: solid at the core, fading to nothing at radius `r`. */
+export const paintFlame = (ctx: CanvasRenderingContext2D, r: number, color: string) => {
+  const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, r)
+  glow.addColorStop(0, color)
+  glow.addColorStop(0.35, color)
+  glow.addColorStop(1, `${color}00`)
+  ctx.fillStyle = glow
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill()
+}
+
 /** A bug facing +x, centred on the origin: legs, antennae, glowing body, spots, eyes, armour. */
 export const paintBug = (ctx: CanvasRenderingContext2D, r: number, color: string, time: number, options: BugLook) => {
   const t = options.frozen ? 0 : time
