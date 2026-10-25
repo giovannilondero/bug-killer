@@ -36,6 +36,8 @@ export interface RoomInfo {
   readonly code: string
   readonly state: RoomState
   readonly level: LevelId
+  /** The host's choice for the next run: one sanity and no Pizza, for the whole team. */
+  readonly hardcore: boolean
   readonly host: number
   readonly members: ReadonlyArray<Member>
 }
@@ -47,9 +49,9 @@ export type NetView = Omit<View, "level">
 export type ErrorCode = "notFound" | "full" | "started" | "nameTaken" | "badName" | "badLevel" | "notHost" | "busy"
 
 export type ClientMessage =
-  | { readonly t: "create"; readonly name: string; readonly level: LevelId; readonly locale: Locale }
+  | { readonly t: "create"; readonly name: string; readonly level: LevelId; readonly locale: Locale; readonly hardcore?: boolean }
   | { readonly t: "join"; readonly code: string; readonly name: string }
-  | { readonly t: "start"; readonly level?: LevelId }
+  | { readonly t: "start"; readonly level?: LevelId; readonly hardcore?: boolean }
   | { readonly t: "input"; readonly input: InputValue }
   | { readonly t: "leave" }
   | { readonly t: "ping" }
@@ -73,6 +75,9 @@ const isObject = (value: unknown): value is Record<string, unknown> => typeof va
 
 const finite = (value: unknown, limit: number): number =>
   typeof value === "number" && Number.isFinite(value) ? Math.max(-limit, Math.min(limit, value)) : 0
+
+/** An optional flag: absent, or a real boolean. */
+const isFlag = (value: unknown): value is boolean | undefined => value === undefined || typeof value === "boolean"
 
 const vec = (value: unknown, limit: number) => (isObject(value) ? { x: finite(value.x, limit), y: finite(value.y, limit) } : { x: 0, y: 0 })
 
@@ -99,14 +104,18 @@ export const readClientMessage = (raw: string, isLevel: (id: unknown) => id is L
   if (!isObject(data)) return null
   switch (data.t) {
     case "create":
-      if (typeof data.name !== "string" || !isLevel(data.level) || !isLocale(data.locale)) return null
-      return { t: "create", name: data.name, level: data.level, locale: data.locale }
+      if (typeof data.name !== "string" || !isLevel(data.level) || !isLocale(data.locale) || !isFlag(data.hardcore)) return null
+      return { t: "create", name: data.name, level: data.level, locale: data.locale, hardcore: data.hardcore === true }
     case "join":
       if (typeof data.name !== "string" || typeof data.code !== "string") return null
       return { t: "join", name: data.name, code: data.code.trim().toUpperCase() }
     case "start":
-      if (data.level !== undefined && !isLevel(data.level)) return null
-      return data.level === undefined ? { t: "start" } : { t: "start", level: data.level }
+      if ((data.level !== undefined && !isLevel(data.level)) || !isFlag(data.hardcore)) return null
+      return {
+        t: "start",
+        ...(data.level === undefined ? {} : { level: data.level }),
+        ...(data.hardcore === undefined ? {} : { hardcore: data.hardcore })
+      }
     case "input": {
       const input = readInput(data.input)
       return input && { t: "input", input }
