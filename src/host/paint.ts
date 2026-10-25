@@ -19,7 +19,8 @@ export const pickupIcons = {
   pizza: "🍕",
   tools: "🤖",
   ai: "🧠",
-  pairProgramming: "👥"
+  pairProgramming: "👥",
+  pushForce: "🚀"
 } as const satisfies Record<PickupKind, string>
 
 export const pickupInfo = (kind: PickupKind) => ({ icon: pickupIcons[kind], ...t().pickups[kind] })

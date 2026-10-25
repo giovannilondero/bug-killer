@@ -144,7 +144,8 @@ export const it: Strings = {
     pizza: { label: "Pizza", hint: "+2 sanità" },
     tools: { label: "Strumenti", hint: "colpi a ricerca" },
     ai: { label: "AI", hint: "torretta automatica" },
-    pairProgramming: { label: "Pair programming", hint: "due colpi alla volta" }
+    pairProgramming: { label: "Pair programming", hint: "due colpi alla volta" },
+    pushForce: { label: "git push --force", hint: "un razzo: boom dove miri" }
   },
   floorCode: [
     "console.log('qui ci arriva?')",

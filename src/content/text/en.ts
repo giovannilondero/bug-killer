@@ -144,7 +144,8 @@ export const en: Strings = {
     pizza: { label: "Pizza", hint: "+2 sanity" },
     tools: { label: "Tools", hint: "homing shots" },
     ai: { label: "AI", hint: "auto turret" },
-    pairProgramming: { label: "Pair programming", hint: "two shots at once" }
+    pairProgramming: { label: "Pair programming", hint: "two shots at once" },
+    pushForce: { label: "git push --force", hint: "a rocket: boom where you aim" }
   },
   floorCode: [
     "console.log('does it get here?')",
