@@ -528,8 +528,8 @@ test("Pair programming arrives with Side Quests: never in Glacier, in Endless fr
   assert.equal(contentTiers.pairProgramming, 1)
   assert.ok(!isUnlocked("pairProgramming", levels[0]!.tier), "not in Glacier")
   assert.ok(isUnlocked("pairProgramming", levels[1]!.tier), "from Side Quests on")
-  assert.ok(!isUnlocked("pairProgramming", tierOf(endlessLevel, 2)), "not in Endless's first waves")
-  assert.ok(isUnlocked("pairProgramming", tierOf(endlessLevel, 3)))
+  assert.ok(!isUnlocked("pairProgramming", tierOf(endlessLevel, 3)), "not in Endless's first waves")
+  assert.ok(isUnlocked("pairProgramming", tierOf(endlessLevel, 4)))
 
   const seen = new Set<string>()
   watch({ level: levels[0]!, seed: 5 }, 240, (v) => {
