@@ -1081,6 +1081,18 @@ test("Breakpoint: two charges from sprint 3 (Keystone) on, none before, and a dr
   assert.equal(sim.view().breakpoints.length, 3, "the dropped charge is picked up and placed too")
 })
 
+test("Breakpoint: in Endless every developer gets the sprint's two once the tier brings them in", () => {
+  const quick = { ...endlessLevel, waveSize: 1, endless: { ...endlessLevel.endless!, every: 100 } }
+  const before: Array<number> = []
+  let first: ReadonlyArray<number> | null = null
+  watch({ level: quick, seed: 5, party: crew(["Ada", "Bob"]) }, 200, (v) => {
+    if (v.tier < contentTiers.breakpoint) before.push(...v.players.map((p) => p.breakpoints))
+    else first ??= v.players.map((p) => p.breakpoints)
+  })
+  assert.ok(before.length > 0 && before.every((n) => n === 0), "none before the tier")
+  assert.deepEqual(first, [2, 2], "two each as soon as it arrives")
+})
+
 test("Breakpoint: the autopilot sets them down when bugs close in, and they go off", () => {
   const { fx } = play(levels[2]!, 90)
   assert.ok(fx.some((e) => e.type === "breakpointSet"), "it placed one")
