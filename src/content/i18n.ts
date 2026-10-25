@@ -1,6 +1,6 @@
 import type { Priority, StatusTrait, TicketType } from "./bugs.ts"
 import type { CallKind, ClientId, MissionKind } from "./clients.ts"
-import type { ConflictSide, LevelId } from "./levels.ts"
+import type { ConflictSide, LevelId, RaceThread } from "./levels.ts"
 import type { Voice } from "./text/voice.ts"
 import { en } from "./text/en.ts"
 import { it } from "./text/it.ts"
@@ -60,6 +60,10 @@ export interface Strings {
     readonly conflict: string
     /** One half of a merge conflict is fixed, the other is still there. */
     readonly halfResolved: string
+    /** One twin of a race condition is fixed: the other has to follow, fast. */
+    readonly threadDown: string
+    /** The twin left running restarted the one that was fixed. */
+    readonly restarted: string
   }
 
   // --- What the host draws --------------------------------------------------
@@ -91,6 +95,10 @@ export interface Strings {
     readonly factor: string
     /** Under each half of a merge conflict. */
     readonly sides: Record<ConflictSide, string>
+    /** Under each twin of a race condition. */
+    readonly threads: Record<RaceThread, string>
+    /** Over the spot where a fixed twin comes back, with the seconds left. */
+    readonly restarting: (seconds: number) => string
     readonly startBanner: string
     readonly audioOn: string
     readonly audioOff: string

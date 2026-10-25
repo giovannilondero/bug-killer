@@ -1,5 +1,5 @@
 import type { Strings } from "../i18n.ts"
-import { plusOne, shout } from "./voice.ts"
+import { morePop, plusOne, shout } from "./voice.ts"
 
 export const it: Strings = {
   tag: "it-IT",
@@ -28,7 +28,8 @@ export const it: Strings = {
       voice: (text) => `Guarda che in staging funzionava eh. Comunque: ${text}`
     },
     tobia: { role: "Tech Lead", laugh: "ahah", voice: (text) => text },
-    fabrizio: { role: "Stakeholder (in copia a tutto)", laugh: "+1", voice: plusOne }
+    fabrizio: { role: "Stakeholder (in copia a tutto)", laugh: "+1", voice: plusOne },
+    debora: { role: "Marketing", laugh: "ahah top ✨", voice: morePop("Si può fare un po' più pop? Per venerdì, idealmente ✨", "E un po' più pop, grazie. È per venerdì 🎨", "Bellissimo, deve solo essere più pop. Venerdì? 💥") }
   },
 
   tobiaLines: [
@@ -64,7 +65,11 @@ export const it: Strings = {
       success: ["visto? con gli _strumenti_ è un attimo"],
       failure: ["ok ma la prossima volta usa gli _strumenti_"]
     },
-    fabrizio: { success: ["+1"], failure: ["up"] }
+    fabrizio: { success: ["+1"], failure: ["up"] },
+    debora: {
+      success: ["Top!! Ora si può fare il logo più grande? 💖", "Perfetto, lo posto subito su LinkedIn ✨"],
+      failure: ["Mmh, non è abbastanza pop. Ne parliamo venerdì.", "Rimandiamo il lancio, di nuovo. E il font è ancora triste."]
+    }
   },
   missions: {
     killCount: (goal, seconds) => `Mi servono ${goal} bug chiusi entro ${seconds} secondi.`,
@@ -127,7 +132,9 @@ export const it: Strings = {
     dispenserRestart: "timeout... si riparte",
     otp: "Inserisci il codice OTP",
     conflict: "CONFLITTO: nostri contro loro",
-    halfResolved: "un lato risolto, manca l'altro"
+    halfResolved: "un lato risolto, manca l'altro",
+    threadDown: "un thread giù: chiudi l'altro, svelto",
+    restarted: "race persa: il thread è ripartito"
   },
 
   traits: {
@@ -149,6 +156,7 @@ export const it: Strings = {
     keystone: "Permessi, SSO e CVE. Qualcuno ha detto 2FA?",
     foundry: "Il backlog più grande. Ugo è online.",
     monorepo: "Un solo repo per tutto, e tutti dentro. Fabrizio mette +1.",
+    microservices: "Quaranta servizi, un bug in ognuno. Debora lo vuole più pop entro venerdì.",
     endless: "Tutti i bug di tutti i progetti, per sempre. Quanto resisti?"
   },
   pickups: {
@@ -198,6 +206,8 @@ export const it: Strings = {
     booting: "⏳ riavvio...",
     factor: "FATTORE 2/2",
     sides: { ours: "<<<<<<< nostri", theirs: ">>>>>>> loro" },
+    threads: { main: "thread: main", worker: "thread: worker" },
+    restarting: (seconds) => `⟳ riavvio tra ${seconds.toFixed(1)}s`,
     startBanner: "Chiudi il backlog prima che arrivi il cliente",
     audioOn: "🔊 AUDIO ON",
     audioOff: "🔇 AUDIO OFF",

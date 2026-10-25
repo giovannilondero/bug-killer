@@ -4,7 +4,7 @@ import * as Random from "@typeonce/ritmo-math/Random"
 import type { Priority, StatusTrait, TicketType } from "../content/bugs.ts"
 import type { CallKind, ClientId, MissionKind } from "../content/clients.ts"
 import type { Locale } from "../content/i18n.ts"
-import type { BossPattern, ConflictSide, Level } from "../content/levels.ts"
+import type { BossPattern, ConflictSide, Level, RaceThread } from "../content/levels.ts"
 import type { StatusValue } from "./statuses.ts"
 import type { TierTable } from "./tiers.ts"
 import type { Cone, WeaponKind, WeaponValue } from "./weapons.ts"
@@ -95,6 +95,10 @@ export interface BossValue {
   statuses: ReadonlyArray<StatusValue>
   /** Which half of a merge conflict it is; `null` for a boss in one piece. */
   side: ConflictSide | null
+  /** Which twin of a race condition it is; `null` for any other boss, and for a race condition before it forks. */
+  thread: RaceThread | null
+  /** Seconds until its fixed twin comes back; 0 while the twin is running, or for any other boss. */
+  revive: number
 }
 export const Boss = Descriptor.Component<BossValue>()("BugKiller/Boss")
 

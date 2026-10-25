@@ -82,3 +82,6 @@ export const ENDLESS = {
   maxWaveSize: 12,
   minWaveInterval: 7
 } as const
+
+/** A race condition's twins: one fixed alone comes back unless the other is fixed within `window` seconds. */
+export const RACE = { window: 4, rebootShield: 1 } as const

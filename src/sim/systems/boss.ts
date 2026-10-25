@@ -4,10 +4,10 @@ import { text } from "../../content/i18n.ts"
 import { arenaOf } from "../../content/arenas.ts"
 import { bossRules, toward } from "../bosses.ts"
 import { DT } from "../constants.ts"
-import { makeBug, makeHostileShot } from "../drafts.ts"
-import { angleTo, nearest } from "../math.ts"
+import { makeBug, makeHostileShot, spawnBoss } from "../drafts.ts"
+import { angleTo, clampToArena, nearest } from "../math.ts"
 import { BossWrite, BugRead, PlayerRead, standing } from "../queries.ts"
-import { Bug, Fx, Game, HostileShot, Language, LevelSpec, Rng } from "../schema.ts"
+import { Boss, Bug, Fx, Game, HostileShot, Language, LevelSpec, Rng } from "../schema.ts"
 import type { BossValue } from "../schema.ts"
 import { speedFactor } from "../statuses.ts"
 
@@ -21,7 +21,7 @@ export const BossBrainSystem = Game.System(
     queries: { player: PlayerRead, bosses: BossWrite, bugs: BugRead },
     resources: { rng: Game.System.writeResource(Rng), language: Game.System.readResource(Language), level: Game.System.readResource(LevelSpec) },
     events: { fx: Game.System.writeEvent(Fx) },
-    commands: Game.System.commands(Game.System.spawns(HostileShot, Bug))
+    commands: Game.System.commands(Game.System.spawns(HostileShot, Bug, Boss))
   },
   ({ queries, resources, events, commands }) => {
     const team = standing(queries.player.each())
@@ -48,6 +48,7 @@ export const BossBrainSystem = Game.System(
       const velocity = bossRules[boss.pattern].fight({
         boss,
         position,
+        radius: match.data.body.get().radius,
         target,
         aim: angleTo(position, target),
         rage: 1 - boss.hp / boss.maxHp,
@@ -68,6 +69,11 @@ export const BossBrainSystem = Game.System(
           events.fx.emit({ type: "teleport", x: to.x, y: to.y })
         },
         spawnMinion: (seed, at) => commands.spawn(makeBug(seed, at)),
+        fork: (shape) => {
+          const at = clampToArena({ x: position.x + shape.offset.x, y: position.y + shape.offset.y }, shape.radius, arena)
+          commands.spawn(spawnBoss(shape.boss, at, shape.radius))
+          events.fx.emit({ type: "teleport", x: at.x, y: at.y })
+        },
         announce: (line) => events.fx.emit({ type: "bossPhase", x: position.x, y: position.y, text: line })
       })
 

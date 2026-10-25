@@ -6,12 +6,16 @@ import type { ClientId } from "./clients.ts"
 import type { Tier } from "../sim/tiers.ts"
 
 /** How a boss fights; each pattern is one branch of the boss system. */
-export const bossPatterns = ["dispenser", "crash", "twoFactor", "undefined", "mergeConflict"] as const
+export const bossPatterns = ["dispenser", "crash", "twoFactor", "undefined", "mergeConflict", "raceCondition"] as const
 export type BossPattern = (typeof bossPatterns)[number]
 
 /** The two halves a merge conflict splits into. */
 export const conflictSides = ["ours", "theirs"] as const
 export type ConflictSide = (typeof conflictSides)[number]
+
+/** The twins a race condition forks into. */
+export const raceThreads = ["main", "worker"] as const
+export type RaceThread = (typeof raceThreads)[number]
 
 export interface Boss {
   readonly key: string
@@ -24,7 +28,7 @@ export interface Boss {
   readonly shotText: string
 }
 
-export const levelIds = ["glacier", "sidequests", "keystone", "foundry", "monorepo", "endless"] as const
+export const levelIds = ["glacier", "sidequests", "keystone", "foundry", "monorepo", "microservices", "endless"] as const
 export type LevelId = (typeof levelIds)[number]
 
 export interface Level {
@@ -152,6 +156,26 @@ export const levels: ReadonlyArray<Level> = [
       radius: 58,
       color: "#e3b341",
       shotText: "======="
+    }
+  }),
+  level({
+    id: "microservices",
+    sprint: "Sprint 6",
+    name: "Microservices",
+    projects: ["MSVC"],
+    theme: { background: "#081517", grid: "#11302f", accent: "#3ee6c4" },
+    clients: ["debora", "kevin", "fabrizio", "debora", "samanta"],
+    clientEvery: 10,
+    waveSize: 7,
+    tier: 5,
+    boss: {
+      key: "MSVC-1024",
+      title: "Race condition: two services write the same order at once",
+      pattern: "raceCondition",
+      hp: 140,
+      radius: 50,
+      color: "#3ee6c4",
+      shotText: "409"
     }
   })
 ]

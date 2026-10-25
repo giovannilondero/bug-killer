@@ -4,8 +4,8 @@ import { Ops } from "@typeonce/ritmo-math"
 import { arenas } from "../content/arenas.ts"
 import type { Arena } from "../content/arenas.ts"
 import type { Strings } from "../content/i18n.ts"
-import type { BossPattern, ConflictSide } from "../content/levels.ts"
-import { DT } from "./constants.ts"
+import type { BossPattern, ConflictSide, RaceThread } from "../content/levels.ts"
+import { DT, RACE } from "./constants.ts"
 import type { BugSeed } from "./drafts.ts"
 import { clamp, normalize, openPoint } from "./math.ts"
 import type { BossValue, Vec } from "./schema.ts"
@@ -15,6 +15,7 @@ export interface Brain {
   /** Its own state, a copy the fight may change: timers, volleys, phase. */
   readonly boss: BossValue
   readonly position: Vec
+  readonly radius: number
   /** The nearest developer still standing. */
   readonly target: Vec
   /** The angle from the boss to `target`. */
@@ -36,6 +37,8 @@ export interface Brain {
   readonly steer: (goal: Vec, speed: number) => Vec
   readonly teleport: (to: Vec) => void
   readonly spawnMinion: (seed: BugSeed, at: Vec) => void
+  /** Puts another boss in the arena, `shape.offset` away from this one. */
+  readonly fork: (shape: BossShape) => void
   readonly announce: (text: string) => void
 }
 
@@ -60,6 +63,8 @@ export interface BossRules {
    * the hit as it is (at 0 hp it is fixed). `radius` is its current size.
    */
   readonly turn: (boss: BossValue, hp: number, radius: number) => BossTurn | null
+  /** What fixing one piece says while the rest of the boss still fights; "one side resolved" when left out. */
+  readonly piece?: keyof Strings["bossPhase"]
 }
 
 const minion = (key: string, summary: string, priority: BugSeed["priority"]): BugSeed => ({ key, summary, priority, status: "Open" })
@@ -80,6 +85,20 @@ const conflictLooks = {
   ours: { color: "#7ee787", shotText: "<<<<<<<" },
   theirs: { color: "#ff7b72", shotText: ">>>>>>>" }
 } as const satisfies Record<ConflictSide, { color: string; shotText: string }>
+
+const raceLooks = {
+  main: { color: "#3ee6c4", shotText: "409" },
+  worker: { color: "#ff9bd2", shotText: "412" }
+} as const satisfies Record<RaceThread, { color: string; shotText: string }>
+
+const otherThread = (thread: RaceThread): RaceThread => (thread === "main" ? "worker" : "main")
+
+/**
+ * Where a race condition's `thread` runs at `age`: both twins share one lap
+ * round the arena, half a lap apart. A fixed twin comes back at its spot.
+ */
+export const raceSpot = (arena: Arena, age: number, thread: RaceThread): Vec =>
+  orbit(arena, age * 0.6 + (thread === "worker" ? Math.PI : 0), 380, 240)
 
 /**
  * Every boss pattern, in one table: each is one of the level's worst tickets
@@ -215,6 +234,50 @@ export const bossRules: Record<BossPattern, BossRules> = {
       })
       return { into: [shape("ours", -70), shape("theirs", 70)], announce: "conflict" }
     }
+  },
+
+  // Two services writing the same row. It forks into twins on its first tick;
+  // fix one alone and the other restarts it, unless it is fixed in time too.
+  raceCondition: {
+    fight: ({ boss, position, radius, aim, rage, arena, kin, strings, fire, ring, steer, fork, announce }) => {
+      if (boss.thread === null) {
+        const half = Math.ceil(boss.hp / 2)
+        Object.assign(boss, { ...raceLooks.main, thread: "main", hp: half, maxHp: half })
+        fork({ boss: { ...boss, ...raceLooks.worker, thread: "worker" }, offset: { x: 90, y: 0 }, radius })
+        return { x: 0, y: 0 }
+      }
+      if (kin > 0) {
+        boss.revive = 0
+      } else if (boss.revive === 0) {
+        // Its twin was just fixed: the clock starts.
+        boss.revive = RACE.window
+      } else {
+        boss.revive = Math.max(0, boss.revive - DT)
+        if (boss.revive === 0) {
+          const thread = otherThread(boss.thread)
+          const at = raceSpot(arena, boss.age, thread)
+          fork({
+            boss: { ...boss, ...raceLooks[thread], thread, hp: boss.maxHp, shield: RACE.rebootShield, hitFlash: 0.3, timer: 1, statuses: [] },
+            offset: { x: at.x - position.x, y: at.y - position.y },
+            radius
+          })
+          announce(strings.bossPhase.restarted)
+        }
+      }
+      if (boss.timer <= 0) {
+        boss.volley += 1
+        if (boss.volley % 3 === 0) {
+          ring(10 + Math.round(rage * 6), 210, boss.age)
+        } else {
+          for (let i = -1; i <= 1; i++) fire(aim + i * 0.15, 280)
+        }
+        // Running alone, it races to restart its twin.
+        boss.timer = (kin > 0 ? 1.2 : 0.7) - rage * 0.3
+      }
+      return steer(raceSpot(arena, boss.age, boss.thread), kin > 0 ? 180 : 230)
+    },
+    turn: () => null,
+    piece: "threadDown"
   }
 }
 

@@ -1140,7 +1140,8 @@ test("Flame war flashes the bugs it burns without a hit sound per puff: the burn
 
 test("Flame war arrives with sprint 6 and not before", () => {
   assert.equal(contentTiers.flameWar, 5)
-  for (const level of levels) assert.ok(level.tier >= 5 || !isUnlocked("flameWar", level.tier), `not in ${level.id}`)
+  for (const level of levels.slice(0, 5)) assert.ok(!isUnlocked("flameWar", level.tier), `not in ${level.id}`)
+  assert.ok(isUnlocked("flameWar", levels[5]!.tier), "Sprint 6 has it")
   assert.ok(!isUnlocked("flameWar", tierOf(endlessLevel, 15)), "not in Endless before wave 16")
   assert.ok(isUnlocked("flameWar", tierOf(endlessLevel, 16)))
 })

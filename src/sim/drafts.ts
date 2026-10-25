@@ -115,7 +115,9 @@ export const makeBoss = (boss: BossContent, at: Vec, hpFactor = 1) =>
       hitFlash: 0,
       age: 0,
       statuses: [],
-      side: null
+      side: null,
+      thread: null,
+      revive: 0
     },
     at,
     boss.radius

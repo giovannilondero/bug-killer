@@ -275,7 +275,7 @@ export const CombatSystem = Game.System(
       const rest = bosses.some((other) => !gone.has(other.entity.id) && other.data.boss.get().key === boss.key)
       if (rest) {
         credit(by, bossPoints, 0)
-        events.fx.emit({ type: "kill", x: at.x, y: at.y, color: boss.color, key: boss.key, summary: strings.bossPhase.halfResolved, points: BOSS_POINTS * 10, boss: false })
+        events.fx.emit({ type: "kill", x: at.x, y: at.y, color: boss.color, key: boss.key, summary: strings.bossPhase[bossRules[boss.pattern].piece ?? "halfResolved"], points: BOSS_POINTS * 10, boss: false })
         return
       }
       credit(by, bossPoints, 1)

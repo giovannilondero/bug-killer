@@ -1,5 +1,5 @@
 import type { Strings } from "../i18n.ts"
-import { plusOne, shout } from "./voice.ts"
+import { morePop, plusOne, shout } from "./voice.ts"
 
 export const en: Strings = {
   tag: "en-US",
@@ -28,7 +28,8 @@ export const en: Strings = {
       voice: (text) => `It worked on staging, you know. Anyway: ${text}`
     },
     tobia: { role: "Tech Lead", laugh: "haha", voice: (text) => text },
-    fabrizio: { role: "Stakeholder (cc'd on everything)", laugh: "+1", voice: plusOne }
+    fabrizio: { role: "Stakeholder (cc'd on everything)", laugh: "+1", voice: plusOne },
+    debora: { role: "Marketing", laugh: "ahah love it ✨", voice: morePop("Can we make it a bit more pop? By Friday, ideally ✨", "And a bit more pop, please. It's for Friday 🎨", "Love it, just needs to pop more. Friday? 💥") }
   },
 
   tobiaLines: [
@@ -64,7 +65,11 @@ export const en: Strings = {
       success: ["see? with the _tools_ it's a breeze"],
       failure: ["ok but next time use the _tools_"]
     },
-    fabrizio: { success: ["+1"], failure: ["up"] }
+    fabrizio: { success: ["+1"], failure: ["up"] },
+    debora: {
+      success: ["Love it!! Now can we make the logo bigger? 💖", "Perfect, posting it on LinkedIn right now ✨"],
+      failure: ["Hmm, it doesn't pop. We'll talk on Friday.", "Moving the launch, again. And the font is still sad."]
+    }
   },
   missions: {
     killCount: (goal, seconds) => `I need ${goal} bugs closed within ${seconds} seconds.`,
@@ -127,7 +132,9 @@ export const en: Strings = {
     dispenserRestart: "timeout... restarting",
     otp: "Enter your OTP code",
     conflict: "CONFLICT: ours vs theirs",
-    halfResolved: "one side resolved, one to go"
+    halfResolved: "one side resolved, one to go",
+    threadDown: "one thread down: fix the other, fast",
+    restarted: "race lost: the thread restarted"
   },
 
   traits: {
@@ -149,6 +156,7 @@ export const en: Strings = {
     keystone: "Permissions, SSO and CVEs. Did somebody say 2FA?",
     foundry: "The biggest backlog. Ugo is online.",
     monorepo: "One repo for everything, and everyone on it. Fabrizio says +1.",
+    microservices: "Forty services, one bug in each. Debora wants it more pop by Friday.",
     endless: "Every bug from every project, forever. How long can you last?"
   },
   pickups: {
@@ -198,6 +206,8 @@ export const en: Strings = {
     booting: "⏳ booting...",
     factor: "FACTOR 2/2",
     sides: { ours: "<<<<<<< ours", theirs: ">>>>>>> theirs" },
+    threads: { main: "thread: main", worker: "thread: worker" },
+    restarting: (seconds) => `⟳ restarting in ${seconds.toFixed(1)}s`,
     startBanner: "Close the backlog before the client shows up",
     audioOn: "🔊 AUDIO ON",
     audioOff: "🔇 AUDIO OFF",
