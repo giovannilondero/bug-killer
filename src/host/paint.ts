@@ -1,9 +1,11 @@
 // Canvas 2D painters shared by the renderers: the Canvas renderer draws with them every frame,
 // the Pixi renderer bakes them into textures once. Each paints in its own local coordinates.
 import { arenaOf } from "../content/arenas.ts"
+import type { Arena } from "../content/arenas.ts"
 import { ticketColors } from "../content/bugs.ts"
 import type { Priority, StatusTrait, TicketType } from "../content/bugs.ts"
 import type { Level } from "../content/levels.ts"
+import { loopSpot } from "../sim/bosses.ts"
 import { DEPLOY, PLAYER } from "../sim/constants.ts"
 import type { BossValue, PickupKind } from "../sim/schema.ts"
 import { locale, t } from "./language.ts"
@@ -78,12 +80,27 @@ export const paintFloor = (level: Level): HTMLCanvasElement => {
     g.fillText(`${String(Math.floor(rand() * 900) + 10).padStart(4, " ")}  ${line}`, rand() * (arena.width - 300), 30 + rand() * (arena.height - 40))
   }
   g.globalAlpha = 1
+  if (level.theme.crt) paintScanlines(g, arena, level.theme.accent)
   g.strokeStyle = level.theme.accent
   g.lineWidth = 4
   g.shadowColor = level.theme.accent
   g.shadowBlur = 20
   g.strokeRect(2, 2, arena.width - 4, arena.height - 4)
   return c
+}
+
+/** An old terminal's screen over the floor: phosphor glowing from the middle, and scanlines. */
+const paintScanlines = (g: CanvasRenderingContext2D, arena: Arena, phosphor: string) => {
+  const glow = g.createRadialGradient(arena.width / 2, arena.height / 2, 0, arena.width / 2, arena.height / 2, Math.max(arena.width, arena.height) * 0.7)
+  glow.addColorStop(0, phosphor)
+  glow.addColorStop(1, "transparent")
+  g.globalAlpha = 0.07
+  g.fillStyle = glow
+  g.fillRect(0, 0, arena.width, arena.height)
+  g.globalAlpha = 0.28
+  g.fillStyle = "#000000"
+  for (let y = 0; y < arena.height; y += 4) g.fillRect(0, y, arena.width, 2)
+  g.globalAlpha = 1
 }
 
 /** Which floor a level has, in its arena and the current language, to know when to repaint it. */
@@ -488,6 +505,23 @@ export const paintRestartGhost = (ctx: CanvasRenderingContext2D, radius: number,
   ctx.lineWidth = 3
   ctx.setLineDash([12, 9])
   ctx.beginPath(); ctx.arc(0, 0, radius, 0, Math.PI * 2); ctx.stroke()
+  ctx.setLineDash([])
+  ctx.globalAlpha = 1
+}
+
+/** An infinite loop's circuit, in arena coordinates: a faint dashed ∞ in its colour. */
+export const paintCircuit = (ctx: CanvasRenderingContext2D, arena: Arena, color: string) => {
+  ctx.strokeStyle = color
+  ctx.globalAlpha = 0.22
+  ctx.lineWidth = 6
+  ctx.setLineDash([18, 14])
+  ctx.beginPath()
+  for (let i = 0; i <= 96; i++) {
+    const at = loopSpot(arena, (i / 96) * Math.PI * 2)
+    if (i === 0) ctx.moveTo(at.x, at.y)
+    else ctx.lineTo(at.x, at.y)
+  }
+  ctx.stroke()
   ctx.setLineDash([])
   ctx.globalAlpha = 1
 }

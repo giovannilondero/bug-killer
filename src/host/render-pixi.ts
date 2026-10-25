@@ -10,7 +10,7 @@ import { bugKinds } from "../content/bugs.ts"
 import { clients } from "../content/clients.ts"
 import type { BossPattern } from "../content/levels.ts"
 import { comboMultiplier } from "../sim/systems/combat.ts"
-import { raceSpot } from "../sim/bosses.ts"
+import { lapOf, raceSpot } from "../sim/bosses.ts"
 import { BREAKPOINT, BUFF_SECONDS, DEPLOY, PARTY, PLAYER, ROCKET, TURRET } from "../sim/constants.ts"
 import { isUnlocked } from "../sim/tiers.ts"
 import { hasStatus } from "../sim/statuses.ts"
@@ -18,7 +18,7 @@ import { WEAPONS } from "../sim/weapons.ts"
 import type { FxValue, PickupKind, Vec } from "../sim/schema.ts"
 import type { View } from "../sim/simulation.ts"
 import { formatNumber, locale, t } from "./language.ts"
-import { bossHealth, conflictMarkerColors, conflictMarkers, floorKey, fuseBlink, fuseProgress, MONO, paintBreakpoint, paintBug, paintFloor, paintFuseRing, paintHeart, paintHostile, paintLabel, paintNest, paintPickup, paintPing, paintPlayer, paintRestartGhost, paintRocket, paintRocketTarget, paintTooltip, pickupIcons, pickupInfo, SANS, shade, tooltipHeight, TOOLTIP_WIDTH, truncate } from "./paint.ts"
+import { bossHealth, conflictMarkerColors, conflictMarkers, floorKey, fuseBlink, fuseProgress, MONO, paintBreakpoint, paintBug, paintFloor, paintFuseRing, paintHeart, paintHostile, paintLabel, paintNest, paintPickup, paintPing, paintPlayer, paintCircuit, paintRestartGhost, paintRocket, paintRocketTarget, paintTooltip, pickupIcons, pickupInfo, SANS, shade, tooltipHeight, TOOLTIP_WIDTH, truncate } from "./paint.ts"
 import type { BugLook, TooltipBug } from "./paint.ts"
 import type { Camera, Renderer } from "./render.ts"
 import { touchMode } from "./touch.ts"
@@ -584,7 +584,7 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
   }
 
   /** What each boss pattern adds to the plain boss: drawn under it, or over it. */
-  const bossMarks: Record<BossPattern, { readonly under?: (boss: ViewBoss, heading: number) => void; readonly over?: (boss: ViewBoss, arena: Arena) => void }> = {
+  const bossMarks: Record<BossPattern, { readonly under?: (boss: ViewBoss, heading: number, arena: Arena) => void; readonly over?: (boss: ViewBoss, arena: Arena) => void }> = {
     dispenser: {},
     crash: {
       // Glitches now and then, a ghost of the restart.
@@ -629,6 +629,15 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
         W.sprite(bakery.bake(`restartGhost|${boss.radius}`, wres, around(boss.radius + 3), (g) => paintRestartGhost(g, boss.radius, "#ffffff")), spot.x, spot.y, { rotation: time * 1.5 })
         text(W, wres, t().hud.restarting(boss.revive), `bold 14px ${MONO}`, Math.sin(time * 12) > 0 ? "#ffffff" : boss.color, spot.x, spot.y)
       }
+    },
+    infiniteLoop: {
+      // The circuit it runs, baked once at one pixel per world unit, and the lap it is on.
+      under: (boss, _heading, arena) => {
+        W.sprite(bakery.bake(`circuit|${arena.width}x${arena.height}|${boss.color}`, 1, { left: 0, top: 0, right: arena.width, bottom: arena.height }, (g) => paintCircuit(g, arena, boss.color)), 0, 0)
+      },
+      over: (boss) => {
+        text(W, wres, t().hud.lap(lapOf(boss.course) + 1), `bold 13px ${MONO}`, boss.color, boss.position.x, boss.position.y + boss.radius * 1.6)
+      }
     }
   }
 
@@ -636,7 +645,7 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
     const { x, y } = boss.position
     const heading = Math.atan2(boss.position.y - (boss.position.y - 1), 0) + Math.sin(boss.age) * 0.2 + Math.PI / 2
     const marks = bossMarks[boss.pattern]
-    marks.under?.(boss, heading)
+    marks.under?.(boss, heading, arena)
     drawBug(x, y, boss.radius, boss.radius, boss.color, heading, boss.age, { flash: boss.hitFlash, trait: "plain", reopened: true, boss: true, frozen: hasStatus(boss.statuses, "freeze"), poisoned: hasStatus(boss.statuses, "poison"), burning: hasStatus(boss.statuses, "burn") }, 1)
     if (boss.shield > 0) {
       const r = boss.radius * 1.35
