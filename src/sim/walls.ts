@@ -7,6 +7,7 @@ import type { Vec } from "./schema.ts"
  */
 const wallsOf = (arena: Arena): ReadonlyArray<Wall> => arena.walls ?? []
 
+// `clamp` and a distance of its own, not math.ts's: math.ts imports this module, so importing back would be a cycle.
 const within = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value))
 
 /** Whether a circle of `radius` at `p` overlaps `wall`; a point (radius 0) only counts inside it. */
@@ -89,6 +90,7 @@ export const firstWall = (arena: Arena, a: Vec, b: Vec, pad = 0): number | null 
 /** Whether a wall stands between `a` and `b`: nothing passes, not a shot, not a flame, not a blast. */
 export const blocked = (arena: Arena, a: Vec, b: Vec, pad = 0): boolean => firstWall(arena, a, b, pad) !== null
 
+// Not math.ts's distance: see `within`.
 const span = (a: Vec, b: Vec): number => Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2)
 
 /**
