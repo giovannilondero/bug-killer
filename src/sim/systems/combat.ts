@@ -5,7 +5,7 @@ import { bugKinds } from "../../content/bugs.ts"
 import { text } from "../../content/i18n.ts"
 import { BOMB_RADIUS, BREAKPOINT, BUFF_SECONDS, COMBO_WINDOW, DT, PLAYER, ROCKET } from "../constants.ts"
 import { makeBug, makePickup, makeTurret } from "../drafts.ts"
-import { clampToArena, distanceSquared, overlaps } from "../math.ts"
+import { clampToArena, distanceSquared, nearest, overlaps } from "../math.ts"
 import { BossWrite, BugWrite, HostileShotWrite, PickupWrite, PlayerWrite, ShotWrite } from "../queries.ts"
 import {
   BombBlast,
@@ -140,10 +140,10 @@ export const CombatSystem = Game.System(
       // Memory leak: the poison moves on to the nearest bug, still owned by whoever applied it.
       const leak = bug.statuses.find((status) => status.kind === "poison")
       if (leak) {
-        const heir = bugs
-          .filter((other) => !gone.has(other.entity.id))
-          .reduce<(typeof bugs)[number] | null>((best, other) =>
-            !best || distanceSquared(other.data.position.get(), at) < distanceSquared(best.data.position.get(), at) ? other : best, null)
+        const left = bugs.filter((other) => !gone.has(other.entity.id))
+        const spots = left.map((other) => other.data.position.get())
+        const spot = nearest(at, spots)
+        const heir = spot && left[spots.indexOf(spot)]
         if (heir) {
           const value = heir.data.bug.get()
           heir.data.bug.set({ ...value, statuses: applyStatus(value.statuses, "poison", leak.by) })
