@@ -160,8 +160,16 @@ export const endlessLevel: Level = {
   endless: { bosses: levels.map((l) => l.boss), every: 6 }
 }
 
-/** A bonus level draws from what Endless does: every open ticket of every project. */
-const bonus = (spec: Omit<Level, "bugs" | "projects">): Level => ({ ...spec, projects: endlessLevel.projects, bugs: endlessLevel.bugs })
+/**
+ * A bonus level draws from what Endless does, every open ticket of every
+ * project, and offers the content of the sprint that unlocks it.
+ */
+const bonus = (spec: Omit<Level, "bugs" | "projects" | "tier" | "bonus"> & { readonly bonus: NonNullable<Level["bonus"]> }): Level => ({
+  ...spec,
+  projects: endlessLevel.projects,
+  bugs: endlessLevel.bugs,
+  tier: levels[spec.bonus.after - 1]?.tier ?? 0
+})
 
 const sprintBoss = (id: LevelId): Boss => levels.find((l) => l.id === id)!.boss
 
