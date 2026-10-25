@@ -1,11 +1,12 @@
 import * as Random from "@typeonce/ritmo-math/Random"
 
+import { arenaOf } from "../../content/arenas.ts"
 import { bugKinds } from "../../content/bugs.ts"
 import { text } from "../../content/i18n.ts"
 import { BOMB_RADIUS, BUFF_SECONDS, COMBO_WINDOW, PLAYER } from "../constants.ts"
 import { makeBug, makePickup, makeTurret } from "../drafts.ts"
 import { allowedPickups } from "../hardcore.ts"
-import { distanceSquared, overlaps } from "../math.ts"
+import { clampToArena, distanceSquared, overlaps } from "../math.ts"
 import { BossWrite, BugWrite, HostileShotWrite, PickupWrite, PlayerWrite, ShotWrite } from "../queries.ts"
 import {
   BombBlast,
@@ -17,15 +18,18 @@ import {
   Hardcore,
   HostileShot,
   Language,
+  LevelSpec,
   Pickup,
   PlayerHurt,
   Rng,
   Run,
   Shot,
+  Tiers,
   Turret,
   pickupKinds
 } from "../schema.ts"
 import type { BugValue, PickupKind, PlayerValue, RunValue, Vec } from "../schema.ts"
+import { isUnlocked, tierOf } from "../tiers.ts"
 import { Ops } from "@typeonce/ritmo-math"
 
 const REOPEN_CHANCE = 0.4
@@ -58,6 +62,8 @@ export const CombatSystem = Game.System(
       run: Game.System.writeResource(Run),
       rng: Game.System.writeResource(Rng),
       language: Game.System.readResource(Language),
+      level: Game.System.readResource(LevelSpec),
+      tiers: Game.System.readResource(Tiers),
       hardcore: Game.System.readResource(Hardcore)
     },
     events: {
@@ -75,6 +81,7 @@ export const CombatSystem = Game.System(
     const run: RunValue = { ...resources.run.get(), fixed: [...resources.run.get().fixed] }
     const random = Random.draw(resources.rng)
     const strings = text[resources.language.get()]
+    const arena = arenaOf(resources.level.get())
     const drops = allowedPickups(pickupKinds, resources.hardcore.get())
     const gone = new Set<number>()
     const playing = run.phase === "waves" || run.phase === "boss"
@@ -128,8 +135,10 @@ export const CombatSystem = Game.System(
       }
 
       if (random.next() < dropChance[bug.priority]) {
-        const kindDropped = random.weighted(drops, (k) => dropWeights[k]) ?? "hotfix"
-        commands.spawn(makePickup(kindDropped, at))
+        // Only what the level has unlocked so far can drop, and no Pizza in hardcore.
+        const tier = tierOf(resources.level.get(), run.wave)
+        const kindDropped = random.weighted(drops, (k) => (isUnlocked(k, tier, resources.tiers.get()) ? dropWeights[k] : 0))
+        if (kindDropped) commands.spawn(makePickup(kindDropped, at))
       }
     }
 
@@ -250,7 +259,7 @@ export const CombatSystem = Game.System(
           events.fx.emit({ type: "down", x: at.x, y: at.y, slot: player.slot, name: player.name })
         }
         const push = Math.sqrt(distanceSquared(at, from)) || 1
-        data.position.set({ x: at.x + ((at.x - from.x) / push) * 26, y: at.y + ((at.y - from.y) / push) * 26 })
+        data.position.set(clampToArena({ x: at.x + ((at.x - from.x) / push) * 26, y: at.y + ((at.y - from.y) / push) * 26 }, radius, arena))
         return true
       }
 

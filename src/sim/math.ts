@@ -1,6 +1,7 @@
 import type * as Random from "@typeonce/ritmo-math/Random"
 
-import { ARENA, SPAWN_SAFE_DISTANCE } from "./constants.ts"
+import type { Arena } from "../content/arenas.ts"
+import { SPAWN_SAFE_DISTANCE } from "./constants.ts"
 import type { Vec } from "./schema.ts"
 import { Ops } from "@typeonce/ritmo-math"
 
@@ -17,9 +18,9 @@ export const overlaps = (a: Vec, ra: number, b: Vec, rb: number): boolean => dis
 
 export const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value))
 
-export const clampToArena = (p: Vec, radius: number): Vec => ({
-  x: clamp(p.x, radius, ARENA.width - radius),
-  y: clamp(p.y, radius, ARENA.height - radius)
+export const clampToArena = (p: Vec, radius: number, arena: Arena): Vec => ({
+  x: clamp(p.x, radius, arena.width - radius),
+  y: clamp(p.y, radius, arena.height - radius)
 })
 
 export const angleTo = (from: Vec, to: Vec): number => Ops.atan2(to.y - from.y, to.x - from.x)
@@ -39,16 +40,16 @@ export const nearest = (from: Vec, points: ReadonlyArray<Vec>): Vec | null => {
 }
 
 /** A point on the arena's edge, as far from `avoid` as a few tries allow. */
-export const edgePoint = (random: Random.Random, avoid: Vec | null): Vec => {
+export const edgePoint = (random: Random.Random, avoid: Vec | null, arena: Arena): Vec => {
   let best: Vec = { x: 60, y: 60 }
   let bestDistance = -1
   for (let attempt = 0; attempt < 6; attempt++) {
     const side = random.integer(0, 4)
-    const along = random.range(60, side % 2 === 0 ? ARENA.width - 60 : ARENA.height - 60)
+    const along = random.range(60, side % 2 === 0 ? arena.width - 60 : arena.height - 60)
     const point =
       side === 0 ? { x: along, y: 50 }
-      : side === 1 ? { x: ARENA.width - 50, y: along }
-      : side === 2 ? { x: along, y: ARENA.height - 50 }
+      : side === 1 ? { x: arena.width - 50, y: along }
+      : side === 2 ? { x: along, y: arena.height - 50 }
       : { x: 50, y: along }
     const d = avoid === null ? Infinity : distanceSquared(point, avoid)
     if (d > SPAWN_SAFE_DISTANCE ** 2) {
@@ -62,13 +63,16 @@ export const edgePoint = (random: Random.Random, avoid: Vec | null): Vec => {
   return best
 }
 
+/** The middle of the arena. */
+export const centreOf = (arena: Arena): Vec => ({ x: arena.width / 2, y: arena.height / 2 })
+
 /** A point inside the arena at least `minDistance` from `avoid`. */
-export const openPoint = (random: Random.Random, avoid: Vec, minDistance: number): Vec => {
+export const openPoint = (random: Random.Random, avoid: Vec, minDistance: number, arena: Arena): Vec => {
   for (let attempt = 0; attempt < 12; attempt++) {
-    const point = { x: random.range(140, ARENA.width - 140), y: random.range(140, ARENA.height - 140) }
+    const point = { x: random.range(140, arena.width - 140), y: random.range(140, arena.height - 140) }
     if (distanceSquared(point, avoid) > minDistance ** 2) {
       return point
     }
   }
-  return { x: ARENA.width - avoid.x, y: ARENA.height - avoid.y }
+  return { x: arena.width - avoid.x, y: arena.height - avoid.y }
 }

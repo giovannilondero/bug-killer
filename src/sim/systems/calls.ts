@@ -2,26 +2,29 @@ import * as Random from "@typeonce/ritmo-math/Random"
 import { Ops } from "@typeonce/ritmo-math"
 
 import { text } from "../../content/i18n.ts"
-import { ARENA, CALLS, DT } from "../constants.ts"
+import { arenaOf } from "../../content/arenas.ts"
+import type { Arena } from "../../content/arenas.ts"
+import { CALLS, DT } from "../constants.ts"
 import { makePickup } from "../drafts.ts"
 import { allowedPickups } from "../hardcore.ts"
 import { clamp, distanceSquared } from "../math.ts"
 import { PlayerRead, standing } from "../queries.ts"
 import { callKinds } from "../../content/clients.ts"
-import { Calls, Chat, Fx, Game, Hardcore, Language, LevelSpec, Pickup, Rng, Run } from "../schema.ts"
+import { Calls, Chat, Fx, Game, Hardcore, Language, LevelSpec, Pickup, Rng, Run, Tiers } from "../schema.ts"
 import type { CallValue, PickupKind, Vec } from "../schema.ts"
+import { tierOf, unlocked } from "../tiers.ts"
 
 const rewards: ReadonlyArray<PickupKind> = ["hotfix", "refactor", "coffee", "unitTest", "revert", "pizza"]
 
 const MARGIN = 140
 
 /** A point in the arena between `near` and `far` from the player, away from the walls. */
-const somewhere = (random: Random.Random, from: Vec, near: number, far: number): Vec => {
+const somewhere = (random: Random.Random, arena: Arena, from: Vec, near: number, far: number): Vec => {
   const angle = random.range(0, Math.PI * 2)
   const distance = random.range(near, far)
   return {
-    x: clamp(from.x + Ops.cos(angle) * distance, MARGIN, ARENA.width - MARGIN),
-    y: clamp(from.y + Ops.sin(angle) * distance, MARGIN, ARENA.height - MARGIN)
+    x: clamp(from.x + Ops.cos(angle) * distance, MARGIN, arena.width - MARGIN),
+    y: clamp(from.y + Ops.sin(angle) * distance, MARGIN, arena.height - MARGIN)
   }
 }
 
@@ -39,6 +42,7 @@ export const CallSystem = Game.System(
     resources: {
       level: Game.System.readResource(LevelSpec),
       language: Game.System.readResource(Language),
+      tiers: Game.System.readResource(Tiers),
       hardcore: Game.System.readResource(Hardcore),
       run: Game.System.writeResource(Run),
       calls: Game.System.writeResource(Calls),
@@ -60,6 +64,7 @@ export const CallSystem = Game.System(
     // Rooms and messages appear around the first developer still standing.
     let me = lead
     const state = { ...resources.calls.get() }
+    const arena = arenaOf(resources.level.get())
     const random = Random.draw(resources.rng)
     const strings = text[resources.language.get()]
     const say = (client: CallValue["client"], line: string) => strings.people[client].voice(line, (n) => random.integer(0, Math.max(1, n)))
@@ -77,7 +82,7 @@ export const CallSystem = Game.System(
             kind,
             client,
             title,
-            room: somewhere(random, me, 320, 620),
+            room: somewhere(random, arena, me, 320, 620),
             radius: CALLS.meet.radius,
             pings: [],
             progress: 0,
@@ -88,7 +93,7 @@ export const CallSystem = Game.System(
           events.chat.emit({ type: "call", kind, client, text: say(client, strings.calls.meetInvite(title, CALLS.meet.duration)) })
         } else {
           const thread = random.pick(strings.calls.slackThreads) ?? []
-          const pings = thread.slice(0, CALLS.slack.pings).map((line) => ({ ...somewhere(random, me, 240, 600), text: line }))
+          const pings = thread.slice(0, CALLS.slack.pings).map((line) => ({ ...somewhere(random, arena, me, 240, 600), text: line }))
           call = {
             kind,
             client,
@@ -133,9 +138,10 @@ export const CallSystem = Game.System(
         events.chat.emit({ type: "outcome", client: call.client, text: say(call.client, random.pick(lines.answered) ?? "ok"), success: true })
         events.fx.emit({ type: "callDone", x: me.x, y: me.y, kind: call.kind, points })
         const angle = random.range(0, Math.PI * 2)
-        commands.spawn(makePickup(random.pick(allowedPickups(rewards, resources.hardcore.get())) ?? "coffee", {
-          x: clamp(me.x + Ops.cos(angle) * 90, 40, ARENA.width - 40),
-          y: clamp(me.y + Ops.sin(angle) * 90, 40, ARENA.height - 40)
+        const reward = random.pick(allowedPickups(unlocked(rewards, tierOf(resources.level.get(), run.wave), resources.tiers.get()), resources.hardcore.get()))
+        if (reward) commands.spawn(makePickup(reward, {
+          x: clamp(me.x + Ops.cos(angle) * 90, 40, arena.width - 40),
+          y: clamp(me.y + Ops.sin(angle) * 90, 40, arena.height - 40)
         }))
         state.active = null
         state.nextIn = random.range(CALLS.min, CALLS.max)

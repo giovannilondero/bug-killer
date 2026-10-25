@@ -5,6 +5,7 @@ import type { Priority, StatusTrait } from "../content/bugs.ts"
 import type { CallKind, ClientId, MissionKind } from "../content/clients.ts"
 import type { Locale } from "../content/i18n.ts"
 import type { BossPattern, Level } from "../content/levels.ts"
+import type { TierTable } from "./tiers.ts"
 
 export type Vec = { x: number; y: number }
 
@@ -128,6 +129,8 @@ export const LevelSpec = Descriptor.Resource<Level>()("BugKiller/Level")
 export const Language = Descriptor.Resource<Locale>()("BugKiller/Language")
 /** Hardcore: one sanity and no Pizza, fixed for the whole run like the language. */
 export const Hardcore = Descriptor.Resource<boolean>()("BugKiller/Hardcore")
+/** Which content tier each pickup belongs to: the table in `tiers.ts`, unless a test tiers something up. */
+export const Tiers = Descriptor.Resource<TierTable>()("BugKiller/Tiers")
 export const Rng = Descriptor.ConstructedResource(Random.codec)("BugKiller/Rng")
 
 export type Phase = "waves" | "boss" | "cleared" | "dead"
@@ -276,7 +279,7 @@ export const Game = Schema.bind(
       Schema.requires(Pickup, Position, Body),
       Schema.requires(Turret, Position, Body)
     ],
-    resources: { Input, Party, LevelSpec, Language, Hardcore, Rng, Run, Missions, Interruptions, Calls },
+    resources: { Input, Party, LevelSpec, Language, Tiers, Hardcore, Rng, Run, Missions, Interruptions, Calls },
     events: { Fx, Chat, BugFixed, PlayerHurt, BombBlast }
   })
 )
