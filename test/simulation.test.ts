@@ -9,8 +9,9 @@ import type { View } from "../src/sim/simulation.ts"
 import { makeBoss, makeBug, makePickup } from "../src/sim/drafts.ts"
 import type { BugSeed } from "../src/sim/drafts.ts"
 import { contentTiers, isUnlocked, tierOf } from "../src/sim/tiers.ts"
+import { hasStatus } from "../src/sim/statuses.ts"
 import { Boss, Bug, Game, Pickup, pickupKinds } from "../src/sim/schema.ts"
-import type { ChatValue, FxValue, InputValue, PickupKind } from "../src/sim/schema.ts"
+import type { ChatValue, FxValue, InputValue, PickupKind, Vec } from "../src/sim/schema.ts"
 
 /** A bot that kites the nearest bug and shoots at it: the same intents a player sends. */
 const autopilot = (view: () => View | null, tick: () => number) => ({
@@ -715,4 +716,133 @@ test("Memory leak: when a poisoned bug dies, the leak passes to the nearest bug"
 test("Memory leak arrives with sprint 4 (Foundry) and not before", () => {
   assert.equal(isUnlocked("memoryLeak", levels[2]!.tier), false)
   assert.equal(isUnlocked("memoryLeak", levels[3]!.tier), true)
+})
+
+// --- git push --force --------------------------------------------------------
+
+/** Sets down practice targets that never move: tough Medium bugs, so one blast leaves them standing and readable. */
+const dummies = (sim: ReturnType<typeof range>["sim"], ...spots: Array<Vec>) => {
+  const Place = Game.System("Test/Place", { commands: Game.System.commands(Game.System.spawns(Bug)) }, ({ commands }) => {
+    spots.forEach((at, i) => commands.spawn(makeBug({ key: `DUMMY-${i + 1}`, summary: "target practice", priority: "Medium", status: "Open" }, at, { toughness: { hp: 10, speed: 0 } })))
+  })
+  assert.ok(sim.runtime.tick(Game.Schedule(Place, Game.Schedule.applyDeferred())).ok)
+  return (key: string) => sim.view().bugs.find((bug) => bug.key === key)
+}
+
+const blasts = (fx: ReadonlyArray<FxValue>) => fx.flatMap((e) => (e.type === "explosion" ? [e] : []))
+
+test("a rocket fired at empty space explodes where the crosshair was, hurting the bugs around it", () => {
+  const { sim, fx, wait, drop, volley } = range()
+  const at = sim.view().player!.position
+  drop("pushForce")
+  assert.equal(sim.view().player!.weapon.kind, "pushForce")
+  // One bug just off the aimed point, one well outside the blast.
+  const bug = dummies(sim, { x: at.x + 400, y: at.y + 80 }, { x: at.x + 400, y: at.y + 300 })
+  assert.equal(volley().length, 0, "no bullets: a rocket")
+  assert.equal(sim.view().rockets.length, 1)
+  wait(2)
+  assert.equal(sim.view().rockets.length, 0, "it went off")
+  const [blast, ...more] = blasts(fx)
+  assert.ok(blast, "an explosion")
+  assert.equal(more.length, 0, "just one")
+  assert.ok(Math.abs(blast.x - (at.x + 400)) < 15 && Math.abs(blast.y - at.y) < 15, `at the aimed point, not at ${blast.x},${blast.y}`)
+  assert.ok(bug("DUMMY-1")!.hp < bug("DUMMY-1")!.maxHp, "the bug next to it took damage")
+  assert.equal(bug("DUMMY-2")!.hp, bug("DUMMY-2")!.maxHp, "the far one did not")
+})
+
+test("a rocket that meets a bug on the way explodes there, short of the crosshair", () => {
+  const { sim, fx, wait, drop, volley } = range()
+  const at = sim.view().player!.position
+  drop("pushForce")
+  const bug = dummies(sim, { x: at.x + 180, y: at.y })
+  volley()
+  wait(2)
+  const [blast, ...more] = blasts(fx)
+  assert.ok(blast, "an explosion")
+  assert.equal(more.length, 0, "just one")
+  assert.ok(blast.x < at.x + 180, `on the bug, not at the crosshair: ${blast.x - at.x} px out`)
+  assert.ok(bug("DUMMY-1")!.hp < bug("DUMMY-1")!.maxHp)
+})
+
+test("a rocket's explosion never hurts a developer, not even the one standing in it", () => {
+  const fx: Array<FxValue> = []
+  let fire = false
+  let aim = { x: 0, y: 0 }
+  const made = createSimulation({
+    level: levels[1]!,
+    seed: 3,
+    locale: "en",
+    party: crew(["Ada", "Linus"]),
+    inputs: { snapshot: () => [{ ...idleInput, fire, aim }, idleInput] },
+    presentation: { fx: (e) => fx.push(e), chat: () => undefined }
+  })
+  if (!made.ok) throw new Error(JSON.stringify(made.error))
+  const sim = made.value
+  const [ada, linus] = sim.view().players
+  const Drop = Game.System("Test/Drop", { commands: Game.System.commands(Game.System.spawns(Pickup)) }, ({ commands }) => {
+    commands.spawn(makePickup("pushForce", { ...ada!.position }))
+  })
+  assert.ok(sim.runtime.tick(Game.Schedule(Drop, Game.Schedule.applyDeferred())).ok)
+  assert.ok(sim.step().ok)
+  // Right on the teammate, a short way from the one firing: both stand in the blast.
+  aim = { ...linus!.position }
+  fire = true
+  assert.ok(sim.step().ok)
+  fire = false
+  for (let frame = 0; frame < 60; frame++) assert.ok(sim.step().ok)
+
+  assert.equal(blasts(fx).length, 1, "it went off")
+  assert.ok(!fx.some((e) => e.type === "hurt"), "nobody got hurt")
+  assert.deepEqual(sim.view().players.map((p) => p.hp), [ada!.maxHp, linus!.maxHp])
+})
+
+test("git push --force fires slowly; Hotfix speeds it up, Refactor and Tools leave it alone", () => {
+  const { sim, wait, drop, hold } = range()
+  const basic = hold(2)
+  wait(1)
+  drop("pushForce")
+  const slow = hold(3)
+  assert.ok(slow >= 2 && slow / 3 < basic / 2 / 3, `a few rockets (${slow} in 3 s), under a third of the gun's rate (${basic} in 2 s)`)
+  wait(1)
+
+  drop("refactor", "tools")
+  const before = new Set(sim.view().rockets.map((rocket) => rocket.id))
+  assert.equal(hold(1 / 60), 1)
+  const fired = sim.view().rockets.filter((rocket) => !before.has(rocket.id))
+  assert.equal(fired.length, 1, "still one rocket per pull, no spread")
+  assert.equal(sim.view().shots.length, 0, "and no bullets")
+  wait(1)
+
+  drop("hotfix")
+  assert.ok(hold(3) >= slow * 2, "Hotfix more than doubles its fire rate")
+})
+
+test("git push --force arrives with Sprint 5: a rare drop and a possible reward, never earlier", () => {
+  assert.equal(contentTiers.pushForce, 4)
+  for (const level of levels) assert.ok(!isUnlocked("pushForce", level.tier), `not in ${level.id}`)
+  assert.ok(isUnlocked("pushForce", 4))
+  assert.ok(!isUnlocked("pushForce", tierOf(endlessLevel, 1)), "not in Endless's first waves")
+  assert.ok(isUnlocked("pushForce", endlessLevel.tier), "but Endless gets there")
+})
+
+test("under Code freeze a rocket's blast freezes every bug it reaches", () => {
+  const { sim, wait, drop, volley } = range()
+  const at = sim.view().player!.position
+  drop("pushForce", "codeFreeze")
+  const bug = dummies(sim, { x: at.x + 400, y: at.y + 80 }, { x: at.x + 400, y: at.y - 80 }, { x: at.x + 400, y: at.y + 300 })
+  volley()
+  wait(1.2)
+  assert.ok(hasStatus(bug("DUMMY-1")!.statuses, "freeze") && hasStatus(bug("DUMMY-2")!.statuses, "freeze"), "both bugs in the blast are frozen")
+  assert.ok(!hasStatus(bug("DUMMY-3")!.statuses, "freeze"), "the one out of reach is not")
+})
+
+test("under Memory leak a rocket's blast poisons every bug it reaches", () => {
+  const { sim, wait, drop, volley } = range()
+  const at = sim.view().player!.position
+  drop("pushForce", "memoryLeak")
+  const bug = dummies(sim, { x: at.x + 400, y: at.y + 80 }, { x: at.x + 400, y: at.y - 80 }, { x: at.x + 400, y: at.y + 300 })
+  volley()
+  wait(1.2)
+  assert.ok(hasStatus(bug("DUMMY-1")!.statuses, "poison") && hasStatus(bug("DUMMY-2")!.statuses, "poison"), "both bugs in the blast are poisoned")
+  assert.ok(!hasStatus(bug("DUMMY-3")!.statuses, "poison"), "the one out of reach is not")
 })

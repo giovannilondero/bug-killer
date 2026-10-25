@@ -3,13 +3,13 @@ import type { Arena } from "../content/arenas.ts"
 import { bugKinds } from "../content/bugs.ts"
 import { clients } from "../content/clients.ts"
 import { comboMultiplier } from "../sim/systems/combat.ts"
-import { BUFF_SECONDS, PARTY, PLAYER, TURRET } from "../sim/constants.ts"
+import { BUFF_SECONDS, PARTY, PLAYER, ROCKET, TURRET } from "../sim/constants.ts"
 import { hasStatus } from "../sim/statuses.ts"
 import { WEAPONS } from "../sim/weapons.ts"
 import type { FxValue, Vec } from "../sim/schema.ts"
 import type { View } from "../sim/simulation.ts"
 import { formatNumber, t } from "./language.ts"
-import { floorKey, MONO, paintBug, paintFloor, paintHeart, paintHostile, paintLabel, paintPickup, paintPing, paintPlayer, paintTooltip, pickupIcons, pickupInfo, roundRect, SANS, shade, tooltipHeight, TOOLTIP_WIDTH, truncate } from "./paint.ts"
+import { floorKey, MONO, paintBug, paintFloor, paintHeart, paintHostile, paintLabel, paintPickup, paintPing, paintPlayer, paintRocket, paintRocketTarget, paintTooltip, pickupIcons, pickupInfo, roundRect, SANS, shade, tooltipHeight, TOOLTIP_WIDTH, truncate } from "./paint.ts"
 import type { BugLook } from "./paint.ts"
 import { touchMode } from "./touch.ts"
 
@@ -73,6 +73,13 @@ export const makeRenderer = (canvas: HTMLCanvasElement) => {
       const life = 0.3 + Math.random() * 0.5
       particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life, max: life, color, size: size * (0.5 + Math.random()) })
     }
+  }
+
+  /** A wisp of smoke left behind a rocket each frame. */
+  const puff = (at: Vec, velocity: Vec) => {
+    const len = Math.hypot(velocity.x, velocity.y) || 1
+    const life = 0.35 + Math.random() * 0.25
+    particles.push({ x: at.x - (velocity.x / len) * 26, y: at.y - (velocity.y / len) * 26, vx: (Math.random() - 0.5) * 30, vy: (Math.random() - 0.5) * 30, life, max: life, color: "#9aa4b8", size: 4 })
   }
 
   const fx = (event: FxValue) => {
@@ -157,6 +164,13 @@ export const makeRenderer = (canvas: HTMLCanvasElement) => {
         break
       case "hallucination":
         floaters.push({ x: event.x, y: event.y - 30, life: 1.2, max: 1.2, text: t().hud.hallucination, sub: "", color: "#c792ff", big: false })
+        break
+      case "explosion":
+        shake = Math.max(shake, 12)
+        flash = Math.max(flash, 0.25)
+        burst(event.x, event.y, "#ff9440", 40, event.radius * 3, 5)
+        burst(event.x, event.y, "#ffd84a", 24, event.radius * 2, 4)
+        burst(event.x, event.y, "#ffffff", 10, event.radius, 3)
         break
       case "shoot":
         break
@@ -528,6 +542,20 @@ export const makeRenderer = (canvas: HTMLCanvasElement) => {
       ctx.beginPath(); ctx.moveTo(x - tx, y - ty); ctx.lineTo(x, y); ctx.stroke()
     }
     ctx.shadowBlur = 0
+
+    // Rockets: where each will go off, then the rocket with its smoke.
+    for (const rocket of view.rockets) {
+      ctx.save()
+      ctx.translate(rocket.target.x, rocket.target.y)
+      paintRocketTarget(ctx, ROCKET.blastRadius)
+      ctx.restore()
+      ctx.save()
+      ctx.translate(rocket.position.x, rocket.position.y)
+      ctx.rotate(Math.atan2(rocket.velocity.y, rocket.velocity.x))
+      paintRocket(ctx)
+      ctx.restore()
+      puff(rocket.position, rocket.velocity)
+    }
 
     for (const shot of view.hostile) {
       const { x, y } = shot.position

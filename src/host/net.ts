@@ -106,7 +106,8 @@ export const makeFrames = () => {
         bosses: blend(a.view.bosses, next.bosses, (e) => e.id, k),
         shots: blend(a.view.shots, next.shots, (e) => e.id, k),
         hostile: blend(a.view.hostile, next.hostile, (e) => e.id, k),
-        pickups: blend(a.view.pickups, next.pickups, (e) => e.id, k)
+        pickups: blend(a.view.pickups, next.pickups, (e) => e.id, k),
+        rockets: blend(a.view.rockets, next.rockets, (e) => e.id, k)
       }
     }
   }
