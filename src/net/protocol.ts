@@ -56,6 +56,8 @@ export type ClientMessage =
   | { readonly t: "create"; readonly name: string; readonly level: LevelId; readonly locale: Locale; readonly hardcore?: boolean; readonly arena?: ArenaId }
   | { readonly t: "join"; readonly code: string; readonly name: string }
   | { readonly t: "start"; readonly level?: LevelId; readonly hardcore?: boolean; readonly arena?: ArenaId }
+  /** The host changing the level, hardcore or Endless's arena in the lobby: every teammate sees it before the run. */
+  | { readonly t: "settings"; readonly level?: LevelId; readonly hardcore?: boolean; readonly arena?: ArenaId }
   | { readonly t: "input"; readonly input: InputValue }
   | { readonly t: "leave" }
   | { readonly t: "ping" }
@@ -128,6 +130,14 @@ export const readClientMessage = (raw: string, isLevel: (id: unknown) => id is L
       if ((data.level !== undefined && !isLevel(data.level)) || !isFlag(data.hardcore) || !isArena(data.arena)) return null
       return {
         t: "start",
+        ...(data.level === undefined ? {} : { level: data.level }),
+        ...(data.hardcore === undefined ? {} : { hardcore: data.hardcore }),
+        ...(data.arena === undefined ? {} : { arena: data.arena })
+      }
+    case "settings":
+      if ((data.level !== undefined && !isLevel(data.level)) || !isFlag(data.hardcore) || !isArena(data.arena)) return null
+      return {
+        t: "settings",
         ...(data.level === undefined ? {} : { level: data.level }),
         ...(data.hardcore === undefined ? {} : { hardcore: data.hardcore }),
         ...(data.arena === undefined ? {} : { arena: data.arena })

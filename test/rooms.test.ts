@@ -305,3 +305,35 @@ test("an arena Endless doesn't offer is refused, and a sprint is always played i
   const [p] = ada.last("frame")!.view.players
   assert.ok(Math.abs(p!.position.x - arenas.normal.width / 2) < 200, JSON.stringify(p!.position))
 })
+
+test("the host's level, hardcore and Endless arena reach the teammates' lobby as soon as they change", () => {
+  const rooms = makeRooms({ random: seeded() })
+  const ada = browser()
+  const bob = browser()
+  send(rooms, ada, { t: "create", name: "Ada", level: "endless", locale: "en" })
+  const code = ada.last("room")!.room.code
+  send(rooms, bob, { t: "join", code, name: "Bob" })
+  send(rooms, ada, { t: "settings", hardcore: true, arena: "small" })
+  assert.equal(bob.last("room")?.room.hardcore, true, "Bob sees hardcore before the run starts")
+  assert.equal(bob.last("room")?.room.arena, "small")
+  assert.equal(bob.last("room")?.room.state, "lobby")
+  send(rooms, ada, { t: "settings", hardcore: false })
+  assert.equal(bob.last("room")?.room.hardcore, false, "each change goes out")
+  assert.equal(bob.last("room")?.room.arena, "small", "what the host didn't touch stays")
+  send(rooms, ada, { t: "settings", level: "glacier" })
+  assert.equal(bob.last("room")?.room.level, "glacier")
+  send(rooms, ada, { t: "settings", level: "endless" })
+
+  // A teammate cannot change them, and a malformed change is refused.
+  send(rooms, bob, { t: "settings", hardcore: true })
+  assert.equal(bob.last("error")?.code, "notHost")
+  const seen = bob.inbox.length
+  for (const bad of [{ t: "settings", hardcore: "yes" }, { t: "settings", arena: "moon" }, { t: "settings", arena: 3 }, { t: "settings", level: "../etc" }]) send(rooms, ada, bad)
+  assert.equal(bob.inbox.length, seen, "nothing went out")
+  assert.equal(rooms.room(code)?.hardcore, false)
+  assert.equal(rooms.room(code)?.arena, "small")
+
+  // And the run the host starts plays by them.
+  send(rooms, ada, { t: "start" })
+  assert.equal(bob.last("started")?.arena, "small")
+})

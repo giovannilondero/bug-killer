@@ -275,6 +275,16 @@ export const makeRooms = (options: RoomsOptions = {}) => {
         start(at.room, message.level ?? at.room.level, message.hardcore ?? at.room.hardcore, message.arena ?? at.room.arena)
         return
       }
+      case "settings": {
+        if (!at) return
+        if (at.room.host !== at.slot) return fail(peer, "notHost")
+        if (at.room.sim && !over(at.room)) return
+        at.room.level = message.level ?? at.room.level
+        at.room.hardcore = message.hardcore ?? at.room.hardcore
+        at.room.arena = message.arena ?? at.room.arena
+        announce(at.room)
+        return
+      }
       case "input": {
         if (!at || !at.room.sim) return
         const previous = at.room.inputs[at.slot] ?? idleInput

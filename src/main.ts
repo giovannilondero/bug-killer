@@ -523,6 +523,8 @@ const showLobby = () => {
   const isHost = room.host === r.you
   const host = room.members.find((m) => m.slot === room.host)?.name ?? ""
   const level = levelById(room.level)
+  // Every change the host makes comes back as a new room: keep the control they were on.
+  const focused = document.activeElement?.getAttribute("name")
   show(html`
     <div class="panel multi lobby" style="--accent:${level.theme.accent}">
       <h2>${t().multi.lobby(room.code)}</h2>
@@ -543,6 +545,16 @@ const showLobby = () => {
       </div>
     </div>`, "menu")
   wireArenaField(overlay)
+  if (focused) overlay.querySelector<HTMLElement>(`[name="${focused}"]`)?.focus()
+  // The host's picks go out as they change, so the whole team sees the rules it will play by.
+  const chosen = () => ({
+    level: playable.find((l) => l.id === overlay.querySelector<HTMLSelectElement>("[name=level]")?.value)?.id ?? room.level,
+    hardcore: overlay.querySelector<HTMLInputElement>("[name=hardcore]")?.checked ?? room.hardcore,
+    arena: chosenArena(overlay, room.arena)
+  })
+  overlay.querySelectorAll("[name=level], [name=hardcore], [name=arena]").forEach((control) =>
+    control.addEventListener("change", () => r.connection.send({ t: "settings", ...chosen() }))
+  )
   overlay.querySelector<HTMLButtonElement>("[data-copy]")?.addEventListener("click", (event) => {
     const button = event.currentTarget as HTMLButtonElement
     void navigator.clipboard.writeText(shareLink(room.code)).then(() => {
@@ -551,10 +563,7 @@ const showLobby = () => {
   })
   overlay.querySelector<HTMLButtonElement>("[data-start]")?.addEventListener("click", () => {
     audio.unlock()
-    const chosen = overlay.querySelector<HTMLSelectElement>("[name=level]")?.value
-    const level = playable.find((l) => l.id === chosen)?.id ?? room.level
-    const hardcoreChosen = overlay.querySelector<HTMLInputElement>("[name=hardcore]")?.checked ?? room.hardcore
-    r.connection.send({ t: "start", level, hardcore: hardcoreChosen, arena: chosenArena(overlay, room.arena) })
+    r.connection.send({ t: "start", ...chosen() })
   })
   overlay.querySelector<HTMLButtonElement>("[data-leave]")?.addEventListener("click", () => {
     leaveRemote()
