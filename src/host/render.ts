@@ -327,7 +327,7 @@ export const makeRenderer = (canvas: HTMLCanvasElement) => {
       drawBug(x, y, boss.radius, "#ff00ff", heading, boss.age, { flash: 0, trait: "plain", reopened: false, boss: true })
       ctx.restore()
     }
-    drawBug(x, y, boss.radius, boss.color, heading, boss.age, { flash: boss.hitFlash, trait: "plain", reopened: true, boss: true, frozen: hasStatus(boss.statuses, "freeze") })
+    drawBug(x, y, boss.radius, boss.color, heading, boss.age, { flash: boss.hitFlash, trait: "plain", reopened: true, boss: true, frozen: hasStatus(boss.statuses, "freeze"), poisoned: hasStatus(boss.statuses, "poison") })
     if (boss.shield > 0) {
       ctx.strokeStyle = "rgba(255,255,255,0.8)"
       ctx.lineWidth = 4
@@ -483,7 +483,7 @@ export const makeRenderer = (canvas: HTMLCanvasElement) => {
         ctx.beginPath(); ctx.arc(x, y, bug.radius * 1.45, -time * 3, -time * 3 + Math.PI * 2); ctx.stroke()
         ctx.setLineDash([])
       }
-      drawBug(x, y, bug.radius * (0.4 + appear * 0.6), bug.resurrectedBy ? "#9dff6b" : bugKinds[bug.priority].color, heading, bug.age, { flash: bug.hitFlash, trait: bug.trait, reopened: bug.reopened || bug.resurrectedBy !== null, frozen: hasStatus(bug.statuses, "freeze") })
+      drawBug(x, y, bug.radius * (0.4 + appear * 0.6), bug.resurrectedBy ? "#9dff6b" : bugKinds[bug.priority].color, heading, bug.age, { flash: bug.hitFlash, trait: bug.trait, reopened: bug.reopened || bug.resurrectedBy !== null, frozen: hasStatus(bug.statuses, "freeze"), poisoned: hasStatus(bug.statuses, "poison") })
       ctx.globalAlpha = 1
       const isTarget = mission?.kind === "killTarget" && mission.target === bug.key
       if (isTarget) {
