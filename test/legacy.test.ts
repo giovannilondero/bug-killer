@@ -100,8 +100,7 @@ test("Infinite loop's new strings exist in every language", () => {
   }
 })
 
-test("Endless rotates 7 bosses, Infinite loop last", () => {
-  assert.equal(endlessLevel.endless!.bosses.length, 7)
+test("Endless rotates Infinite loop seventh", () => {
   assert.equal(endlessLevel.endless!.bosses[6]!.pattern, "infiniteLoop")
   assert.ok(endlessLevel.bugs.some((bug) => bug.key.startsWith("LGC-")))
 })

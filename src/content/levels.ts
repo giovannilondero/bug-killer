@@ -6,7 +6,7 @@ import type { ClientId } from "./clients.ts"
 import type { Tier } from "../sim/tiers.ts"
 
 /** How a boss fights; each pattern is one branch of the boss system. */
-export const bossPatterns = ["dispenser", "crash", "twoFactor", "undefined", "mergeConflict", "raceCondition", "infiniteLoop"] as const
+export const bossPatterns = ["dispenser", "crash", "twoFactor", "undefined", "mergeConflict", "raceCondition", "infiniteLoop", "stackOverflow"] as const
 export type BossPattern = (typeof bossPatterns)[number]
 
 /** The two halves a merge conflict splits into. */
@@ -28,7 +28,7 @@ export interface Boss {
   readonly shotText: string
 }
 
-export const levelIds = ["glacier", "sidequests", "keystone", "foundry", "monorepo", "microservices", "legacy", "endless"] as const
+export const levelIds = ["glacier", "sidequests", "keystone", "foundry", "monorepo", "microservices", "legacy", "production", "endless"] as const
 export type LevelId = (typeof levelIds)[number]
 
 export interface Level {
@@ -197,6 +197,26 @@ export const levels: ReadonlyArray<Level> = [
       radius: 48,
       color: "#33ff66",
       shotText: "GOTO"
+    }
+  }),
+  level({
+    id: "production",
+    sprint: "Sprint 8",
+    name: "Production",
+    projects: ["PROD"],
+    theme: { background: "#170909", grid: "#311212", accent: "#ff5a4f" },
+    clients: ["ugo", "debora", "fabrizio", "gualtiero", "ornella", "kevin"],
+    clientEvery: 8,
+    waveSize: 9,
+    tier: 5,
+    boss: {
+      key: "PROD-404",
+      title: "RangeError: Maximum call stack size exceeded",
+      pattern: "stackOverflow",
+      hp: 200,
+      radius: 54,
+      color: "#f48024",
+      shotText: "f()"
     }
   })
 ]

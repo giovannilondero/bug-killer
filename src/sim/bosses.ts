@@ -319,6 +319,11 @@ export const bossRules: Record<BossPattern, BossRules> = {
       return toward(position, goal, Math.min(gap / DT, 700))
     },
     turn: () => null
+  },
+
+  stackOverflow: {
+    fight: ({ chase }) => chase(30),
+    turn: () => null
   }
 }
 

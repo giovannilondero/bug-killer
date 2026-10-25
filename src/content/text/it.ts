@@ -92,7 +92,7 @@ export const it: Strings = {
   ],
   regression: (key) => `Regressione introdotta dal fix di ${key}`,
   subtask: (summary) => `Sotto-task: ${summary}`,
-  minions: { crash: "Crash report senza stack trace", null: "Cannot read properties of null" },
+  minions: { crash: "Crash report senza stack trace", null: "Cannot read properties of null", frame: (depth) => `at recurse (index.js:${depth})` },
   calls: {
     meetTitles: [
       "Sync veloce (5 min)",
@@ -135,6 +135,7 @@ export const it: Strings = {
     halfResolved: "un lato risolto, manca l'altro",
     threadDown: "un thread giù: chiudi l'altro, svelto",
     faster: "GOTO 10: un altro giro, più veloce",
+    frameDropped: "un frame è caduto dallo stack: prima prendi lui",
     restarted: "race persa: il thread è ripartito"
   },
 
@@ -159,6 +160,7 @@ export const it: Strings = {
     monorepo: "Un solo repo per tutto, e tutti dentro. Fabrizio mette +1.",
     microservices: "Quaranta servizi, un bug in ognuno. Debora lo vuole più pop entro venerdì.",
     legacy: "Schermo verde, COBOL e un loop che nessuno osa toccare. Più dura che mai.",
+    production: "È in produzione, è venerdì e lo stack trabocca. L'ultimo sprint, il più duro.",
     endless: "Tutti i bug di tutti i progetti, per sempre. Quanto resisti?"
   },
   pickups: {
@@ -210,6 +212,7 @@ export const it: Strings = {
     sides: { ours: "<<<<<<< nostri", theirs: ">>>>>>> loro" },
     threads: { main: "thread: main", worker: "thread: worker" },
     lap: (lap) => `GIRO ${lap}`,
+    depth: (frames) => `PROFONDITÀ STACK ${frames}`,
     restarting: (seconds) => `⟳ riavvio tra ${seconds.toFixed(1)}s`,
     startBanner: "Chiudi il backlog prima che arrivi il cliente",
     audioOn: "🔊 AUDIO ON",
