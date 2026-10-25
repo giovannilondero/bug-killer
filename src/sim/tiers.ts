@@ -32,9 +32,12 @@ export const contentTiers = {
 
 export type TierTable = Readonly<Record<Unlockable, Tier>>
 
-/** The highest tier a run allows right now: the level's, or in Endless one step every few waves up to it. */
+/**
+ * The highest tier a run allows right now: the level's, or in Endless one step every few waves up to it.
+ * `wave` is the wave on the floor (counted up as it is released): waves 1–3 play at tier 0, 4–6 at tier 1.
+ */
 export const tierOf = (level: Level, wave: number): Tier =>
-  level.endless ? Math.min(level.tier, Math.floor(wave / WAVES_PER_TIER)) : level.tier
+  level.endless ? Math.min(level.tier, Math.floor(Math.max(0, wave - 1) / WAVES_PER_TIER)) : level.tier
 
 /** The subset of `kinds` a run at `tier` may offer, in the same order. */
 export const unlocked = <K extends Unlockable>(kinds: ReadonlyArray<K>, tier: Tier, table: TierTable = contentTiers): ReadonlyArray<K> =>

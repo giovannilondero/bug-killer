@@ -379,10 +379,10 @@ test("endless unlocks one content tier every 3 waves, all of it by wave 18", () 
     if (!tierAt.has(v.run.wave)) tierAt.set(v.run.wave, v.tier)
   })
   assert.ok(view.run.wave >= 18, `only reached wave ${view.run.wave}`)
-  // `run.wave` counts the waves released so far: the next wave plays at this tier.
+  // `run.wave` is the wave on the floor (it counts up as each wave is released): waves 1–3 play at tier 0, 16–18 at tier 5.
   assert.deepEqual(
-    [0, 2, 3, 5, 6, 9, 12, 15, 17].map((wave) => tierAt.get(wave)),
-    [0, 0, 1, 1, 2, 3, 4, 5, 5]
+    [0, 1, 3, 4, 6, 7, 9, 10, 13, 15, 16, 18].map((wave) => tierAt.get(wave)),
+    [0, 0, 0, 1, 1, 2, 2, 3, 4, 4, 5, 5]
   )
 })
 
