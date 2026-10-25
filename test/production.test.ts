@@ -3,6 +3,7 @@ import { test } from "node:test"
 
 import { locales, text } from "../src/content/i18n.ts"
 import { endlessLevel, levels } from "../src/content/levels.ts"
+import type { Level } from "../src/content/levels.ts"
 import { idleInput } from "../src/sim/simulation.ts"
 import type { View } from "../src/sim/simulation.ts"
 import type { Vec } from "../src/sim/schema.ts"
@@ -10,6 +11,7 @@ import { dist, nearest, scene, shooter } from "./scene.ts"
 
 const production = levels.find((level) => level.id === "production")!
 const legacy = levels.find((level) => level.id === "legacy")!
+const microservices = levels.find((level) => level.id === "microservices")!
 
 const isFrame = (bug: { readonly key: string }) => bug.key.startsWith("FRAME-")
 const frames = (view: View) => view.bugs.filter(isFrame)
@@ -59,6 +61,18 @@ test("Production is the 8th and last sprint, right after Legacy, and the hardest
   assert.ok(production.waveSize > legacy.waveSize)
   assert.ok(production.clientEvery < legacy.clientEvery)
   assert.ok(production.boss.hp > legacy.boss.hp)
+})
+
+test("Legacy's and Production's tickets are tougher than the same ticket in Microservices", () => {
+  /** The health one of Microservices' Highest bugs comes in with, released in `level`. */
+  const health = (level: Level) => {
+    const ticket = microservices.bugs.find((bug) => bug.priority === "Highest" && (bug.type ?? "bug") === "bug")!
+    const { until } = scene({ ...level, bugs: [ticket] })
+    return until((v) => v.bugs.length > 0, 5).bugs[0]!.maxHp
+  }
+  const msvc = health(microservices)
+  assert.ok(health(legacy) > msvc, `Legacy ${health(legacy)}, Microservices ${msvc}`)
+  assert.ok(health(production) > health(legacy), `Production ${health(production)}, Legacy ${health(legacy)}`)
 })
 
 test("Stack overflow's new strings exist in every language", () => {

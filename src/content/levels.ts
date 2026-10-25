@@ -43,6 +43,8 @@ export interface Level {
   readonly clientEvery: number
   /** Bugs released per wave. */
   readonly waveSize: number
+  /** How much tougher than usual its tickets come in: their health ×; 1 when left out. */
+  readonly bugHp?: number
   /** The highest content tier this level offers (see `src/sim/tiers.ts`); Endless climbs to it. */
   readonly tier: Tier
   readonly boss: Boss
@@ -188,6 +190,7 @@ export const levels: ReadonlyArray<Level> = [
     clients: ["gualtiero", "ugo", "ornella", "debora", "fabrizio"],
     clientEvery: 9,
     waveSize: 8,
+    bugHp: 1.15,
     tier: 5,
     boss: {
       key: "LGC-1983",
@@ -208,6 +211,7 @@ export const levels: ReadonlyArray<Level> = [
     clients: ["ugo", "debora", "fabrizio", "gualtiero", "ornella", "kevin"],
     clientEvery: 8,
     waveSize: 9,
+    bugHp: 1.3,
     tier: 5,
     boss: {
       key: "PROD-404",
