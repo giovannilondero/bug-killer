@@ -6,6 +6,7 @@ import type { CallKind, ClientId, MissionKind } from "../content/clients.ts"
 import type { Locale } from "../content/i18n.ts"
 import type { BossPattern, Level } from "../content/levels.ts"
 import type { TierTable } from "./tiers.ts"
+import type { WeaponKind, WeaponValue } from "./weapons.ts"
 
 export type Vec = { x: number; y: number }
 
@@ -31,6 +32,8 @@ export interface PlayerValue {
   dashDirection: Vec
   aim: Vec
   bombs: number
+  /** The weapon in hand and how long it lasts. */
+  weapon: WeaponValue
   /** Seconds left on each power-up. */
   buffs: Record<PickupKind, number>
   /** While down: seconds a teammate has spent reviving. */
@@ -84,7 +87,7 @@ export const Boss = Descriptor.Component<BossValue>()("BugKiller/Boss")
 export const Shot = Descriptor.Component<{ damage: number; life: number; pierce: number; homing: boolean; owner: number }>()("BugKiller/Shot")
 export const HostileShot = Descriptor.Component<{ damage: number; life: number; text: string }>()("BugKiller/HostileShot")
 
-export const pickupKinds = ["hotfix", "refactor", "coffee", "unitTest", "revert", "pizza", "tools", "ai"] as const
+export const pickupKinds = ["hotfix", "refactor", "coffee", "unitTest", "revert", "pizza", "tools", "ai", "pairProgramming"] as const
 export type PickupKind = (typeof pickupKinds)[number]
 export const Pickup = Descriptor.Component<{ kind: PickupKind; life: number }>()("BugKiller/Pickup")
 
@@ -226,7 +229,7 @@ export const Calls = Descriptor.Resource<CallsValue>()("BugKiller/Calls")
 export type FxValue =
   | { type: "kill"; x: number; y: number; color: string; key: string; summary: string; points: number; boss: boolean }
   | { type: "hit"; x: number; y: number; color: string }
-  | { type: "shoot"; x: number; y: number }
+  | { type: "shoot"; x: number; y: number; weapon: WeaponKind }
   | { type: "hurt"; x: number; y: number }
   | { type: "pickup"; x: number; y: number; kind: PickupKind }
   | { type: "reopen"; x: number; y: number; key: string }

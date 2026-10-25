@@ -50,7 +50,7 @@ export const TurretSystem = Game.System(
       const muzzle = (angle: number) => ({ x: at.x + Ops.cos(angle) * 20, y: at.y + Ops.sin(angle) * 20 })
       const fire = (angle: number) => {
         commands.spawn(makeShot(muzzle(angle), { x: Ops.cos(angle), y: Ops.sin(angle) }, 0, false, turret.owner))
-        events.fx.emit({ type: "shoot", ...muzzle(angle) })
+        events.fx.emit({ type: "shoot", ...muzzle(angle), weapon: "gun" })
         turret.cooldown = TURRET.cooldown
       }
 

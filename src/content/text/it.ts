@@ -144,7 +144,8 @@ export const it: Strings = {
     revert: { label: "git reset", hint: "+1 bomba" },
     pizza: { label: "Pizza", hint: "+2 sanità" },
     tools: { label: "Strumenti", hint: "colpi a ricerca" },
-    ai: { label: "AI", hint: "torretta automatica" }
+    ai: { label: "AI", hint: "torretta automatica" },
+    pairProgramming: { label: "Pair programming", hint: "due colpi alla volta" }
   },
   floorCode: [
     "console.log('qui ci arriva?')",

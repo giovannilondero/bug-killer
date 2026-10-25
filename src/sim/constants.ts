@@ -47,8 +47,8 @@ export const HOMING = { range: 520, turnRate: 9 } as const
 /** A Deploying bug lights its fuse this close to a developer (gap between bodies), then goes off over this radius. */
 export const DEPLOY = { reach: 50, fuse: 1, chainFuse: 0.12, radius: 130, damage: 4 } as const
 
-/** Seconds each timed power-up lasts. */
-export const BUFF_SECONDS = { hotfix: 8, refactor: 10, coffee: 8, unitTest: 6, revert: 0, pizza: 0, tools: 10, ai: 0 } as const
+/** Seconds each timed power-up lasts. Weapons time themselves (`weapons.ts`). */
+export const BUFF_SECONDS = { hotfix: 8, refactor: 10, coffee: 8, unitTest: 6, revert: 0, pizza: 0, tools: 10, ai: 0, pairProgramming: 0 } as const
 
 /** The "AI" turret: how long it lasts, how far it sees, how fast it shoots, and how often it makes things up. */
 export const TURRET = { seconds: 12, range: 560, cooldown: 0.2, radius: 18, hallucinateMin: 3, hallucinateMax: 6 } as const

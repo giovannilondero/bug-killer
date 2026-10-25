@@ -1,5 +1,6 @@
 import { makeMusic } from "./music.ts"
 import type { Music, Track } from "./music.ts"
+import type { WeaponKind } from "../sim/weapons.ts"
 
 /** Tiny WebAudio synth: every sound is a few oscillators, no assets. */
 export const makeAudio = () => {
@@ -79,11 +80,17 @@ export const makeAudio = () => {
     },
     /** A fresh run starts the music from the top. */
     rewindMusic: () => music?.rewind(),
-    shoot: () => {
+    shoot: (weapon: WeaponKind = "gun") => {
       const now = performance.now()
       if (now - lastShot < 50) return
       lastShot = now
-      tone(880, 0.05, { type: "square", volume: 0.04, slide: 0.5 })
+      if (weapon === "pairProgramming") {
+        // Two keyboards at once: the same blip, a fifth apart.
+        tone(740, 0.05, { type: "square", volume: 0.035, slide: 0.5 })
+        tone(1110, 0.05, { type: "square", volume: 0.03, slide: 0.5, delay: 0.015 })
+      } else {
+        tone(880, 0.05, { type: "square", volume: 0.04, slide: 0.5 })
+      }
     },
     hit: () => tone(220, 0.04, { type: "triangle", volume: 0.08, slide: 0.7 }),
     kill: (combo: number) => {

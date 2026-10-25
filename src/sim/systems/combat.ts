@@ -28,6 +28,7 @@ import {
 } from "../schema.ts"
 import type { BugValue, PickupKind, PlayerValue, RunValue, Vec } from "../schema.ts"
 import { isUnlocked, tierOf } from "../tiers.ts"
+import { isWeapon, pickUp } from "../weapons.ts"
 import { Ops } from "@typeonce/ritmo-math"
 
 const REOPEN_CHANCE = 0.4
@@ -38,7 +39,7 @@ export const comboMultiplier = (combo: number): number => Math.min(4, 1 + Math.f
 const dropChance = { Lowest: 0.05, Low: 0.07, Medium: 0.09, High: 0.2, Highest: 1 } as const satisfies Record<BugValue["priority"], number>
 
 /** Pickups that drop from bugs; reverts and pizza are rarer, the AI turret rarest, and only Tobia hands out the _strumenti_. */
-const dropWeights = { hotfix: 3, refactor: 3, coffee: 2, unitTest: 2, revert: 1, pizza: 1.5, tools: 0, ai: 0.5 } as const satisfies Record<PickupKind, number>
+const dropWeights = { hotfix: 3, refactor: 3, coffee: 2, unitTest: 2, revert: 1, pizza: 1.5, tools: 0, ai: 0.5, pairProgramming: 1 } as const satisfies Record<PickupKind, number>
 
 /**
  * Every collision in the arena: shots fix bugs, bugs and their projectiles
@@ -326,6 +327,9 @@ export const CombatSystem = Game.System(
           player = { ...player, bombs: Math.min(5, player.bombs + 1) }
         } else if (kind === "pizza") {
           player = { ...player, hp: Math.min(player.maxHp, player.hp + 2) }
+        } else if (isWeapon(kind)) {
+          // A new weapon replaces the one in hand, with a full timer.
+          player = { ...player, weapon: pickUp(kind) }
         } else {
           player = { ...player, buffs: { ...player.buffs, [kind]: BUFF_SECONDS[kind] } }
         }

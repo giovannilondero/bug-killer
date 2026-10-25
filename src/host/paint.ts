@@ -18,7 +18,8 @@ export const pickupIcons = {
   revert: "⏪",
   pizza: "🍕",
   tools: "🤖",
-  ai: "🧠"
+  ai: "🧠",
+  pairProgramming: "👥"
 } as const satisfies Record<PickupKind, string>
 
 export const pickupInfo = (kind: PickupKind) => ({ icon: pickupIcons[kind], ...t().pickups[kind] })
@@ -80,7 +81,10 @@ export const paintFloor = (level: Level): HTMLCanvasElement => {
 }
 
 /** Which floor a level has, in its arena and the current language, to know when to repaint it. */
-export const floorKey = (level: Level) => `${level.id}:${arenaOf(level).width}x${arenaOf(level).height}:${locale()}`
+export const floorKey = (level: Level) => {
+  const arena = arenaOf(level)
+  return `${level.id}:${arena.width}x${arena.height}:${locale()}`
+}
 
 export interface BugLook {
   flash: number
