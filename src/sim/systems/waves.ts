@@ -1,6 +1,7 @@
 import * as Random from "@typeonce/ritmo-math/Random"
 
-import { ARENA, DT, ENDLESS, PARTY, WAVE_INTERVAL } from "../constants.ts"
+import { arenaOf } from "../../content/arenas.ts"
+import { DT, ENDLESS, PARTY, WAVE_INTERVAL } from "../constants.ts"
 import { makeBoss, makeBug } from "../drafts.ts"
 import { edgePoint } from "../math.ts"
 import { BossRead, BugRead, PlayerRead, standing } from "../queries.ts"
@@ -28,6 +29,7 @@ export const WavesSystem = Game.System(
   },
   ({ queries, resources, events, commands }) => {
     const level = resources.level.get()
+    const arena = arenaOf(level)
     const run = { ...resources.run.get() }
     const team = queries.player.each()
     const up = standing(team)
@@ -69,7 +71,7 @@ export const WavesSystem = Game.System(
             continue
           }
           // Away from one developer per bug, in turn, so nobody gets them all.
-          const at = edgePoint(random, up[i % Math.max(1, up.length)] ?? null)
+          const at = edgePoint(random, up[i % Math.max(1, up.length)] ?? null, arena)
           commands.spawn(makeBug(seed, at, { toughness }))
           events.fx.emit({ type: "spawn", x: at.x, y: at.y })
         }
@@ -79,7 +81,7 @@ export const WavesSystem = Game.System(
       }
       if (backlogLeft === 0 && aliveBugs === 0) {
         setPhase("boss")
-        const at = { x: ARENA.width / 2, y: 360 }
+        const at = { x: arena.width / 2, y: Math.min(360, arena.height * 0.3) }
         const boss = endless ? (endless.bosses[run.loop % endless.bosses.length] ?? level.boss) : level.boss
         commands.spawn(makeBoss(boss, at, (endless ? 1 + run.loop * ENDLESS.bossHpPerLoop : 1) * (1 + extra * PARTY.bossHpPerPlayer)))
         events.fx.emit({ type: "spawn", x: at.x, y: at.y })

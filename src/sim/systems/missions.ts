@@ -6,9 +6,10 @@ import { clients, missionKinds } from "../../content/clients.ts"
 import type { Client, ClientId, MissionKind } from "../../content/clients.ts"
 import { text } from "../../content/i18n.ts"
 import type { Strings } from "../../content/i18n.ts"
-import { ARENA, DT } from "../constants.ts"
+import { arenaOf } from "../../content/arenas.ts"
+import { DT } from "../constants.ts"
 import { makeBug, makePickup } from "../drafts.ts"
-import { clamp, edgePoint } from "../math.ts"
+import { centreOf, clamp, edgePoint } from "../math.ts"
 import { BugRead, PlayerRead, standing } from "../queries.ts"
 import { Bug, BugFixed, Chat, Fx, Game, Language, LevelSpec, Missions, Pickup, PlayerHurt, Rng, Run } from "../schema.ts"
 import type { BugValue, MissionValue, PickupKind } from "../schema.ts"
@@ -114,12 +115,13 @@ export const MissionDirectorSystem = Game.System(
       return
     }
     const level = resources.level.get()
+    const arena = arenaOf(level)
     const state = { ...resources.missions.get() }
     const random = Random.draw(resources.rng)
     const pickInt = (n: number) => random.integer(0, Math.max(1, n))
     const strings = text[resources.language.get()]
     const say = (client: ClientId, line: string) => strings.people[client].voice(line, pickInt)
-    const playerAt = standing(queries.player.each())[0] ?? { x: ARENA.width / 2, y: ARENA.height / 2 }
+    const playerAt = standing(queries.player.each())[0] ?? centreOf(arena)
     const bugs = queries.bugs.each().map((match) => match.data.bug.get())
 
     if (state.active === null) {
@@ -184,7 +186,7 @@ export const MissionDirectorSystem = Game.System(
         const line = random.pick(strings.outcomes[mission.client].failure) ?? "..."
         events.chat.emit({ type: "outcome", client: mission.client, text: say(mission.client, line), success: false })
         for (let i = 0; i < ESCALATION_BUGS; i++) {
-          const at = edgePoint(random, playerAt)
+          const at = edgePoint(random, playerAt, arena)
           const summary = random.pick(strings.scopeCreep) ?? ""
           commands.spawn(makeBug({ key: `ESC-${run.escalations}${i + 1}`, summary, priority: i === 0 ? "High" : "Medium", status: "Open" }, at))
           events.fx.emit({ type: "spawn", x: at.x, y: at.y })
@@ -199,8 +201,8 @@ export const MissionDirectorSystem = Game.System(
         const reward = random.pick(rewards) ?? "hotfix"
         const angle = random.range(0, Math.PI * 2)
         commands.spawn(makePickup(reward, {
-          x: clamp(playerAt.x + Ops.cos(angle) * 90, 40, ARENA.width - 40),
-          y: clamp(playerAt.y + Ops.sin(angle) * 90, 40, ARENA.height - 40)
+          x: clamp(playerAt.x + Ops.cos(angle) * 90, 40, arena.width - 40),
+          y: clamp(playerAt.y + Ops.sin(angle) * 90, 40, arena.height - 40)
         }))
         state.active = null
         state.nextIn = level.clientEvery

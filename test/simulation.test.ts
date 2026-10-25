@@ -310,3 +310,44 @@ test("the rare AI drop sets down a turret that fixes bugs on its own, and someti
   assert.ok(fx.some((e) => e.type === "hallucination"), "it made something up at least once")
   assert.equal(view.turrets.length, 0, "and after its seconds it is gone")
 })
+
+// --- Arena size ------------------------------------------------------------
+
+test("a level with a smaller arena keeps bugs, developers and placements inside it", () => {
+  const arena = { width: 900, height: 640 }
+  const small: Level = { ...levels[3]!, arena }
+  const fx: Array<FxValue> = []
+  let current: View | null = null
+  let frame = 0
+  const made = createSimulation({
+    level: small,
+    seed: 11,
+    locale: "en",
+    input: answeringPilot(() => current, () => frame),
+    presentation: { fx: (e) => fx.push(e), chat: () => undefined }
+  })
+  if (!made.ok) throw new Error(JSON.stringify(made.error))
+  const sim = made.value
+  current = sim.view()
+  const inside = (what: string, p: { x: number; y: number }) =>
+    assert.ok(p.x >= 0 && p.y >= 0 && p.x <= arena.width && p.y <= arena.height, `${what} at ${p.x.toFixed(0)},${p.y.toFixed(0)} on frame ${frame}`)
+  let bugsSeen = 0
+  for (; frame < 120 * 60; frame++) {
+    assert.ok(sim.step().ok)
+    current = sim.view()
+    for (const p of current.players) inside("developer", p.position)
+    for (const b of current.bugs) inside(`bug ${b.key}`, b.position)
+    for (const b of current.bosses) inside(`boss ${b.key}`, b.position)
+    for (const p of current.pickups) inside(`pickup ${p.kind}`, p.position)
+    for (const t of current.turrets) inside("turret", t.position)
+    const call = current.calls.active
+    if (call) {
+      inside("meeting room", call.room)
+      for (const ping of call.pings) inside("slack ping", ping)
+    }
+    bugsSeen = Math.max(bugsSeen, current.bugs.length)
+    if (current.run.phase === "cleared" || current.run.phase === "dead") break
+  }
+  assert.ok(bugsSeen > 0, "bugs spawned")
+  for (const e of fx) if (e.type === "spawn" || e.type === "resurrect" || e.type === "teleport") inside(e.type, e)
+})

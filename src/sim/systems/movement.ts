@@ -1,9 +1,11 @@
 import * as Random from "@typeonce/ritmo-math/Random"
 
-import { ARENA, DT, HOMING } from "../constants.ts"
-import { clampToArena, nearest, normalize } from "../math.ts"
+import { arenaOf } from "../../content/arenas.ts"
+import type { Arena } from "../../content/arenas.ts"
+import { DT, HOMING } from "../constants.ts"
+import { centreOf, clampToArena, nearest, normalize } from "../math.ts"
 import { BossRead, BugRead, BugWrite, HostileShotWrite, Moving, PickupWrite, PlayerRead, ShotWrite, standing } from "../queries.ts"
-import { Body, Game, HostileShot, Pickup, Position, Rng, Run, Shot, Velocity } from "../schema.ts"
+import { Body, Game, HostileShot, LevelSpec, Pickup, Position, Rng, Run, Shot, Velocity } from "../schema.ts"
 import { Ops } from "@typeonce/ritmo-math"
 
 /** Bugs crawl toward the nearest developer still standing; each workflow status moves differently. */
@@ -13,12 +15,13 @@ export const BugBrainSystem = Game.System(
     queries: { player: PlayerRead, bugs: BugWrite },
     resources: {
       rng: Game.System.writeResource(Rng),
-      run: Game.System.readResource(Run)
+      run: Game.System.readResource(Run),
+      level: Game.System.readResource(LevelSpec)
     }
   },
   ({ queries, resources }) => {
     const team = standing(queries.player.each())
-    const centre = { x: ARENA.width / 2, y: ARENA.height / 2 }
+    const centre = centreOf(arenaOf(resources.level.get()))
     const dead = resources.run.get().phase === "dead"
     const random = Random.draw(resources.rng)
     const bugs = queries.bugs.each()
@@ -77,34 +80,38 @@ export const IntegrateSystem = Game.System(
         selection: { position: Game.Query.write(Position), body: Game.Query.read(Body) },
         without: [Shot, HostileShot, Pickup]
       })
-    }
+    },
+    resources: { level: Game.System.readResource(LevelSpec) }
   },
-  ({ queries }) => {
+  ({ queries, resources }) => {
+    const arena = arenaOf(resources.level.get())
     for (const match of queries.moving.each()) {
       const velocity = match.data.velocity.get()
       match.data.position.update((p) => ({ x: p.x + velocity.x * DT, y: p.y + velocity.y * DT }))
     }
     for (const match of queries.contained.each()) {
       const radius = match.data.body.get().radius
-      match.data.position.update((p) => clampToArena(p, radius))
+      match.data.position.update((p) => clampToArena(p, radius, arena))
     }
   }
 )
 
-const outside = (p: { x: number; y: number }): boolean =>
-  p.x < -40 || p.y < -40 || p.x > ARENA.width + 40 || p.y > ARENA.height + 40
+const outside = (p: { x: number; y: number }, arena: Arena): boolean =>
+  p.x < -40 || p.y < -40 || p.x > arena.width + 40 || p.y > arena.height + 40
 
 /** Shots and pickups expire. */
 export const LifetimeSystem = Game.System(
   "BugKiller/Lifetime",
   {
     queries: { shots: ShotWrite, hostile: HostileShotWrite, pickups: PickupWrite },
+    resources: { level: Game.System.readResource(LevelSpec) },
     commands: Game.System.commands(Game.System.despawns(Shot, HostileShot, Pickup))
   },
-  ({ queries, commands }) => {
+  ({ queries, resources, commands }) => {
+    const arena = arenaOf(resources.level.get())
     for (const match of queries.shots.each()) {
       const shot = match.data.shot.get()
-      if (shot.life - DT <= 0 || outside(match.data.position.get())) {
+      if (shot.life - DT <= 0 || outside(match.data.position.get(), arena)) {
         commands.despawn(match.entity)
       } else {
         match.data.shot.set({ ...shot, life: shot.life - DT })
@@ -112,7 +119,7 @@ export const LifetimeSystem = Game.System(
     }
     for (const match of queries.hostile.each()) {
       const shot = match.data.shot.get()
-      if (shot.life - DT <= 0 || outside(match.data.position.get())) {
+      if (shot.life - DT <= 0 || outside(match.data.position.get(), arena)) {
         commands.despawn(match.entity)
       } else {
         match.data.shot.set({ ...shot, life: shot.life - DT })

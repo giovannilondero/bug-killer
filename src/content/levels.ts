@@ -1,3 +1,4 @@
+import type { Arena } from "./arenas.ts"
 import { backlog } from "./backlog.ts"
 import { projectOf } from "./bugs.ts"
 import type { BacklogBug } from "./bugs.ts"
@@ -36,6 +37,8 @@ export interface Level {
   readonly bugs: ReadonlyArray<BacklogBug>
   /** Endless mode: waves never run out, and every `every` waves the next boss steps in. */
   readonly endless?: { readonly bosses: ReadonlyArray<Boss>; readonly every: number }
+  /** The floor it is played on; the normal arena when left out. */
+  readonly arena?: Arena
 }
 
 const bugsOf = (projects: ReadonlyArray<string>, bossKey: string): ReadonlyArray<BacklogBug> =>

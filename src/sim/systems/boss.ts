@@ -1,12 +1,13 @@
 import * as Random from "@typeonce/ritmo-math/Random"
 
 import { text } from "../../content/i18n.ts"
-import { ARENA, DT } from "../constants.ts"
+import { arenaOf, arenas } from "../../content/arenas.ts"
+import { DT } from "../constants.ts"
 import { makeBug, makeHostileShot } from "../drafts.ts"
 import type { BugSeed } from "../drafts.ts"
 import { angleTo, clamp, nearest, normalize, openPoint } from "../math.ts"
 import { BossWrite, BugRead, PlayerRead, standing } from "../queries.ts"
-import { Bug, Fx, Game, HostileShot, Language, Rng } from "../schema.ts"
+import { Bug, Fx, Game, HostileShot, Language, LevelSpec, Rng } from "../schema.ts"
 import type { BossValue, Vec } from "../schema.ts"
 import { Ops } from "@typeonce/ritmo-math"
 
@@ -22,12 +23,13 @@ export const BossBrainSystem = Game.System(
   "BugKiller/BossBrain",
   {
     queries: { player: PlayerRead, bosses: BossWrite, bugs: BugRead },
-    resources: { rng: Game.System.writeResource(Rng), language: Game.System.readResource(Language) },
+    resources: { rng: Game.System.writeResource(Rng), language: Game.System.readResource(Language), level: Game.System.readResource(LevelSpec) },
     events: { fx: Game.System.writeEvent(Fx) },
     commands: Game.System.commands(Game.System.spawns(HostileShot, Bug))
   },
   ({ queries, resources, events, commands }) => {
     const team = standing(queries.player.each())
+    const arena = arenaOf(resources.level.get())
     if (team.length === 0) {
       return
     }
@@ -78,7 +80,7 @@ export const BossBrainSystem = Game.System(
         case "crash": {
           velocity = chase(60)
           if (boss.timer <= 0) {
-            const to = openPoint(random, target, 320)
+            const to = openPoint(random, target, 320, arena)
             events.fx.emit({ type: "teleport", x: position.x, y: position.y })
             match.data.position.set(to)
             events.fx.emit({ type: "teleport", x: to.x, y: to.y })
@@ -96,9 +98,12 @@ export const BossBrainSystem = Game.System(
           break
         }
         case "twoFactor": {
-          // Circles the arena centre; phase two is the second factor, faster and angrier.
+          // Circles the arena centre, wide as the arena; phase two is the second factor, faster and angrier.
           const t = boss.age * (boss.phase === 1 ? 0.5 : 0.8)
-          const goal = { x: ARENA.width / 2 + Ops.cos(t) * 420, y: ARENA.height / 2 + Ops.sin(t) * 260 }
+          const goal = {
+            x: arena.width / 2 + Ops.cos(t) * 420 * (arena.width / arenas.normal.width),
+            y: arena.height / 2 + Ops.sin(t) * 260 * (arena.height / arenas.normal.height)
+          }
           const d = normalize({ x: goal.x - position.x, y: goal.y - position.y })
           const speed = boss.phase === 1 ? 160 : 215
           velocity = { x: d.x * speed, y: d.y * speed }
@@ -125,7 +130,7 @@ export const BossBrainSystem = Game.System(
                 const angle = (i / 3) * Math.PI * 2 + boss.age
                 commands.spawn(makeBug(
                   minion(`NULL-${boss.volley}${i}`, strings.minions.null, rage > 0.5 ? "High" : "Medium"),
-                  { x: clamp(position.x + Ops.cos(angle) * 90, 40, ARENA.width - 40), y: clamp(position.y + Ops.sin(angle) * 90, 40, ARENA.height - 40) }
+                  { x: clamp(position.x + Ops.cos(angle) * 90, 40, arena.width - 40), y: clamp(position.y + Ops.sin(angle) * 90, 40, arena.height - 40) }
                 ))
               }
             } else {
