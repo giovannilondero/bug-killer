@@ -1,5 +1,5 @@
 import { levels } from "./content/levels.ts"
-import type { LevelId } from "./content/levels.ts"
+import type { Level, LevelId } from "./content/levels.ts"
 
 /**
  * What this browser has achieved: sprints unlocked and best scores.
@@ -58,6 +58,14 @@ export const clearSprint = (progress: Progress, index: number, run: RunResult): 
   const level = levels[index]
   return run.solo && level ? withBest(unlocked, level.id, run.score) : unlocked
 }
+
+/** A bonus level opens once the sprint it follows is cleared; it is never needed to go on. */
+export const bonusUnlocked = (progress: Progress, level: Level): boolean =>
+  level.bonus !== undefined && sprintsCleared(progress) >= level.bonus.after
+
+/** Clearing a bonus level unlocks nothing: a solo clear may only set its best score. */
+export const clearBonus = (progress: Progress, level: Level, run: RunResult): Progress =>
+  run.solo ? withBest(progress, level.id, run.score) : progress
 
 /** An Endless run only ends in defeat: a solo run that beats the best score is a new record. */
 export const endEndless = (progress: Progress, run: RunResult): { readonly progress: Progress; readonly record: boolean } => {

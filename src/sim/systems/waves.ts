@@ -1,6 +1,7 @@
 import * as Random from "@typeonce/ritmo-math/Random"
 
 import { arenaOf } from "../../content/arenas.ts"
+import { ticketsOf } from "../../content/levels.ts"
 import { DT, ENDLESS, PARTY, WAVE_INTERVAL } from "../constants.ts"
 import { makeBoss, makeBug } from "../drafts.ts"
 import { edgePoint } from "../math.ts"
@@ -12,7 +13,8 @@ import { Boss, Bug, Fx, Game, LevelSpec, Rng, Run } from "../schema.ts"
  * boss when the backlog is empty, and decides when the level is cleared or
  * lost. In endless mode the backlog never empties: bugs are drawn at random,
  * a boss steps in every few waves, and each one beaten makes the next round
- * tougher. A bigger team gets bigger waves and a tougher boss; the run is
+ * tougher. A bonus level draws a fixed number of tickets at random from
+ * the whole backlog, each at most once, then calls its boss. A bigger team gets bigger waves and a tougher boss; the run is
  * lost when every developer is down. Also runs the combo timer and the clocks.
  */
 export const WavesSystem = Game.System(
@@ -58,19 +60,26 @@ export const WavesSystem = Game.System(
     if (run.phase === "waves") {
       run.waveTimer -= DT
       // Endless: the backlog is bottomless until the wave that calls the next boss.
-      const backlogLeft = endless ? (run.wave < run.nextBossAt ? Infinity : 0) : level.bugs.length - run.nextBug
+      const backlogLeft = endless ? (run.wave < run.nextBossAt ? Infinity : 0) : ticketsOf(level) - run.nextBug
       const solo = endless ? Math.min(ENDLESS.maxWaveSize, level.waveSize + Math.floor(run.wave / 3)) : level.waveSize
       const waveSize = Math.round(solo * (1 + extra * PARTY.waveSizePerPlayer))
       const quiet = aliveBugs <= Math.floor(waveSize / 2)
       if (backlogLeft > 0 && (quiet || run.waveTimer <= 0) && run.time > 1.2) {
         const count = Math.min(waveSize, backlogLeft)
         const toughness = { hp: 1 + run.loop * ENDLESS.hpPerLoop, speed: Math.min(ENDLESS.maxSpeed, 1 + run.loop * ENDLESS.speedPerLoop) }
+        // A bonus level never draws a ticket that is open or already closed this run.
+        const drawn = new Set([...run.fixed.map((f) => f.key), ...queries.bugs.each().map((b) => b.data.bug.get().key)])
         for (let i = 0; i < count; i++) {
-          const seed = endless ? random.pick(level.bugs) : level.bugs[run.nextBug + i]
+          const seed = endless
+            ? random.pick(level.bugs)
+            : level.bonus
+              ? random.pick(level.bugs.filter((bug) => !drawn.has(bug.key)))
+              : level.bugs[run.nextBug + i]
           if (!seed) {
             continue
           }
           // Away from one developer per bug, in turn, so nobody gets them all.
+          drawn.add(seed.key)
           const at = edgePoint(random, up[i % Math.max(1, up.length)] ?? null, arena)
           commands.spawn(makeBug(seed, at, { toughness }))
           events.fx.emit({ type: "spawn", x: at.x, y: at.y })

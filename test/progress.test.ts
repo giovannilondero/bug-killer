@@ -1,7 +1,8 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { bestScore, clearSprint, emptyProgress, endEndless, loadProgress, unlockEverySprint, saveProgress, sprintsCleared, sprintUnlocked } from "../src/progress.ts"
+import { bonusLevels } from "../src/content/levels.ts"
+import { bestScore, bonusUnlocked, clearBonus, clearSprint, emptyProgress, endEndless, loadProgress, unlockEverySprint, saveProgress, sprintsCleared, sprintUnlocked } from "../src/progress.ts"
 
 test("progress saved by today's version loads unchanged", () => {
   const saved = JSON.stringify({ unlocked: 3, best: { glacier: 12400, sidequests: 8100, endless: 30500 } })
@@ -80,4 +81,24 @@ test("the playtest shortcut unlocks every sprint and keeps the scores", () => {
   const progress = unlockEverySprint(loadProgress(JSON.stringify({ unlocked: 1, best: { endless: 700 } })))
   assert.equal(sprintUnlocked(progress, 3), true)
   assert.equal(bestScore(progress, "endless"), 700)
+})
+
+test("Hotdesk unlocks after sprint 3", () => {
+  const hotdesk = bonusLevels.find((level) => level.id === "hotdesk")!
+  assert.equal(bonusUnlocked(emptyProgress, hotdesk), false)
+  assert.equal(bonusUnlocked(loadProgress(JSON.stringify({ unlocked: 3, best: {} })), hotdesk), false)
+  const third = clearSprint(loadProgress(JSON.stringify({ unlocked: 3, best: {} })), 2, { score: 100, solo: true })
+  assert.equal(bonusUnlocked(third, hotdesk), true)
+})
+
+test("clearing a bonus level keeps its best score and unlocks no sprint", () => {
+  const hotdesk = bonusLevels.find((level) => level.id === "hotdesk")!
+  const before = loadProgress(JSON.stringify({ unlocked: 4, best: {} }))
+  const cleared = clearBonus(before, hotdesk, { score: 7000, solo: true })
+  assert.equal(sprintUnlocked(cleared, 4), false)
+  assert.equal(sprintsCleared(cleared), 3)
+  assert.equal(bestScore(cleared, "hotdesk"), 7000)
+  const together = clearBonus(cleared, hotdesk, { score: 90000, solo: false })
+  assert.equal(bestScore(together, "hotdesk"), 7000)
+  assert.equal(sprintsCleared(together), 3)
 })
