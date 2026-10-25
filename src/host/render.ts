@@ -9,7 +9,7 @@ import { WEAPONS } from "../sim/weapons.ts"
 import type { FxValue, Vec } from "../sim/schema.ts"
 import type { View } from "../sim/simulation.ts"
 import { formatNumber, t } from "./language.ts"
-import { floorKey, fuseBlink, fuseProgress, MONO, paintBug, paintFloor, paintFuseRing, paintHeart, paintHostile, paintLabel, paintPickup, paintPing, paintPlayer, paintTooltip, pickupIcons, pickupInfo, roundRect, SANS, shade, tooltipHeight, TOOLTIP_WIDTH, truncate } from "./paint.ts"
+import { floorKey, fuseBlink, fuseProgress, MONO, paintBug, paintFloor, paintFuseRing, paintHeart, paintHostile, paintLabel, paintNest, paintPickup, paintPing, paintPlayer, paintTooltip, pickupIcons, pickupInfo, roundRect, SANS, shade, tooltipHeight, TOOLTIP_WIDTH, truncate } from "./paint.ts"
 import type { BugLook } from "./paint.ts"
 import { touchMode } from "./touch.ts"
 
@@ -498,6 +498,13 @@ export const makeRenderer = (canvas: HTMLCanvasElement) => {
       const heading = view.player ? Math.atan2(view.player.position.y - y, view.player.position.x - x) : 0
       const appear = Math.min(1, bug.age / 0.4)
       ctx.globalAlpha = appear
+      if (bug.type === "epic") {
+        // An Epic sits in its nest.
+        ctx.save()
+        ctx.translate(x, y)
+        paintNest(ctx, bug.radius)
+        ctx.restore()
+      }
       if (bug.resurrectedBy) {
         // A zombie ticket: a sickly green aura and the client's colour around it.
         const glow = ctx.createRadialGradient(x, y, bug.radius * 0.5, x, y, bug.radius * 2)

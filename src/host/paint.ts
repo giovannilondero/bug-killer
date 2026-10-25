@@ -182,6 +182,19 @@ export const paintBug = (ctx: CanvasRenderingContext2D, r: number, color: string
     ctx.beginPath()
     ctx.moveTo(-r * 0.75, -w); ctx.lineTo(-r * 0.15, -w); ctx.lineTo(-r * 0.3, 0); ctx.lineTo(-r * 0.15, w); ctx.lineTo(-r * 0.75, w)
     ctx.closePath(); ctx.fill(); ctx.stroke()
+  } else if (options.type === "epic") {
+    // A purple rim and a lightning bolt on the back.
+    ctx.strokeStyle = ticketColors.epic
+    ctx.lineWidth = Math.max(2, r * 0.08)
+    ctx.beginPath(); ctx.ellipse(-r * 0.15, 0, r * 0.9, r * 0.73, 0, 0, Math.PI * 2); ctx.stroke()
+    const s = r * 0.3
+    ctx.fillStyle = ticketColors.epic
+    ctx.strokeStyle = "#ffffff"
+    ctx.lineWidth = 1.5
+    ctx.beginPath()
+    ctx.moveTo(-r * 0.3 + s * 0.3, -s); ctx.lineTo(-r * 0.3 - s * 0.5, s * 0.15); ctx.lineTo(-r * 0.3, s * 0.15)
+    ctx.lineTo(-r * 0.3 - s * 0.3, s); ctx.lineTo(-r * 0.3 + s * 0.5, -s * 0.15); ctx.lineTo(-r * 0.3, -s * 0.15)
+    ctx.closePath(); ctx.fill(); ctx.stroke()
   } else if (options.type === "subtask") {
     // Two linked boxes on the back.
     const s = Math.max(3, r * 0.26)
@@ -208,6 +221,27 @@ export const paintBug = (ctx: CanvasRenderingContext2D, r: number, color: string
       ctx.stroke()
     }
   }
+}
+
+/** The nest an Epic sits in, centred on the origin, as wide as `r` times 1.35: a bowl of woven twigs. */
+export const paintNest = (ctx: CanvasRenderingContext2D, r: number) => {
+  const outer = r * 1.35
+  ctx.fillStyle = "#3a2618"
+  ctx.beginPath(); ctx.arc(0, 0, outer, 0, Math.PI * 2); ctx.fill()
+  ctx.lineCap = "round"
+  // Twigs laid round and round the rim, a little off each other.
+  for (let i = 0; i < 18; i++) {
+    const from = i * 2.4
+    const radius = outer * (0.72 + ((i * 7) % 5) * 0.06)
+    ctx.strokeStyle = i % 3 === 0 ? "#8a6240" : i % 3 === 1 ? "#6e4a2c" : "#a57a4e"
+    ctx.lineWidth = Math.max(2, r * (0.08 + (i % 2) * 0.04))
+    ctx.beginPath(); ctx.arc(0, 0, radius, from, from + 1.4); ctx.stroke()
+  }
+  ctx.strokeStyle = ticketColors.epic
+  ctx.lineWidth = Math.max(2, r * 0.06)
+  ctx.globalAlpha = 0.8
+  ctx.beginPath(); ctx.arc(0, 0, outer - 1, 0, Math.PI * 2); ctx.stroke()
+  ctx.globalAlpha = 1
 }
 
 /** A developer aiming along +x, centred on the origin: laptop-gun, hoodie in their colour, head and headphones. */

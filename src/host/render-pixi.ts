@@ -15,7 +15,7 @@ import { WEAPONS } from "../sim/weapons.ts"
 import type { FxValue, PickupKind, Vec } from "../sim/schema.ts"
 import type { View } from "../sim/simulation.ts"
 import { formatNumber, locale, t } from "./language.ts"
-import { floorKey, fuseBlink, fuseProgress, MONO, paintBug, paintFloor, paintFuseRing, paintHeart, paintHostile, paintLabel, paintPickup, paintPing, paintPlayer, paintTooltip, pickupIcons, pickupInfo, SANS, shade, tooltipHeight, TOOLTIP_WIDTH, truncate } from "./paint.ts"
+import { floorKey, fuseBlink, fuseProgress, MONO, paintBug, paintFloor, paintFuseRing, paintHeart, paintHostile, paintLabel, paintNest, paintPickup, paintPing, paintPlayer, paintTooltip, pickupIcons, pickupInfo, SANS, shade, tooltipHeight, TOOLTIP_WIDTH, truncate } from "./paint.ts"
 import type { BugLook, TooltipBug } from "./paint.ts"
 import type { Camera, Renderer } from "./render.ts"
 import { touchMode } from "./touch.ts"
@@ -389,7 +389,7 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
     const k = options.frozen ? 0 : Math.floor((((age % period) + period) % period) / period * frames) % frames
     const blur = options.boss ? 30 : 12
     const half = Math.max(r * 1.45 + 4, r + blur * 1.6)
-    const look = `${options.flash > 0 ? "f" : ""}${options.reopened ? "r" : ""}${options.trait === "armored" ? "a" : ""}${options.boss ? "b" : ""}${options.type === "story" ? "s" : options.type === "subtask" ? "t" : ""}${options.frozen ? "i" : ""}`
+    const look = `${options.flash > 0 ? "f" : ""}${options.reopened ? "r" : ""}${options.trait === "armored" ? "a" : ""}${options.boss ? "b" : ""}${options.type === "story" ? "s" : options.type === "subtask" ? "t" : options.type === "epic" ? "e" : ""}${options.frozen ? "i" : ""}`
     return bakery.bake(`bug|${color}|${r}|${look}|${k}`, wres, around(half), (g) => paintBug(g, r, color, (k * period) / frames, options))
   }
 
@@ -673,6 +673,10 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
       const { x, y } = bug.position
       const heading = view.player ? Math.atan2(view.player.position.y - y, view.player.position.x - x) : 0
       const appear = Math.min(1, bug.age / 0.4)
+      if (bug.type === "epic") {
+        // An Epic sits in its nest.
+        W.sprite(bakery.bake(`nest|${bug.radius}`, wres, around(bug.radius * 1.35 + 4), (g) => paintNest(g, bug.radius)), x, y, { alpha: appear })
+      }
       if (bug.resurrectedBy) {
         // A zombie ticket: a sickly green aura and the client's colour around it.
         const r = bug.radius
