@@ -94,7 +94,8 @@ const raceLooks = {
   worker: { color: "#ff9bd2", shotText: "412" }
 } as const satisfies Record<RaceThread, { color: string; shotText: string }>
 
-const otherThread = (thread: RaceThread): RaceThread => (thread === "main" ? "worker" : "main")
+/** The twin that isn't `thread`. */
+export const otherThread = (thread: RaceThread): RaceThread => (thread === "main" ? "worker" : "main")
 
 /**
  * Where a race condition's `thread` runs at `age`: both twins share one lap
@@ -121,8 +122,14 @@ export const stackTop = (position: Vec, radius: number, frames: number): Vec => 
   y: position.y - radius * 0.8 - (frames - 1) * STACK.frameHeight
 })
 
+/** The key every bug a crash drops as it restarts starts with. */
+export const CRASH_PREFIX = "CRASH-"
+/** The key every bug an `undefined` spreads around starts with. */
+export const NULL_PREFIX = "NULL-"
 /** The key every frame a stack overflow drops starts with. */
 export const FRAME_PREFIX = "FRAME-"
+/** What every boss's minions' keys start with: a boss's own bugs, never the sprint's tickets. */
+export const minionPrefixes = [CRASH_PREFIX, NULL_PREFIX, FRAME_PREFIX] as const
 
 /**
  * Every boss pattern, in one table: each is one of the level's worst tickets
@@ -162,7 +169,7 @@ export const bossRules: Record<BossPattern, BossRules> = {
       ring(12 + Math.round(rage * 8), 230, random.range(0, Math.PI))
       if (boss.volley % 2 === 0 && minions < 8) {
         for (let i = 0; i < 2; i++) {
-          spawnMinion(minion(`CRASH-${boss.volley}${i}`, strings.minions.crash, "Low"), { x: to.x + (i ? 50 : -50), y: to.y })
+          spawnMinion(minion(`${CRASH_PREFIX}${boss.volley}${i}`, strings.minions.crash, "Low"), { x: to.x + (i ? 50 : -50), y: to.y })
         }
       }
       return { x: 0, y: 0 }
@@ -204,7 +211,7 @@ export const bossRules: Record<BossPattern, BossRules> = {
           for (let i = 0; i < 3; i++) {
             const angle = (i / 3) * Math.PI * 2 + boss.age
             spawnMinion(
-              minion(`NULL-${boss.volley}${i}`, strings.minions.null, rage > 0.5 ? "High" : "Medium"),
+              minion(`${NULL_PREFIX}${boss.volley}${i}`, strings.minions.null, rage > 0.5 ? "High" : "Medium"),
               { x: clamp(position.x + Ops.cos(angle) * 90, 40, arena.width - 40), y: clamp(position.y + Ops.sin(angle) * 90, 40, arena.height - 40) }
             )
           }
