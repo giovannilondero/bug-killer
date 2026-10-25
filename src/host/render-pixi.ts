@@ -909,7 +909,7 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
         text(S, res, `${t().pickups[weapon.kind].label.toUpperCase()}  ${Math.ceil(weapon.seconds)}s`, `bold 11px ${MONO}`, "#ffd84a", 152, y + 2, "left")
         row++
       }
-      for (const kind of ["tools", "hotfix", "refactor", "coffee", "unitTest", "codeFreeze"] as const) {
+      for (const kind of ["tools", "hotfix", "refactor", "coffee", "unitTest", "codeFreeze", "memoryLeak"] as const) {
         const left = player.buffs[kind]
         if (left <= 0) continue
         const y = 142 + row * 22

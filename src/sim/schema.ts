@@ -90,7 +90,7 @@ export const Boss = Descriptor.Component<BossValue>()("BugKiller/Boss")
 export const Shot = Descriptor.Component<{ damage: number; life: number; pierce: number; homing: boolean; owner: number }>()("BugKiller/Shot")
 export const HostileShot = Descriptor.Component<{ damage: number; life: number; text: string }>()("BugKiller/HostileShot")
 
-export const pickupKinds = ["hotfix", "refactor", "coffee", "unitTest", "revert", "pizza", "tools", "ai", "pairProgramming", "codeFreeze"] as const
+export const pickupKinds = ["hotfix", "refactor", "coffee", "unitTest", "revert", "pizza", "tools", "ai", "pairProgramming", "codeFreeze", "memoryLeak"] as const
 export type PickupKind = (typeof pickupKinds)[number]
 export const Pickup = Descriptor.Component<{ kind: PickupKind; life: number }>()("BugKiller/Pickup")
 

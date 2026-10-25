@@ -616,3 +616,103 @@ test("Code freeze arrives with sprint 3 (Keystone) and not before", () => {
   assert.equal(isUnlocked("codeFreeze", levels[1]!.tier), false)
   assert.equal(isUnlocked("codeFreeze", levels[2]!.tier), true)
 })
+
+// --- Statuses: Memory leak (poison) ------------------------------------------
+
+/**
+ * One developer holding Memory leak (picked up on the spot) in Foundry, and
+ * the bugs given, crawling so slowly they never reach the developer. The
+ * developer shoots `target` one shot at a time, each landing before the next,
+ * until `hits` have landed, then stands still.
+ */
+const poisonScene = (spawned: ReadonlyArray<{ bug: BugSeed; dx: number; dy: number; hp?: number }>, target: string, hits: number) => {
+  const fx: Array<FxValue> = []
+  let aim: { x: number; y: number } | null = null
+  let firing = false
+  const made = createSimulation({
+    level: levels[3]!,
+    seed: 4,
+    locale: "en",
+    input: { snapshot: () => (firing && aim ? { ...idleInput, aim, fire: true } : idleInput) },
+    presentation: { fx: (e) => fx.push(e), chat: () => undefined }
+  })
+  if (!made.ok) throw new Error(JSON.stringify(made.error))
+  const sim = made.value
+  const me = sim.view().player!.position
+  const Drop = Game.System("Test/Drop", { commands: Game.System.commands(Game.System.spawns(Pickup, Bug)) }, ({ commands }) => {
+    commands.spawn(makePickup("memoryLeak", { x: me.x, y: me.y }))
+    for (const { bug, dx, dy, hp } of spawned) commands.spawn(makeBug(bug, { x: me.x + dx, y: me.y + dy }, { toughness: { hp: hp ?? 1, speed: 0.001 } }))
+  })
+  assert.ok(sim.runtime.tick(Game.Schedule(Drop, Game.Schedule.applyDeferred())).ok)
+  const find = (key: string) => sim.view().bugs.find((bug) => bug.key === key)
+  assert.ok(sim.step().ok)
+  assert.ok(sim.view().player!.buffs.memoryLeak > 0, "the developer holds Memory leak")
+  for (let shot = 0; shot < hits; shot++) {
+    // Fire until one shot is in the air, then wait for it to land.
+    let landed = false
+    for (let frame = 0; frame < 120 && !landed; frame++) {
+      aim = find(target)?.position ?? null
+      firing = !landed && sim.view().shots.length === 0 && frame < 30
+      const before = fx.length
+      assert.ok(sim.step().ok)
+      landed = fx.slice(before).some((e) => e.type === "hit")
+    }
+    firing = false
+    assert.ok(landed, `shot ${shot + 1} landed`)
+  }
+  const wait = (seconds: number) => {
+    for (let frame = 0; frame < seconds * 60; frame++) assert.ok(sim.step().ok)
+  }
+  return { sim, find, wait }
+}
+
+const leaky = (key: string, priority: BugSeed["priority"] = "Medium"): BugSeed => ({ key, summary: "Leaky", priority, status: "Open" })
+
+test("Memory leak: a poisoned bug keeps losing health after the hit, and repeated hits stack", () => {
+  const lostOver = (hits: number) => {
+    const { find, wait } = poisonScene([{ bug: leaky("LEAK-1"), dx: 260, dy: 0, hp: 20 }], "LEAK-1", hits)
+    const start = find("LEAK-1")!.hp
+    wait(2)
+    const after = find("LEAK-1")
+    assert.ok(after, "the bug is still alive")
+    return start - after.hp
+  }
+  const once = lostOver(1)
+  const thrice = lostOver(3)
+  assert.ok(once > 0.5, `one hit: lost only ${once.toFixed(2)} hp over 2 s without being shot`)
+  assert.ok(thrice > once * 2.5, `three hits: lost ${thrice.toFixed(2)} hp vs ${once.toFixed(2)} for one`)
+})
+
+test("Memory leak: a bug the poison finishes off counts as a fix for the developer who applied it", () => {
+  const { sim, find, wait } = poisonScene([{ bug: leaky("LEAK-1"), dx: 260, dy: 0 }], "LEAK-1", 1)
+  assert.ok(find("LEAK-1"), "one hit is not enough to fix it")
+  assert.equal(sim.view().player!.fixed, 0)
+  wait(6)
+  assert.equal(find("LEAK-1"), undefined, "the poison fixed it")
+  assert.equal(sim.view().player!.fixed, 1)
+  assert.ok(sim.view().player!.points > 0)
+  assert.ok(sim.view().run.fixed.some((bug) => bug.key === "LEAK-1"), "it is in the release notes")
+})
+
+test("Memory leak: when a poisoned bug dies, the leak passes to the nearest bug", () => {
+  const { sim, find, wait } = poisonScene([
+    { bug: leaky("LEAK-1"), dx: 260, dy: 0 },
+    { bug: leaky("LEAK-NEAR"), dx: 340, dy: 90, hp: 20 },
+    { bug: leaky("LEAK-FAR"), dx: 340, dy: -400, hp: 20 }
+  ], "LEAK-1", 1)
+  const poisoned = (key: string) => find(key)!.statuses.some((status) => status.kind === "poison")
+  assert.ok(poisoned("LEAK-1"))
+  assert.ok(!poisoned("LEAK-NEAR") && !poisoned("LEAK-FAR"), "only the bug that was hit")
+  const near = find("LEAK-NEAR")!.hp
+  wait(6)
+  assert.equal(find("LEAK-1"), undefined, "the poison fixed it")
+  assert.ok(poisoned("LEAK-NEAR"), "the nearest bug caught the leak")
+  assert.ok(!poisoned("LEAK-FAR"), "the far one did not")
+  wait(1)
+  assert.ok(find("LEAK-NEAR")!.hp < near, "and it hurts")
+})
+
+test("Memory leak arrives with sprint 4 (Foundry) and not before", () => {
+  assert.equal(isUnlocked("memoryLeak", levels[2]!.tier), false)
+  assert.equal(isUnlocked("memoryLeak", levels[3]!.tier), true)
+})
