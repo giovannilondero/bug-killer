@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { test } from "node:test"
 
 import { bonusLevels } from "../src/content/levels.ts"
-import { bestScore, bonusUnlocked, clearBonus, clearSprint, emptyProgress, endEndless, endlessBest, hardcoreBadge, loadProgress, unlockEverySprint, saveProgress, sprintsCleared, sprintUnlocked } from "../src/progress.ts"
+import { bestScore, bonusUnlocked, clearBonus, clearSprint, emptyProgress, endEndless, endlessArenaUnlocked, endlessBest, hardcoreBadge, loadProgress, unlockEverySprint, saveProgress, sprintsCleared, sprintUnlocked } from "../src/progress.ts"
 
 test("progress saved by today's version loads unchanged", () => {
   const saved = JSON.stringify({ unlocked: 3, best: { glacier: 12400, sidequests: 8100, endless: 30500 } })
@@ -160,4 +160,31 @@ test("a bonus level cleared in hardcore gets a badge, solo or together, and stil
   const solo = clearBonus(before, hotdesk, { score: 7000, solo: true, hardcore: true })
   assert.equal(bestScore(solo, "hotdesk"), 7000)
   assert.equal(hardcoreBadge(loadProgress(saveProgress(solo)), "hotdesk"), true)
+})
+
+test("Endless keeps a record for each arena and hardcore combination; plain endless stays the normal arena", () => {
+  const old = loadProgress(JSON.stringify({ unlocked: 4, best: { endless: 30500 } }))
+  assert.equal(endlessBest(old, { hardcore: false, arena: "normal" }), 30500, "older saves are the normal arena's record")
+  assert.equal(endlessBest(old, { hardcore: false, arena: "small" }), undefined)
+
+  const small = endEndless(old, { score: 900, solo: true, arena: "small" })
+  assert.equal(small.record, true, "the first run in an arena is a record of its own")
+  const smallHardcore = endEndless(small.progress, { score: 400, solo: true, hardcore: true, arena: "small" })
+  assert.equal(smallHardcore.record, true)
+  const normalHardcore = endEndless(smallHardcore.progress, { score: 300, solo: true, hardcore: true })
+  assert.equal(normalHardcore.record, true)
+
+  const saved = loadProgress(saveProgress(normalHardcore.progress))
+  assert.equal(endlessBest(saved, { hardcore: false }), 30500)
+  assert.equal(endlessBest(saved, { hardcore: false, arena: "small" }), 900)
+  assert.equal(endlessBest(saved, { hardcore: true, arena: "small" }), 400)
+  assert.equal(endlessBest(saved, { hardcore: true, arena: "normal" }), 300)
+  assert.equal(endEndless(saved, { score: 500, solo: true, arena: "small" }).record, false, "below that arena's record")
+})
+
+test("an Endless arena can be picked once its bonus level is unlocked", () => {
+  assert.equal(endlessArenaUnlocked(emptyProgress, "normal"), true, "the normal arena is always open")
+  assert.equal(endlessArenaUnlocked(emptyProgress, "small"), false)
+  const third = clearSprint(loadProgress(JSON.stringify({ unlocked: 3, best: {} })), 2, { score: 100, solo: true })
+  assert.equal(endlessArenaUnlocked(third, "small"), true, "Hotdesk opens the small arena")
 })

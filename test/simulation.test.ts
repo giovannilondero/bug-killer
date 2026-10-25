@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { test } from "node:test"
 
 import { arenas } from "../src/content/arenas.ts"
-import { bonusLevels, endlessLevel, levels, ticketsOf } from "../src/content/levels.ts"
+import { bonusLevels, endlessArenaOf, endlessArenas, endlessIn, endlessLevel, levels, ticketsOf } from "../src/content/levels.ts"
 import { projectOf } from "../src/content/bugs.ts"
 import type { Locale } from "../src/content/i18n.ts"
 import type { Level } from "../src/content/levels.ts"
@@ -231,6 +231,30 @@ test("endless never runs out: after a boss the next round starts, tougher", () =
   assert.ok(view.run.wave > 1)
 })
 
+
+test("Endless runs in the chosen arena: bugs come in at its edges and nothing leaves it", () => {
+  for (const { id } of endlessArenas) {
+    const arena = arenas[id]
+    let current: View | null = null
+    let frame = 0
+    let widest = { x: 0, y: 0 }
+    const made = createSimulation({ level: endlessIn(id), seed: 5, locale: "en", input: autopilot(() => current, () => frame), presentation: { fx: () => {}, chat: () => {} } })
+    if (!made.ok) throw new Error(JSON.stringify(made.error))
+    current = made.value.view()
+    for (; frame < 90 * 60 && current.run.phase !== "dead"; frame++) {
+      assert.ok(made.value.step().ok)
+      current = made.value.view()
+      for (const thing of [...current.players, ...current.bugs, ...current.bosses]) {
+        widest = { x: Math.max(widest.x, thing.position.x), y: Math.max(widest.y, thing.position.y) }
+      }
+    }
+    assert.equal(endlessArenaOf(current.level), id)
+    assert.ok(current.level.endless, "still Endless")
+    assert.ok(widest.x <= arena.width && widest.y <= arena.height, `${id}: reached ${JSON.stringify(widest)}`)
+    // Spawned at the arena's edges: something got close to its far side.
+    assert.ok(widest.x > arena.width - 120 || widest.y > arena.height - 120, `${id}: only reached ${JSON.stringify(widest)}`)
+  }
+})
 
 // --- Playing together ---------------------------------------------------
 

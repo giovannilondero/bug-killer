@@ -1,4 +1,5 @@
-import { levels } from "./content/levels.ts"
+import type { ArenaId } from "./content/arenas.ts"
+import { bonusLevels, endlessArenas, levels } from "./content/levels.ts"
 import type { Level, LevelId } from "./content/levels.ts"
 
 /**
@@ -54,10 +55,16 @@ export const hardcoreBadge = (progress: Progress, level: LevelId): boolean => pr
 /** Which Endless a record belongs to: each combination keeps its own. */
 export interface EndlessMode {
   readonly hardcore: boolean
+  /** The normal arena when left out. */
+  readonly arena?: ArenaId
 }
 
-/** Where an Endless record is kept in `best`: plain `endless` for the normal run, as older versions saved it. */
-const endlessKey = (mode: EndlessMode): string => (mode.hardcore ? "endless/hardcore" : "endless")
+/**
+ * Where an Endless record is kept in `best`: plain `endless` for the normal
+ * arena without hardcore, as older versions saved it; `endless/small/hardcore` and so on otherwise.
+ */
+const endlessKey = (mode: EndlessMode): string =>
+  ["endless", ...(mode.arena === undefined || mode.arena === "normal" ? [] : [mode.arena]), ...(mode.hardcore ? ["hardcore"] : [])].join("/")
 
 export const endlessBest = (progress: Progress, mode: EndlessMode): number | undefined => progress.best[endlessKey(mode)]
 
@@ -66,6 +73,8 @@ export interface RunResult {
   readonly score: number
   readonly solo: boolean
   readonly hardcore?: boolean
+  /** The arena an Endless run was played in; the normal one unless said. */
+  readonly arena?: ArenaId
 }
 
 const withBest = (progress: Progress, key: string, score: number): Progress =>
@@ -90,6 +99,14 @@ export const clearSprint = (progress: Progress, index: number, run: RunResult): 
 export const bonusUnlocked = (progress: Progress, level: Level): boolean =>
   level.bonus !== undefined && sprintsCleared(progress) >= level.bonus.after
 
+/** An Endless arena can be picked once the bonus level that opens it is unlocked; the normal one always. */
+export const endlessArenaUnlocked = (progress: Progress, arena: ArenaId): boolean => {
+  const entry = endlessArenas.find((candidate) => candidate.id === arena)
+  if (!entry) return false
+  const bonus = bonusLevels.find((level) => level.id === entry.unlockedBy)
+  return entry.unlockedBy === undefined || (bonus !== undefined && bonusUnlocked(progress, bonus))
+}
+
 /** Clearing a bonus level unlocks nothing: a hardcore clear earns its badge, a solo clear may set its best score. */
 export const clearBonus = (progress: Progress, level: Level, run: RunResult): Progress => {
   const badged = run.hardcore === true ? withBadge(progress, level.id) : progress
@@ -98,7 +115,7 @@ export const clearBonus = (progress: Progress, level: Level, run: RunResult): Pr
 
 /** An Endless run only ends in defeat: a solo run that beats the best score of its mode is a new record. */
 export const endEndless = (progress: Progress, run: RunResult): { readonly progress: Progress; readonly record: boolean } => {
-  const key = endlessKey({ hardcore: run.hardcore === true })
+  const key = endlessKey({ hardcore: run.hardcore === true, ...(run.arena === undefined ? {} : { arena: run.arena }) })
   const record = run.solo && run.score > (progress.best[key] ?? 0)
   return { progress: record ? withBest(progress, key, run.score) : progress, record }
 }

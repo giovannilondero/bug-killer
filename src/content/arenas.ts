@@ -16,3 +16,5 @@ export const arenas = {
 
 /** The arena a level is played on: the normal one unless the level says otherwise. */
 export const arenaOf = (level: { readonly arena?: Arena }): Arena => level.arena ?? arenas.normal
+
+export type ArenaId = keyof typeof arenas

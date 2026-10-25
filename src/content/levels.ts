@@ -1,5 +1,5 @@
-import { arenas } from "./arenas.ts"
-import type { Arena } from "./arenas.ts"
+import { arenaOf, arenas } from "./arenas.ts"
+import type { Arena, ArenaId } from "./arenas.ts"
 import { backlog } from "./backlog.ts"
 import { projectOf } from "./bugs.ts"
 import type { BacklogBug } from "./bugs.ts"
@@ -192,3 +192,20 @@ export const bonusLevels: ReadonlyArray<Level> = [
     bonus: { after: 3, tickets: 30 }
   })
 ]
+
+/**
+ * The arenas Endless can be played in, in the picker's order. Each one past
+ * the normal opens with the bonus level played in it. One entry each.
+ */
+export const endlessArenas: ReadonlyArray<{ readonly id: ArenaId; readonly unlockedBy?: LevelId }> = [
+  { id: "normal" },
+  { id: "small", unlockedBy: "hotdesk" }
+]
+
+export const isEndlessArena = (id: unknown): id is ArenaId => endlessArenas.some((arena) => arena.id === id)
+
+/** Endless, played in the chosen arena. */
+export const endlessIn = (arena: ArenaId): Level => ({ ...endlessLevel, arena: arenas[arena] })
+
+/** Which of Endless's arenas a level is played in; the normal one for anything else. */
+export const endlessArenaOf = (level: Level): ArenaId => endlessArenas.find((entry) => arenas[entry.id] === arenaOf(level))?.id ?? "normal"
