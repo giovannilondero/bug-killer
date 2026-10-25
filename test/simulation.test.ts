@@ -8,9 +8,8 @@ import type { Locale } from "../src/content/i18n.ts"
 import type { Level } from "../src/content/levels.ts"
 import { createSimulation, idleInput } from "../src/sim/simulation.ts"
 import type { View } from "../src/sim/simulation.ts"
-import { makeBoss, makeBug, makePickup } from "../src/sim/drafts.ts"
+import { makeBoss, makeBug, makePickup, spawnBoss } from "../src/sim/drafts.ts"
 import type { BugSeed } from "../src/sim/drafts.ts"
-import { PlayerWrite } from "../src/sim/queries.ts"
 import { contentTiers, isUnlocked, tierOf } from "../src/sim/tiers.ts"
 import { hasStatus } from "../src/sim/statuses.ts"
 import type { StatusValue } from "../src/sim/statuses.ts"
@@ -927,22 +926,21 @@ test("Memory leak: when a poisoned bug dies, the leak passes to the nearest bug"
 })
 
 test("statuses hurt a boss in a reduced form: burn and poison deal half", () => {
-  /** Health a boss loses in one second carrying `status`, nobody firing. */
+  /** Health a boss loses in one second carrying `status`, nobody firing: it arrives already afflicted, its boot shield down. */
   const lost = (status: StatusValue) => {
     const made = createSimulation({ level: levels[0]!, seed: 4, input: { snapshot: () => idleInput }, presentation: { fx: () => undefined, chat: () => undefined } })
     if (!made.ok) throw new Error(JSON.stringify(made.error))
     const sim = made.value
     const me = sim.view().player!.position
+    const boss = levels[0]!.boss
     const Spawn = Game.System("Test/Spawn", { commands: Game.System.commands(Game.System.spawns(Boss)) }, ({ commands }) => {
-      commands.spawn(makeBoss({ ...levels[0]!.boss, key: "BOSS-1" }, { x: me.x + 400, y: me.y - 300 }))
+      commands.spawn(spawnBoss({
+        key: "BOSS-1", title: boss.title, pattern: boss.pattern, shotText: boss.shotText, color: boss.color,
+        hp: boss.hp, maxHp: boss.hp, phase: 1, shield: 0, timer: 1.5, volley: 0, hitFlash: 0, age: 0,
+        statuses: [status], side: null, thread: null, revive: 0, course: 0, frames: 0
+      }, { x: me.x + 400, y: me.y - 300 }, boss.radius))
     })
     assert.ok(sim.runtime.tick(Game.Schedule(Spawn, Game.Schedule.applyDeferred())).ok)
-    // Past the boss's boot shield, which shrugs everything off.
-    for (let frame = 0; frame < 2.5 * 60; frame++) assert.ok(sim.step().ok)
-    const Inflict = Game.System("Test/Inflict", { queries: { bosses: Game.Query({ selection: { boss: Game.Query.write(Boss) } }) } }, ({ queries }) => {
-      for (const match of queries.bosses.each()) match.data.boss.update((boss) => ({ ...boss, statuses: [status] }))
-    })
-    assert.ok(sim.runtime.tick(Game.Schedule(Inflict)).ok)
     const before = sim.view().bosses[0]!.hp
     for (let frame = 0; frame < 60; frame++) assert.ok(sim.step().ok)
     return before - sim.view().bosses[0]!.hp
@@ -1343,15 +1341,6 @@ test("Breakpoint: the autopilot sets them down when bugs close in, and they go o
 
 // --- Hardcore ----------------------------------------------------------------
 
-/** Keeps the given seats from being hurt: a run long enough to see what drops, or to revive someone. */
-const shield = (slots: ReadonlyArray<number>) =>
-  Game.Schedule(Game.System("Test/Shield", { queries: { player: PlayerWrite } }, ({ queries }) => {
-    for (const { data } of queries.player.each()) {
-      const state = data.player.get()
-      if (slots.includes(state.slot)) data.player.set({ ...state, invulnerable: 1 })
-    }
-  }))
-
 /** A hardcore (or not) run where `shielded` seats cannot be hurt, watching every frame. */
 const hardcoreRun = (level: Level, seconds: number, pilots: ReadonlyArray<Pilot>, options: { hardcore: boolean; shielded: ReadonlyArray<number>; seed?: number }, onFrame: (v: View) => void) => {
   let current: View | null = null
@@ -1368,10 +1357,18 @@ const hardcoreRun = (level: Level, seconds: number, pilots: ReadonlyArray<Pilot>
   })
   if (!made.ok) throw new Error(JSON.stringify(made.error))
   const sim = made.value
-  const protect = shield(options.shielded)
+  // Shielded seats are kept in Green tests: one dropped at their feet whenever the last is about to run out.
+  const shield = () => {
+    const spots = current!.players.filter((p) => options.shielded.includes(p.slot) && p.hp > 0 && p.buffs.unitTest < 1).map((p) => p.position)
+    if (spots.length === 0) return
+    const Drop = Game.System("Test/Drop", { commands: Game.System.commands(Game.System.spawns(Pickup)) }, ({ commands }) => {
+      for (const at of spots) commands.spawn(makePickup("unitTest", at))
+    })
+    assert.ok(sim.runtime.tick(Game.Schedule(Drop, Game.Schedule.applyDeferred())).ok)
+  }
   current = sim.view()
   for (; frame < seconds * 60; frame++) {
-    assert.ok(sim.runtime.tick(protect).ok)
+    shield()
     assert.ok(sim.step().ok)
     current = sim.view()
     onFrame(current)
@@ -1407,7 +1404,8 @@ test("Pizza never drops in hardcore, from bugs, missions or calls; the other pow
   assert.ok(normal.has("pizza"), `the same runs drop Pizza without hardcore: ${[...normal].join(", ")}`)
   const hardcore = seen(true)
   assert.equal(hardcore.has("pizza"), false)
-  assert.ok(hardcore.has("unitTest"), `Green tests still drop: ${[...hardcore].join(", ")}`)
+  // Green tests are left out: the shield drops those itself.
+  assert.ok([...hardcore].some((kind) => kind !== "unitTest"), `the others still drop: ${[...hardcore].join(", ")}`)
 })
 
 test("in hardcore a revived teammate comes back with 1 sanity", () => {
