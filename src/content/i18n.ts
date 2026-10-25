@@ -170,6 +170,19 @@ export interface Strings {
     readonly pauseBody: string
     readonly errors: Record<"notFound" | "full" | "started" | "nameTaken" | "badName" | "badLevel" | "notHost" | "busy", string>
   }
+  /** One sanity, no Pizza: the menu toggle, the lobby, the HUD, the badges and the end screens. */
+  readonly hardcore: {
+    readonly name: string
+    readonly rules: string
+    readonly on: string
+    readonly off: string
+    /** Next to sanity in the HUD. */
+    readonly hud: string
+    /** On a sprint card cleared in hardcore. */
+    readonly badge: string
+    /** On the end-of-run screen. */
+    readonly run: string
+  }
 }
 
 export const text: Record<Locale, Strings> = { en, it }

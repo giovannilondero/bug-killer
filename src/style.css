@@ -585,3 +585,43 @@ body.touch .text { min-width: 0; margin: 0; font-size: 11px; white-space: nowrap
 
 .touch-small.active { background: rgba(127, 220, 255, 0.25); border-color: rgba(127, 220, 255, 0.6); }
 .home-hint { margin-top: 6px; color: #7fdcff; }
+
+/* ---------- Hardcore ---------- */
+
+.hardcore-toggle {
+  --hardcore: oklch(70% 0.19 15);
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px 10px;
+  margin: 0 0 22px;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: oklch(100% 0 none / 0.04);
+  font: 12px var(--mono);
+  color: var(--muted);
+  cursor: pointer;
+}
+.hardcore-toggle[aria-pressed="true"] {
+  border-color: var(--hardcore);
+  background: color-mix(in oklch, var(--hardcore) 14%, transparent);
+  color: var(--text);
+}
+@media (hover: hover) and (pointer: fine) {
+  .hardcore-toggle:hover { color: var(--text); border-color: color-mix(in oklch, var(--hardcore) 60%, transparent); }
+}
+.hardcore-toggle:active { background: color-mix(in oklch, var(--hardcore) 22%, transparent); }
+.hardcore-toggle:focus-visible { outline: 2px solid var(--hardcore); outline-offset: 2px; }
+.hardcore-state { padding: 1px 7px; border-radius: 6px; background: oklch(100% 0 none / 0.08); font-weight: 700; text-transform: uppercase; }
+.hardcore-toggle[aria-pressed="true"] .hardcore-state { background: var(--hardcore); color: oklch(15% 0 none); }
+.hardcore-name { font: 700 12px var(--mono); color: oklch(70% 0.19 15); text-transform: uppercase; letter-spacing: 0.08em; }
+.hardcore-rules { font: 12px var(--mono); color: var(--muted); }
+.hardcore-badge { font-size: 0.7em; vertical-align: 0.15em; color: oklch(70% 0.19 15); }
+.hardcore-check { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin: 14px 0 0; cursor: pointer; }
+p.hardcore-check { cursor: auto; }
+.hardcore-check input { accent-color: oklch(70% 0.19 15); }
+.hardcore-check input:focus-visible { outline: 2px solid oklch(70% 0.19 15); outline-offset: 2px; }
+.intro-hardcore { display: flex; justify-content: center; flex-wrap: wrap; gap: 4px 10px; margin: -8px 0 18px; }
+.hardcore-run { margin: 0 0 12px; font: 700 13px var(--mono); color: oklch(70% 0.19 15); letter-spacing: 0.06em; }
