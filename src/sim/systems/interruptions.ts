@@ -3,7 +3,7 @@ import { Ops } from "@typeonce/ritmo-math"
 
 import { text } from "../../content/i18n.ts"
 import { arenaOf } from "../../content/arenas.ts"
-import { DT, TOBIA, RESURRECT } from "../constants.ts"
+import { DT, TOBIA, RESURRECT, WALL_MARGIN } from "../constants.ts"
 import { makeBug, makePickup } from "../drafts.ts"
 import { centreOf, clampToArena } from "../math.ts"
 import { BossRead, BugRead, PlayerRead, standing } from "../queries.ts"
@@ -114,7 +114,7 @@ export const TobiaSystem = Game.System(
       const lines = text[resources.language.get()].tobiaLines
       events.chat.emit({ type: "nudge", client: "tobia", text: lines[state.tobiaLine % lines.length] ?? "" })
       const angle = random.range(0, Math.PI * 2)
-      commands.spawn(makePickup("tools", clampToArena({ x: me.x + Ops.cos(angle) * 110, y: me.y + Ops.sin(angle) * 110 }, 40, arena)))
+      commands.spawn(makePickup("tools", clampToArena({ x: me.x + Ops.cos(angle) * 110, y: me.y + Ops.sin(angle) * 110 }, WALL_MARGIN, arena)))
       state.tobiaLine += 1
       state.tobiaIn = TOBIA.cooldown
     }

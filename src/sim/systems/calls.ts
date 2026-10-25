@@ -4,7 +4,7 @@ import { Ops } from "@typeonce/ritmo-math"
 import { text } from "../../content/i18n.ts"
 import { arenaOf } from "../../content/arenas.ts"
 import type { Arena } from "../../content/arenas.ts"
-import { CALLS, DT } from "../constants.ts"
+import { CALLS, DT, WALL_MARGIN } from "../constants.ts"
 import { makePickup } from "../drafts.ts"
 import { allowedPickups } from "../hardcore.ts"
 import { clamp, clampToArena, distanceSquared } from "../math.ts"
@@ -17,7 +17,6 @@ import { tierOf, unlocked } from "../tiers.ts"
 const rewards: ReadonlyArray<PickupKind> = ["hotfix", "refactor", "coffee", "unitTest", "revert", "pizza", "pairProgramming", "codeFreeze", "memoryLeak", "pushForce", "flameWar", "breakpoint"]
 
 const MARGIN = 140
-const WALL_MARGIN = 40
 
 /** A point in the arena between `near` and `far` from the player, away from the walls. */
 const somewhere = (random: Random.Random, arena: Arena, from: Vec, near: number, far: number): Vec => {
@@ -139,7 +138,7 @@ export const CallSystem = Game.System(
         events.fx.emit({ type: "callDone", x: me.x, y: me.y, kind: call.kind, points })
         const angle = random.range(0, Math.PI * 2)
         const reward = random.pick(allowedPickups(unlocked(rewards, tierOf(resources.level.get(), run.wave), resources.tiers.get()), resources.hardcore.get()))
-        if (reward) commands.spawn(makePickup(reward, clampToArena({ x: me.x + Ops.cos(angle) * 90, y: me.y + Ops.sin(angle) * 90 }, 40, arena)))
+        if (reward) commands.spawn(makePickup(reward, clampToArena({ x: me.x + Ops.cos(angle) * 90, y: me.y + Ops.sin(angle) * 90 }, WALL_MARGIN, arena)))
         state.active = null
         state.nextIn = random.range(CALLS.min, CALLS.max)
       } else if (call.timeLeft <= 0) {
