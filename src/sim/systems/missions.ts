@@ -10,8 +10,9 @@ import { ARENA, DT } from "../constants.ts"
 import { makeBug, makePickup } from "../drafts.ts"
 import { clamp, edgePoint } from "../math.ts"
 import { BugRead, PlayerRead, standing } from "../queries.ts"
-import { Bug, BugFixed, Chat, Fx, Game, Language, LevelSpec, Missions, Pickup, PlayerHurt, Rng, Run } from "../schema.ts"
+import { Bug, BugFixed, Chat, Fx, Game, Language, LevelSpec, Missions, Pickup, PlayerHurt, Rng, Run, Tiers } from "../schema.ts"
 import type { BugValue, MissionValue, PickupKind } from "../schema.ts"
+import { tierOf, unlocked } from "../tiers.ts"
 import { Ops } from "@typeonce/ritmo-math"
 
 const MISSION_POINTS = 400
@@ -94,6 +95,7 @@ export const MissionDirectorSystem = Game.System(
     resources: {
       level: Game.System.readResource(LevelSpec),
       language: Game.System.readResource(Language),
+      tiers: Game.System.readResource(Tiers),
       missions: Game.System.writeResource(Missions),
       run: Game.System.writeResource(Run),
       rng: Game.System.writeResource(Rng)
@@ -196,9 +198,9 @@ export const MissionDirectorSystem = Game.System(
         run.score += MISSION_POINTS
         const line = random.pick(strings.outcomes[mission.client].success) ?? "ok"
         events.chat.emit({ type: "outcome", client: mission.client, text: say(mission.client, line), success: true })
-        const reward = random.pick(rewards) ?? "hotfix"
+        const reward = random.pick(unlocked(rewards, tierOf(level, run.wave), resources.tiers.get()))
         const angle = random.range(0, Math.PI * 2)
-        commands.spawn(makePickup(reward, {
+        if (reward) commands.spawn(makePickup(reward, {
           x: clamp(playerAt.x + Ops.cos(angle) * 90, 40, ARENA.width - 40),
           y: clamp(playerAt.y + Ops.sin(angle) * 90, 40, ARENA.height - 40)
         }))

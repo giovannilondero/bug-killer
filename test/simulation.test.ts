@@ -7,7 +7,8 @@ import type { Level } from "../src/content/levels.ts"
 import { createSimulation, idleInput } from "../src/sim/simulation.ts"
 import type { View } from "../src/sim/simulation.ts"
 import { makePickup } from "../src/sim/drafts.ts"
-import { Game, Pickup } from "../src/sim/schema.ts"
+import { contentTiers } from "../src/sim/tiers.ts"
+import { Game, Pickup, pickupKinds } from "../src/sim/schema.ts"
 import type { ChatValue, FxValue, InputValue } from "../src/sim/schema.ts"
 
 /** A bot that kites the nearest bug and shoots at it: the same intents a player sends. */
@@ -309,4 +310,62 @@ test("the rare AI drop sets down a turret that fixes bugs on its own, and someti
   assert.ok(view.players[0]!.points > 0, "the turret's fixes count for whoever picked it up")
   assert.ok(fx.some((e) => e.type === "hallucination"), "it made something up at least once")
   assert.equal(view.turrets.length, 0, "and after its seconds it is gone")
+})
+
+// --- Content tiers ---------------------------------------------------------
+
+/** Steps a run with the autopilot and hands every view to `see`. */
+const watch = (options: Omit<Parameters<typeof createSimulation>[0], "presentation" | "input">, seconds: number, see: (view: View) => void) => {
+  let current: View | null = null
+  let frame = 0
+  const made = createSimulation({ ...options, input: answeringPilot(() => current, () => frame), presentation: { fx: () => undefined, chat: () => undefined } })
+  if (!made.ok) throw new Error(JSON.stringify(made.error))
+  const sim = made.value
+  for (; frame < seconds * 60; frame++) {
+    assert.ok(sim.step().ok)
+    current = sim.view()
+    see(current)
+    if (current.run.phase === "cleared" || current.run.phase === "dead") break
+  }
+  return sim.view()
+}
+
+test("endless unlocks one content tier every 3 waves, all of it by wave 18", () => {
+  // Small, quick waves and no bosses in the way, so a run reaches wave 18 in a few minutes.
+  const quick = { ...endlessLevel, waveSize: 1, endless: { ...endlessLevel.endless!, every: 100 } }
+  const tierAt = new Map<number, number>()
+  const view = watch({ level: quick, seed: 5 }, 400, (v) => {
+    if (!tierAt.has(v.run.wave)) tierAt.set(v.run.wave, v.tier)
+  })
+  assert.ok(view.run.wave >= 18, `only reached wave ${view.run.wave}`)
+  // `run.wave` counts the waves released so far: the next wave plays at this tier.
+  assert.deepEqual(
+    [0, 2, 3, 5, 6, 9, 12, 15, 17].map((wave) => tierAt.get(wave)),
+    [0, 0, 1, 1, 2, 3, 4, 5, 5]
+  )
+})
+
+test("drops, mission rewards and call rewards never offer a pickup above the level's tier", () => {
+  // Pretend every pickup but Revert arrives with sprint 2 (Tobia's tools are his own visit, not a drop or a reward).
+  const kept = ["revert", "tools"]
+  const tiers = { ...contentTiers, ...Object.fromEntries(pickupKinds.filter((kind) => !kept.includes(kind)).map((kind) => [kind, 1])) }
+  const offered = (level: Level) => {
+    const kinds = new Map<number, string>()
+    const view = watch({ level, seed: 5, tiers }, 150, (v) => {
+      for (const pickup of v.pickups) kinds.set(pickup.id, pickup.kind)
+    })
+    return { kinds: [...kinds.values()], view }
+  }
+
+  // Keystone wins several missions and calls on this seed; held at tier 0 it may only offer Revert.
+  const held = offered({ ...levels[2]!, tier: 0 })
+  const { run, calls } = held.view
+  assert.equal(held.view.tier, 0, "a campaign level stays at its own tier")
+  assert.ok(run.missionsWon >= 2 && calls.answered >= 2, `${run.phase} at ${run.time.toFixed(0)}s: missions won ${run.missionsWon}, calls answered ${calls.answered}`)
+  assert.deepEqual(held.kinds.filter((kind) => !kept.includes(kind)), [])
+  assert.ok(held.kinds.filter((kind) => kind === "revert").length >= 5, `reverts: ${held.kinds.join(", ")}`)
+
+  const open = offered(levels[2]!)
+  assert.equal(open.view.tier, 2)
+  assert.ok(open.kinds.some((kind) => !kept.includes(kind)), "a level offers what its tier unlocks")
 })
