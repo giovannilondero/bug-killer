@@ -84,10 +84,18 @@ export const makeAudio = () => {
       const now = performance.now()
       if (now - lastShot < 50) return
       lastShot = now
-      if (weapon === "pairProgramming") {
+      if (weapon === "flameWar") {
+        // A gas burner roaring: filtered noise with a low rumble under it.
+        noise(0.14, 0.06, 1600, 300)
+        tone(90, 0.12, { type: "sawtooth", volume: 0.025, slide: 0.8 })
+      } else if (weapon === "pairProgramming") {
         // Two keyboards at once: the same blip, a fifth apart.
         tone(740, 0.05, { type: "square", volume: 0.035, slide: 0.5 })
         tone(1110, 0.05, { type: "square", volume: 0.03, slide: 0.5, delay: 0.015 })
+      } else if (weapon === "pushForce") {
+        // A rocket leaving: a rising whoosh over a low thump.
+        noise(0.35, 0.18, 500, 2600)
+        tone(120, 0.2, { type: "sawtooth", volume: 0.1, slide: 2.2 })
       } else {
         tone(880, 0.05, { type: "square", volume: 0.04, slide: 0.5 })
       }
@@ -110,6 +118,11 @@ export const makeAudio = () => {
     bomb: () => {
       noise(0.9, 0.6, 3000, 60)
       tone(90, 0.8, { type: "sawtooth", volume: 0.25, slide: 0.3 })
+    },
+    /** A rocket going off: shorter and drier than git reset --hard. */
+    explosion: () => {
+      noise(0.55, 0.45, 2400, 70)
+      tone(70, 0.45, { type: "sawtooth", volume: 0.18, slide: 0.35 })
     },
     dash: () => noise(0.12, 0.12, 4000, 800),
     /** A Deploying bug's fuse: beeps that speed up over its second. */

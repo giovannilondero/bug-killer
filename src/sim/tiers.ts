@@ -38,7 +38,10 @@ export const contentTiers = {
   codeFreeze: 2,
   story: 1,
   epic: 4,
-  deploying: 3
+  deploying: 3,
+  memoryLeak: 3,
+  pushForce: 4,
+  flameWar: 5
 } as const satisfies Record<Unlockable, Tier>
 
 export type TierTable = Readonly<Record<Unlockable, Tier>>

@@ -3,13 +3,13 @@ import type { Arena } from "../content/arenas.ts"
 import { bugKinds } from "../content/bugs.ts"
 import { clients } from "../content/clients.ts"
 import { comboMultiplier } from "../sim/systems/combat.ts"
-import { BUFF_SECONDS, DEPLOY, PARTY, PLAYER, TURRET } from "../sim/constants.ts"
+import { BUFF_SECONDS, DEPLOY, PARTY, PLAYER, ROCKET, TURRET } from "../sim/constants.ts"
 import { hasStatus } from "../sim/statuses.ts"
 import { WEAPONS } from "../sim/weapons.ts"
 import type { FxValue, Vec } from "../sim/schema.ts"
 import type { View } from "../sim/simulation.ts"
 import { formatNumber, t } from "./language.ts"
-import { floorKey, fuseBlink, fuseProgress, MONO, paintBug, paintFloor, paintFuseRing, paintHeart, paintHostile, paintLabel, paintNest, paintPickup, paintPing, paintPlayer, paintTooltip, pickupIcons, pickupInfo, roundRect, SANS, shade, tooltipHeight, TOOLTIP_WIDTH, truncate } from "./paint.ts"
+import { floorKey, fuseBlink, fuseProgress, MONO, paintBug, paintFloor, paintFuseRing, paintHeart, paintHostile, paintLabel, paintNest, paintPickup, paintPing, paintPlayer, paintRocket, paintRocketTarget, paintTooltip, pickupIcons, pickupInfo, roundRect, SANS, shade, tooltipHeight, TOOLTIP_WIDTH, truncate } from "./paint.ts"
 import type { BugLook } from "./paint.ts"
 import { touchMode } from "./touch.ts"
 
@@ -73,6 +73,13 @@ export const makeRenderer = (canvas: HTMLCanvasElement) => {
       const life = 0.3 + Math.random() * 0.5
       particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life, max: life, color, size: size * (0.5 + Math.random()) })
     }
+  }
+
+  /** A wisp of smoke left behind a rocket each frame. */
+  const puff = (at: Vec, velocity: Vec) => {
+    const len = Math.hypot(velocity.x, velocity.y) || 1
+    const life = 0.35 + Math.random() * 0.25
+    particles.push({ x: at.x - (velocity.x / len) * 26, y: at.y - (velocity.y / len) * 26, vx: (Math.random() - 0.5) * 30, vy: (Math.random() - 0.5) * 30, life, max: life, color: "#9aa4b8", size: 4 })
   }
 
   const fx = (event: FxValue) => {
@@ -168,6 +175,24 @@ export const makeRenderer = (canvas: HTMLCanvasElement) => {
       case "hallucination":
         floaters.push({ x: event.x, y: event.y - 30, life: 1.2, max: 1.2, text: t().hud.hallucination, sub: "", color: "#c792ff", big: false })
         break
+      case "flame":
+        // A puff of fire fanning out along the cone, yellow at the core, red at the edges.
+        for (let i = 0; i < 8; i++) {
+          const a = event.angle + (Math.random() * 2 - 1) * event.spread
+          // Particles slow down by 8% a frame, so they travel about a fifth of their speed.
+          const s = (event.range / 0.21) * (0.35 + Math.random() * 0.65)
+          const life = 0.25 + Math.random() * 0.15
+          const color = ["#fff3a0", "#ffd84a", "#ff9440", "#ff4d2d"][Math.floor(Math.random() * 4)]!
+          particles.push({ x: event.x, y: event.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life, max: life, color, size: 5 + Math.random() * 5 })
+        }
+        break
+      case "explosion":
+        shake = Math.max(shake, 12)
+        flash = Math.max(flash, 0.25)
+        burst(event.x, event.y, "#ff9440", 40, event.radius * 3, 5)
+        burst(event.x, event.y, "#ffd84a", 24, event.radius * 2, 4)
+        burst(event.x, event.y, "#ffffff", 10, event.radius, 3)
+        break
       case "shoot":
         break
     }
@@ -207,6 +232,11 @@ export const makeRenderer = (canvas: HTMLCanvasElement) => {
     ctx.rotate(heading)
     paintBug(ctx, r, color, t, options)
     ctx.restore()
+    if (options.burning) {
+      ctx.font = `${Math.round(r * 0.9)}px ${SANS}`
+      ctx.textAlign = "center"
+      ctx.fillText("🔥", x, y - r * 0.7 + Math.sin(t * 20) * 2)
+    }
     if (options.trait === "armored") {
       ctx.font = `${Math.round(r * 0.7)}px ${SANS}`
       ctx.textAlign = "center"
@@ -355,7 +385,7 @@ export const makeRenderer = (canvas: HTMLCanvasElement) => {
       drawBug(x, y, boss.radius, "#ff00ff", heading, boss.age, { flash: 0, trait: "plain", reopened: false, boss: true })
       ctx.restore()
     }
-    drawBug(x, y, boss.radius, boss.color, heading, boss.age, { flash: boss.hitFlash, trait: "plain", reopened: true, boss: true, frozen: hasStatus(boss.statuses, "freeze") })
+    drawBug(x, y, boss.radius, boss.color, heading, boss.age, { flash: boss.hitFlash, trait: "plain", reopened: true, boss: true, frozen: hasStatus(boss.statuses, "freeze"), poisoned: hasStatus(boss.statuses, "poison"), burning: hasStatus(boss.statuses, "burn") })
     if (boss.shield > 0) {
       ctx.strokeStyle = "rgba(255,255,255,0.8)"
       ctx.lineWidth = 4
@@ -518,7 +548,7 @@ export const makeRenderer = (canvas: HTMLCanvasElement) => {
         ctx.beginPath(); ctx.arc(x, y, bug.radius * 1.45, -time * 3, -time * 3 + Math.PI * 2); ctx.stroke()
         ctx.setLineDash([])
       }
-      drawBug(x, y, bug.radius * (0.4 + appear * 0.6), bug.resurrectedBy ? "#9dff6b" : bugKinds[bug.priority].color, heading, bug.age, { flash: bug.hitFlash, trait: bug.trait, reopened: bug.reopened || bug.resurrectedBy !== null, frozen: hasStatus(bug.statuses, "freeze"), type: bug.type, fuse: bug.fuse })
+      drawBug(x, y, bug.radius * (0.4 + appear * 0.6), bug.resurrectedBy ? "#9dff6b" : bugKinds[bug.priority].color, heading, bug.age, { flash: bug.hitFlash, trait: bug.trait, reopened: bug.reopened || bug.resurrectedBy !== null, frozen: hasStatus(bug.statuses, "freeze"), poisoned: hasStatus(bug.statuses, "poison"), burning: hasStatus(bug.statuses, "burn"), type: bug.type, fuse: bug.fuse })
       ctx.globalAlpha = 1
       const isTarget = mission?.kind === "killTarget" && mission.target === bug.key
       if (isTarget) {
@@ -563,6 +593,20 @@ export const makeRenderer = (canvas: HTMLCanvasElement) => {
       ctx.beginPath(); ctx.moveTo(x - tx, y - ty); ctx.lineTo(x, y); ctx.stroke()
     }
     ctx.shadowBlur = 0
+
+    // Rockets: where each will go off, then the rocket with its smoke.
+    for (const rocket of view.rockets) {
+      ctx.save()
+      ctx.translate(rocket.target.x, rocket.target.y)
+      paintRocketTarget(ctx, ROCKET.blastRadius)
+      ctx.restore()
+      ctx.save()
+      ctx.translate(rocket.position.x, rocket.position.y)
+      ctx.rotate(Math.atan2(rocket.velocity.y, rocket.velocity.x))
+      paintRocket(ctx)
+      ctx.restore()
+      puff(rocket.position, rocket.velocity)
+    }
 
     for (const shot of view.hostile) {
       const { x, y } = shot.position
@@ -777,7 +821,7 @@ export const makeRenderer = (canvas: HTMLCanvasElement) => {
         ctx.fillText(`${t().pickups[weapon.kind].label.toUpperCase()}  ${Math.ceil(weapon.seconds)}s`, 152, y + 2)
         row++
       }
-      for (const kind of ["tools", "hotfix", "refactor", "coffee", "unitTest", "codeFreeze"] as const) {
+      for (const kind of ["tools", "hotfix", "refactor", "coffee", "unitTest", "codeFreeze", "memoryLeak"] as const) {
         const left = player.buffs[kind]
         if (left <= 0) continue
         const y = 142 + row * 22

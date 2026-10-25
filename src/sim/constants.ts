@@ -28,6 +28,8 @@ export const PARTY = {
 } as const
 
 export const SHOT = { speed: 820, life: 0.85, radius: 5, damage: 1 } as const
+/** `git push --force`: a slow rocket, and the blast that never hurts a developer. */
+export const ROCKET = { speed: 430, radius: 8, damage: 6, blastRadius: 130, cooldown: 0.9 } as const
 export const HOSTILE_SHOT = { radius: 9, life: 5 } as const
 
 export const BOMB_RADIUS = 520
@@ -51,7 +53,7 @@ export const DEPLOY = { reach: 50, fuse: 1, chainFuse: 0.12, radius: 130, damage
 export const EPIC = { every: 3, brood: 6, priorities: ["Lowest", "Low"], ring: 14 } as const
 
 /** Seconds each timed power-up lasts. Weapons time themselves (`weapons.ts`). */
-export const BUFF_SECONDS = { hotfix: 8, refactor: 10, coffee: 8, unitTest: 6, revert: 0, pizza: 0, tools: 10, ai: 0, pairProgramming: 0, codeFreeze: 8 } as const
+export const BUFF_SECONDS = { hotfix: 8, refactor: 10, coffee: 8, unitTest: 6, revert: 0, pizza: 0, tools: 10, ai: 0, pairProgramming: 0, codeFreeze: 8, memoryLeak: 8, pushForce: 0, flameWar: 0 } as const
 
 /** The "AI" turret: how long it lasts, how far it sees, how fast it shoots, and how often it makes things up. */
 export const TURRET = { seconds: 12, range: 560, cooldown: 0.2, radius: 18, hallucinateMin: 3, hallucinateMax: 6 } as const

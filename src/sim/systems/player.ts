@@ -1,10 +1,11 @@
-import { DT, PARTY, PLAYER } from "../constants.ts"
-import { makeShot } from "../drafts.ts"
-import { distanceSquared, length, normalize } from "../math.ts"
+import { arenaOf } from "../../content/arenas.ts"
+import { DT, PARTY, PLAYER, ROCKET } from "../constants.ts"
+import { makeRocket, makeShot } from "../drafts.ts"
+import { clampToArena, distanceSquared, length, normalize } from "../math.ts"
 import { PlayerWrite } from "../queries.ts"
-import { BombBlast, Fx, Game, Input, Run, Shot, pickupKinds } from "../schema.ts"
+import { BombBlast, FlameBurst, Fx, Game, Input, LevelSpec, Rocket, Run, Shot, pickupKinds } from "../schema.ts"
 import type { InputValue, Vec } from "../schema.ts"
-import { HOTFIX_COOLDOWN, WEAPONS, basicGun } from "../weapons.ts"
+import { HOTFIX_COOLDOWN, WEAPONS, basicGun, flameCone } from "../weapons.ts"
 import type { WeaponKind } from "../weapons.ts"
 import { Ops } from "@typeonce/ritmo-math"
 
@@ -44,18 +45,21 @@ export const PlayerControlSystem = Game.System(
     queries: { player: PlayerWrite },
     resources: {
       input: Game.System.readResource(Input),
-      run: Game.System.readResource(Run)
+      run: Game.System.readResource(Run),
+      level: Game.System.readResource(LevelSpec)
     },
     events: {
       fx: Game.System.writeEvent(Fx),
-      bomb: Game.System.writeEvent(BombBlast)
+      bomb: Game.System.writeEvent(BombBlast),
+      flame: Game.System.writeEvent(FlameBurst)
     },
-    commands: Game.System.commands(Game.System.spawns(Shot))
+    commands: Game.System.commands(Game.System.spawns(Shot, Rocket))
   },
   ({ queries, resources, events, commands }) => {
     const phase = resources.run.get().phase
     const inputs = resources.input.get()
     const team = queries.player.each()
+    const arena = arenaOf(resources.level.get())
     const up = team.filter((match) => match.data.player.get().hp > 0).map((match) => match.data.position.get())
 
     /** Bullets from `lanes` barrels side by side (pixels off the aim line), fanned out by Refactor. */
@@ -73,7 +77,15 @@ export const PlayerControlSystem = Game.System(
     /** What each weapon does with one pull of the trigger. */
     const fire: Record<WeaponKind, (trigger: Trigger) => void> = {
       gun: (trigger) => bullets(trigger, [0]),
-      pairProgramming: (trigger) => bullets(trigger, [-8, 8])
+      pairProgramming: (trigger) => bullets(trigger, [-8, 8]),
+      // One rocket to the crosshair, kept on the floor so the far explosion happens where it can be seen.
+      pushForce: (trigger) => commands.spawn(makeRocket(trigger.muzzle, clampToArena(trigger.target, ROCKET.radius, arena), trigger.owner)),
+      // No bullets: a puff of fire that burns everything in the cone, resolved in Combat.
+      flameWar: (trigger) => {
+        const cone = flameCone(trigger.muzzle, trigger.aim)
+        events.flame.emit({ ...cone, owner: trigger.owner })
+        events.fx.emit({ type: "flame", x: cone.origin.x, y: cone.origin.y, angle: Ops.atan2(cone.direction.y, cone.direction.x), range: cone.range, spread: cone.halfAngle })
+      }
     }
 
     for (const { data } of team) {
