@@ -90,7 +90,10 @@ export const Boss = Descriptor.Component<BossValue>()("BugKiller/Boss")
 export const Shot = Descriptor.Component<{ damage: number; life: number; pierce: number; homing: boolean; owner: number }>()("BugKiller/Shot")
 export const HostileShot = Descriptor.Component<{ damage: number; life: number; text: string }>()("BugKiller/HostileShot")
 
-export const pickupKinds = ["hotfix", "refactor", "coffee", "unitTest", "revert", "pizza", "tools", "ai", "pairProgramming", "codeFreeze", "memoryLeak", "flameWar"] as const
+/** A slow rocket flying to the point it was aimed at, where it explodes unless a bug or a boss is in the way first. */
+export const Rocket = Descriptor.Component<{ target: Vec; owner: number }>()("BugKiller/Rocket")
+
+export const pickupKinds = ["hotfix", "refactor", "coffee", "unitTest", "revert", "pizza", "tools", "ai", "pairProgramming", "codeFreeze", "memoryLeak", "pushForce", "flameWar"] as const
 export type PickupKind = (typeof pickupKinds)[number]
 export const Pickup = Descriptor.Component<{ kind: PickupKind; life: number }>()("BugKiller/Pickup")
 
@@ -248,6 +251,7 @@ export type FxValue =
   | { type: "revived"; x: number; y: number; slot: number; name: string }
   | { type: "turret"; x: number; y: number }
   | { type: "hallucination"; x: number; y: number }
+  | { type: "explosion"; x: number; y: number; radius: number }
   /** One puff of Flame war: from `x, y` along `angle`, as far and as wide as the cone it burns. */
   | { type: "flame"; x: number; y: number; angle: number; range: number; spread: number }
 export const Fx = Descriptor.Event<FxValue>()("BugKiller/Fx")
@@ -279,7 +283,7 @@ export const Presentation = Descriptor.Service<{
 
 export const Game = Schema.bind(
   Schema.fragment({
-    components: { Position, Velocity, Body, Player, Bug, Boss, Shot, HostileShot, Pickup, Turret },
+    components: { Position, Velocity, Body, Player, Bug, Boss, Shot, HostileShot, Pickup, Turret, Rocket },
     requires: [
       Schema.requires(Player, Position, Velocity, Body),
       Schema.requires(Bug, Position, Velocity, Body),
@@ -287,7 +291,8 @@ export const Game = Schema.bind(
       Schema.requires(Shot, Position, Velocity, Body),
       Schema.requires(HostileShot, Position, Velocity, Body),
       Schema.requires(Pickup, Position, Body),
-      Schema.requires(Turret, Position, Body)
+      Schema.requires(Turret, Position, Body),
+      Schema.requires(Rocket, Position, Velocity, Body)
     ],
     resources: { Input, Party, LevelSpec, Language, Tiers, Rng, Run, Missions, Interruptions, Calls },
     events: { Fx, Chat, BugFixed, PlayerHurt, BombBlast, FlameBurst }

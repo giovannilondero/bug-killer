@@ -2,8 +2,8 @@ import { bugKinds, traitOf } from "../content/bugs.ts"
 import type { Priority } from "../content/bugs.ts"
 import type { Boss as BossContent } from "../content/levels.ts"
 import type { ClientId } from "../content/clients.ts"
-import { HOSTILE_SHOT, PLAYER, RESURRECT, SHOT, TURRET } from "./constants.ts"
-import { Body, Boss, Bug, Game, HostileShot, Pickup, Player, Position, Shot, Turret, Velocity } from "./schema.ts"
+import { HOSTILE_SHOT, PLAYER, RESURRECT, ROCKET, SHOT, TURRET } from "./constants.ts"
+import { Body, Boss, Bug, Game, HostileShot, Pickup, Player, Position, Rocket, Shot, Turret, Velocity } from "./schema.ts"
 import type { PickupKind, TeammateValue, Vec } from "./schema.ts"
 import { basicGun } from "./weapons.ts"
 import { Ops } from "@typeonce/ritmo-math"
@@ -27,7 +27,7 @@ export const makePlayer = (at: Vec, teammate: TeammateValue) =>
       aim: { x: at.x + 100, y: at.y },
       bombs: PLAYER.bombs,
       weapon: basicGun,
-      buffs: { hotfix: 0, refactor: 0, coffee: 0, unitTest: 0, revert: 0, pizza: 0, tools: 0, ai: 0, pairProgramming: 0, codeFreeze: 0, memoryLeak: 0, flameWar: 0 },
+      buffs: { hotfix: 0, refactor: 0, coffee: 0, unitTest: 0, revert: 0, pizza: 0, tools: 0, ai: 0, pairProgramming: 0, codeFreeze: 0, memoryLeak: 0, pushForce: 0, flameWar: 0 },
       revive: 0,
       points: 0,
       fixed: 0
@@ -106,6 +106,19 @@ export const makeShot = (at: Vec, direction: Vec, pierce: number, homing: boolea
     Game.Command.entry(Body, { radius: SHOT.radius }),
     Game.Command.entry(Shot, { damage: SHOT.damage, life: homing ? SHOT.life * 1.4 : SHOT.life, pierce, homing, owner })
   )
+
+/** A rocket from `at` toward `target`, where it explodes if nothing is in the way. */
+export const makeRocket = (at: Vec, target: Vec, owner: number) => {
+  const dx = target.x - at.x
+  const dy = target.y - at.y
+  const distance = Math.sqrt(dx * dx + dy * dy) || 1
+  return Game.Command.spawn(
+    Game.Command.entry(Position, at),
+    Game.Command.entry(Velocity, { x: (dx / distance) * ROCKET.speed, y: (dy / distance) * ROCKET.speed }),
+    Game.Command.entry(Body, { radius: ROCKET.radius }),
+    Game.Command.entry(Rocket, { target, owner })
+  )
+}
 
 export const makeHostileShot = (at: Vec, angle: number, speed: number, text: string) =>
   Game.Command.spawn(

@@ -22,6 +22,7 @@ export const pickupIcons = {
   pairProgramming: "👥",
   codeFreeze: "❄️",
   memoryLeak: "🧪",
+  pushForce: "🚀",
   flameWar: "🤬"
 } as const satisfies Record<PickupKind, string>
 
@@ -251,6 +252,43 @@ export const paintPing = (ctx: CanvasRenderingContext2D, text: string, color: st
   ctx.font = `bold 12px ${SANS}`
   ctx.fillStyle = "#e8ecf4"
   ctx.fillText(text, left + 30, 4)
+}
+
+/** The `git push --force` rocket, nose on the origin pointing right, its flame and smoke trailing to the left (to x = -60). */
+export const paintRocket = (ctx: CanvasRenderingContext2D) => {
+  // Smoke first, fading out behind.
+  for (let i = 0; i < 5; i++) {
+    ctx.globalAlpha = 0.32 - i * 0.06
+    ctx.fillStyle = "#9aa4b8"
+    ctx.beginPath(); ctx.arc(-24 - i * 8, 0, 4 + i * 1.4, 0, Math.PI * 2); ctx.fill()
+  }
+  ctx.globalAlpha = 1
+  ctx.shadowColor = "#ff9440"
+  ctx.shadowBlur = 14
+  ctx.fillStyle = "#ffd84a"
+  ctx.beginPath(); ctx.moveTo(-14, -4); ctx.lineTo(-26, 0); ctx.lineTo(-14, 4); ctx.closePath(); ctx.fill()
+  ctx.fillStyle = "#ff9440"
+  ctx.beginPath(); ctx.moveTo(-14, -2.5); ctx.lineTo(-20, 0); ctx.lineTo(-14, 2.5); ctx.closePath(); ctx.fill()
+  ctx.shadowBlur = 0
+  // Fins, body, nose.
+  ctx.fillStyle = "#ff4d6d"
+  ctx.beginPath(); ctx.moveTo(-14, -9); ctx.lineTo(-6, -4); ctx.lineTo(-6, 4); ctx.lineTo(-14, 9); ctx.closePath(); ctx.fill()
+  ctx.fillStyle = "#e8ecf4"
+  roundRect(ctx, -15, -4.5, 13, 9, 3)
+  ctx.fill()
+  ctx.fillStyle = "#ff4d6d"
+  ctx.beginPath(); ctx.moveTo(-3, -4.5); ctx.lineTo(4, 0); ctx.lineTo(-3, 4.5); ctx.closePath(); ctx.fill()
+}
+
+/** Where a rocket will go off if nothing gets in the way, centred on the origin: the blast's reach and a cross. */
+export const paintRocketTarget = (ctx: CanvasRenderingContext2D, radius: number) => {
+  ctx.strokeStyle = "rgba(255,148,64,0.35)"
+  ctx.lineWidth = 2
+  ctx.setLineDash([10, 8])
+  ctx.beginPath(); ctx.arc(0, 0, radius, 0, Math.PI * 2); ctx.stroke()
+  ctx.setLineDash([])
+  ctx.strokeStyle = "rgba(255,148,64,0.8)"
+  ctx.beginPath(); ctx.moveTo(-7, -7); ctx.lineTo(7, 7); ctx.moveTo(7, -7); ctx.lineTo(-7, 7); ctx.stroke()
 }
 
 /** A boss's text projectile centred on the origin: an emoji, or a red pill around the words. */

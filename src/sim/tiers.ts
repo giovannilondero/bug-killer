@@ -33,6 +33,7 @@ export const contentTiers = {
   pairProgramming: 1,
   codeFreeze: 2,
   memoryLeak: 3,
+  pushForce: 4,
   flameWar: 5
 } as const satisfies Record<Unlockable, Tier>
 

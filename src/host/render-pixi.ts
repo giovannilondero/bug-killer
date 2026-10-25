@@ -9,13 +9,13 @@ import type { Arena } from "../content/arenas.ts"
 import { bugKinds } from "../content/bugs.ts"
 import { clients } from "../content/clients.ts"
 import { comboMultiplier } from "../sim/systems/combat.ts"
-import { BUFF_SECONDS, PARTY, PLAYER, TURRET } from "../sim/constants.ts"
+import { BUFF_SECONDS, PARTY, PLAYER, ROCKET, TURRET } from "../sim/constants.ts"
 import { hasStatus } from "../sim/statuses.ts"
 import { WEAPONS } from "../sim/weapons.ts"
 import type { FxValue, PickupKind, Vec } from "../sim/schema.ts"
 import type { View } from "../sim/simulation.ts"
 import { formatNumber, locale, t } from "./language.ts"
-import { floorKey, MONO, paintBug, paintFloor, paintHeart, paintHostile, paintLabel, paintPickup, paintPing, paintPlayer, paintTooltip, pickupIcons, pickupInfo, SANS, shade, tooltipHeight, TOOLTIP_WIDTH, truncate } from "./paint.ts"
+import { floorKey, MONO, paintBug, paintFloor, paintHeart, paintHostile, paintLabel, paintPickup, paintPing, paintPlayer, paintRocket, paintRocketTarget, paintTooltip, pickupIcons, pickupInfo, SANS, shade, tooltipHeight, TOOLTIP_WIDTH, truncate } from "./paint.ts"
 import type { BugLook, TooltipBug } from "./paint.ts"
 import type { Camera, Renderer } from "./render.ts"
 import { touchMode } from "./touch.ts"
@@ -260,6 +260,13 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
     }
   }
 
+  /** A wisp of smoke left behind a rocket each frame. */
+  const puff = (at: Vec, velocity: Vec) => {
+    const len = Math.hypot(velocity.x, velocity.y) || 1
+    const life = 0.35 + Math.random() * 0.25
+    particles.push({ x: at.x - (velocity.x / len) * 26, y: at.y - (velocity.y / len) * 26, vx: (Math.random() - 0.5) * 30, vy: (Math.random() - 0.5) * 30, life, max: life, color: "#9aa4b8", size: 4 })
+  }
+
   const fx = (event: FxValue) => {
     switch (event.type) {
       case "kill":
@@ -353,6 +360,13 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
           const color = ["#fff3a0", "#ffd84a", "#ff9440", "#ff4d2d"][Math.floor(Math.random() * 4)]!
           particles.push({ x: event.x, y: event.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life, max: life, color, size: 5 + Math.random() * 5 })
         }
+        break
+      case "explosion":
+        shake = Math.max(shake, 12)
+        flash = Math.max(flash, 0.25)
+        burst(event.x, event.y, "#ff9440", 40, event.radius * 3, 5)
+        burst(event.x, event.y, "#ffd84a", 24, event.radius * 2, 4)
+        burst(event.x, event.y, "#ffffff", 10, event.radius, 3)
         break
       case "shoot":
         break
@@ -724,6 +738,15 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
         g.lineWidth = 5
         g.beginPath(); g.moveTo(-16, 0); g.lineTo(0, 0); g.stroke()
       }), x, y, { rotation: Math.atan2(shot.velocity.y, shot.velocity.x) })
+    }
+
+    // Rockets: where each will go off, then the rocket with its smoke.
+    for (const rocket of view.rockets) {
+      W.sprite(bakery.bake("rocketTarget", wres, around(ROCKET.blastRadius + 2), (g) => paintRocketTarget(g, ROCKET.blastRadius)), rocket.target.x, rocket.target.y)
+      W.sprite(bakery.bake("rocket", wres, { left: -64, top: -14, right: 10, bottom: 14 }, (g) => paintRocket(g)), rocket.position.x, rocket.position.y, {
+        rotation: Math.atan2(rocket.velocity.y, rocket.velocity.x)
+      })
+      puff(rocket.position, rocket.velocity)
     }
 
     for (const shot of view.hostile) {

@@ -1,4 +1,4 @@
-import { PLAYER } from "./constants.ts"
+import { PLAYER, ROCKET } from "./constants.ts"
 import type { PickupKind, Vec } from "./schema.ts"
 import { Ops } from "@typeonce/ritmo-math"
 
@@ -7,7 +7,7 @@ import { Ops } from "@typeonce/ritmo-math"
  * picking one up replaces whatever weapon is in hand, and when its seconds
  * run out the basic gun comes back.
  */
-export const weaponPickups = ["pairProgramming", "flameWar"] as const satisfies ReadonlyArray<PickupKind>
+export const weaponPickups = ["pairProgramming", "pushForce", "flameWar"] as const satisfies ReadonlyArray<PickupKind>
 export type WeaponPickup = (typeof weaponPickups)[number]
 
 /** What a developer is holding: the basic gun, which never runs out, or a picked-up weapon. */
@@ -32,6 +32,7 @@ export interface WeaponSpec {
 export const WEAPONS = {
   gun: { seconds: 0, cooldown: PLAYER.fireCooldown, upgradable: true },
   pairProgramming: { seconds: 12, cooldown: PLAYER.fireCooldown, upgradable: true },
+  pushForce: { seconds: 12, cooldown: ROCKET.cooldown, upgradable: false },
   flameWar: { seconds: 10, cooldown: 0.1, upgradable: false }
 } as const satisfies Record<WeaponKind, WeaponSpec>
 

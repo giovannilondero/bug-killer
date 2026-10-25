@@ -5,7 +5,7 @@ import type { Arena } from "../../content/arenas.ts"
 import { DT, HOMING } from "../constants.ts"
 import { centreOf, clampToArena, nearest, normalize } from "../math.ts"
 import { BossRead, BugRead, BugWrite, HostileShotWrite, Moving, PickupWrite, PlayerRead, ShotWrite, standing } from "../queries.ts"
-import { Body, Game, HostileShot, LevelSpec, Pickup, Position, Rng, Run, Shot, Velocity } from "../schema.ts"
+import { Body, Game, HostileShot, LevelSpec, Pickup, Position, Rng, Rocket, Run, Shot, Velocity } from "../schema.ts"
 import { speedFactor } from "../statuses.ts"
 import { Ops } from "@typeonce/ritmo-math"
 
@@ -81,7 +81,7 @@ export const IntegrateSystem = Game.System(
       moving: Moving,
       contained: Game.Query({
         selection: { position: Game.Query.write(Position), body: Game.Query.read(Body) },
-        without: [Shot, HostileShot, Pickup]
+        without: [Shot, HostileShot, Pickup, Rocket]
       })
     },
     resources: { level: Game.System.readResource(LevelSpec) }
