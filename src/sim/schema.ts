@@ -241,7 +241,8 @@ export const Calls = Descriptor.Resource<CallsValue>()("BugKiller/Calls")
 
 export type FxValue =
   | { type: "kill"; x: number; y: number; color: string; key: string; summary: string; points: number; boss: boolean }
-  | { type: "hit"; x: number; y: number; color: string }
+  /** `quiet`: flash it, but no hit sound (a weapon whose own sound covers its hits, like Flame war). */
+  | { type: "hit"; x: number; y: number; color: string; quiet?: boolean }
   | { type: "shoot"; x: number; y: number; weapon: WeaponKind }
   | { type: "hurt"; x: number; y: number }
   | { type: "pickup"; x: number; y: number; kind: PickupKind }

@@ -107,7 +107,7 @@ const playFx = (event: FxValue) => {
   renderer.fx(event)
   switch (event.type) {
     case "shoot": audio.shoot(event.weapon); break
-    case "hit": audio.hit(); break
+    case "hit": if (!event.quiet) audio.hit(); break
     case "kill":
       if (event.boss) audio.bossDown()
       else audio.kill(view?.run.combo ?? 0)

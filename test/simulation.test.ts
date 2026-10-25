@@ -938,6 +938,14 @@ test("This is fine: a burning bug takes damage over time and sets the bugs it to
   assert.ok(find("BURNING") === undefined || find("BURNING")!.statuses.length === 0, "after about 3 s the fire is out")
 })
 
+test("Flame war flashes the bugs it burns without a hit sound per puff: the burner sound covers it", () => {
+  const { fx, spray } = flameScene([{ key: "IN-NEAR", dx: 80, dy: 0 }])
+  spray(30)
+  const hits = fx.flatMap((e) => (e.type === "hit" ? [e] : []))
+  assert.ok(hits.length > 0, "the bug still flashes")
+  assert.ok(hits.every((e) => e.quiet === true), "but none of the flashes plays the hit sound")
+})
+
 test("Flame war arrives with sprint 6 and not before", () => {
   assert.equal(contentTiers.flameWar, 5)
   for (const level of levels) assert.ok(level.tier >= 5 || !isUnlocked("flameWar", level.tier), `not in ${level.id}`)

@@ -51,13 +51,19 @@ const dropWeights = { hotfix: 3, refactor: 3, coffee: 2, unitTest: 2, revert: 1,
 
 /**
  * How a hit lands: the statuses it applies (Code freeze from the hitter's
- * buffs, or whatever the weapon itself carries), and whether it is a status
- * ticking, which flashes nothing and applies nothing new.
+ * buffs, or whatever the weapon itself carries), whether it is a status
+ * ticking, which flashes nothing and applies nothing new, and whether it
+ * flashes without the hit sound.
  */
 interface Hit {
   readonly inflict?: ReadonlyArray<StatusKind>
   readonly overTime?: boolean
+  readonly quiet?: boolean
 }
+
+/** The hit fx for `hit`: none for a status ticking, silent for a quiet one. */
+const hitFx = (at: Vec, color: string, hit: Hit) =>
+  hit.quiet ? { type: "hit" as const, x: at.x, y: at.y, color, quiet: true } : { type: "hit" as const, x: at.x, y: at.y, color }
 
 const inflictAll = (statuses: ReadonlyArray<StatusValue>, hit: Hit, by: number): Array<StatusValue> =>
   (hit.inflict ?? []).reduce<Array<StatusValue>>((next, kind) => applyStatus(next, kind, by), [...statuses])
@@ -191,7 +197,7 @@ export const CombatSystem = Game.System(
       const hp = bug.hp - dealt
       const next: BugValue = { ...bug, hp, hitFlash: hit.overTime ? bug.hitFlash : 0.1, statuses: inflictAll(bug.statuses, hit, by) }
       match.data.bug.set(next)
-      if (!hit.overTime) events.fx.emit({ type: "hit", x: at.x, y: at.y, color: bugKinds[bug.priority].color })
+      if (!hit.overTime) events.fx.emit(hitFx(at, bugKinds[bug.priority].color, hit))
       if (hp <= 0) {
         fixBug(match, next, at, by)
       }
@@ -201,12 +207,12 @@ export const CombatSystem = Game.System(
       const boss = match.data.boss.get()
       const at = match.data.position.get()
       if (boss.shield > 0) {
-        if (!hit.overTime) events.fx.emit({ type: "hit", x: at.x, y: at.y, color: "#ffffff" })
+        if (!hit.overTime) events.fx.emit(hitFx(at, "#ffffff", hit))
         return
       }
       const hp = boss.hp - damage
       run.lastProgressAt = run.time
-      if (!hit.overTime) events.fx.emit({ type: "hit", x: at.x, y: at.y, color: boss.color })
+      if (!hit.overTime) events.fx.emit(hitFx(at, boss.color, hit))
       if (hp > 0) {
         match.data.boss.set({ ...boss, hp, hitFlash: hit.overTime ? boss.hitFlash : 0.08, statuses: inflictAll(boss.statuses, hit, by) })
         return
@@ -301,7 +307,8 @@ export const CombatSystem = Game.System(
 
     // Flame war: every bug and boss inside the cone gets a little damage and catches fire.
     for (const flame of events.flames.all()) {
-      const hit: Hit = { inflict: [...(hitBy(flame.owner).inflict ?? []), "burn"] }
+      // The burner's own sound covers every puff: the bugs flash without a hit sound each.
+      const hit: Hit = { inflict: [...(hitBy(flame.owner).inflict ?? []), "burn"], quiet: true }
       for (const match of bugs) {
         if (!gone.has(match.entity.id) && inCone(flame, match.data.position.get())) damageBug(match, FLAME.damage, flame.owner, hit)
       }
