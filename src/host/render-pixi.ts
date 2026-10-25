@@ -10,6 +10,7 @@ import { bugKinds } from "../content/bugs.ts"
 import { clients } from "../content/clients.ts"
 import { comboMultiplier } from "../sim/systems/combat.ts"
 import { BUFF_SECONDS, PARTY, PLAYER, TURRET } from "../sim/constants.ts"
+import { hasStatus } from "../sim/statuses.ts"
 import type { FxValue, PickupKind, Vec } from "../sim/schema.ts"
 import type { View } from "../sim/simulation.ts"
 import { formatNumber, locale, t } from "./language.ts"
@@ -373,10 +374,11 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
   const bugFrame = (r: number, color: string, age: number, options: BugLook) => {
     const period = TAU / 6
     const frames = options.boss ? 12 : 24
-    const k = Math.floor((((age % period) + period) % period) / period * frames) % frames
+    // A frozen bug holds still: one frame will do.
+    const k = options.frozen ? 0 : Math.floor((((age % period) + period) % period) / period * frames) % frames
     const blur = options.boss ? 30 : 12
     const half = Math.max(r * 1.45 + 4, r + blur * 1.6)
-    const look = `${options.flash > 0 ? "f" : ""}${options.reopened ? "r" : ""}${options.trait === "armored" ? "a" : ""}${options.boss ? "b" : ""}`
+    const look = `${options.flash > 0 ? "f" : ""}${options.reopened ? "r" : ""}${options.trait === "armored" ? "a" : ""}${options.boss ? "b" : ""}${options.frozen ? "i" : ""}`
     return bakery.bake(`bug|${color}|${r}|${look}|${k}`, wres, around(half), (g) => paintBug(g, r, color, (k * period) / frames, options))
   }
 
@@ -519,7 +521,7 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
     if (boss.pattern === "crash" && Math.sin(time * 30) > 0.7) {
       drawBug(x + Math.random() * 10 - 5, y, boss.radius, boss.radius, "#ff00ff", heading, boss.age, { flash: 0, trait: "plain", reopened: false, boss: true }, 0.4)
     }
-    drawBug(x, y, boss.radius, boss.radius, boss.color, heading, boss.age, { flash: boss.hitFlash, trait: "plain", reopened: true, boss: true }, 1)
+    drawBug(x, y, boss.radius, boss.radius, boss.color, heading, boss.age, { flash: boss.hitFlash, trait: "plain", reopened: true, boss: true, frozen: hasStatus(boss.statuses, "freeze") }, 1)
     if (boss.shield > 0) {
       const r = boss.radius * 1.35
       W.sprite(bakery.bake(`shield|${r}`, wres, around(r + 34), (g) => {
@@ -667,7 +669,7 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
         }), x, y, { rotation: -time * 3, alpha: appear })
       }
       const color = bug.resurrectedBy ? "#9dff6b" : bugKinds[bug.priority].color
-      drawBug(x, y, bug.radius * (0.4 + appear * 0.6), bug.radius, color, heading, bug.age, { flash: bug.hitFlash, trait: bug.trait, reopened: bug.reopened || bug.resurrectedBy !== null }, appear)
+      drawBug(x, y, bug.radius * (0.4 + appear * 0.6), bug.radius, color, heading, bug.age, { flash: bug.hitFlash, trait: bug.trait, reopened: bug.reopened || bug.resurrectedBy !== null, frozen: hasStatus(bug.statuses, "freeze") }, appear)
       const isTarget = mission?.kind === "killTarget" && mission.target === bug.key
       if (isTarget) {
         const pulse = bug.radius * 1.6 + Math.sin(time * 8) * 4
@@ -896,7 +898,7 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
       text(S, res, "GIT RESET --HARD  [Q]", `11px ${MONO}`, "#9aa4b8", 20, 100, "left")
       for (let i = 0; i < player.bombs; i++) text(S, res, "⏪", `16px ${SANS}`, "#9aa4b8", 20 + i * 24, 122, "left")
       let row = 0
-      for (const kind of ["tools", "hotfix", "refactor", "coffee", "unitTest"] as const) {
+      for (const kind of ["tools", "hotfix", "refactor", "coffee", "unitTest", "codeFreeze"] as const) {
         const left = player.buffs[kind]
         if (left <= 0) continue
         const y = 142 + row * 22

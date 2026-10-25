@@ -4,6 +4,7 @@ import { bugKinds } from "../content/bugs.ts"
 import { clients } from "../content/clients.ts"
 import { comboMultiplier } from "../sim/systems/combat.ts"
 import { BUFF_SECONDS, PARTY, PLAYER, TURRET } from "../sim/constants.ts"
+import { hasStatus } from "../sim/statuses.ts"
 import type { FxValue, Vec } from "../sim/schema.ts"
 import type { View } from "../sim/simulation.ts"
 import { formatNumber, t } from "./language.ts"
@@ -325,7 +326,7 @@ export const makeRenderer = (canvas: HTMLCanvasElement) => {
       drawBug(x, y, boss.radius, "#ff00ff", heading, boss.age, { flash: 0, trait: "plain", reopened: false, boss: true })
       ctx.restore()
     }
-    drawBug(x, y, boss.radius, boss.color, heading, boss.age, { flash: boss.hitFlash, trait: "plain", reopened: true, boss: true })
+    drawBug(x, y, boss.radius, boss.color, heading, boss.age, { flash: boss.hitFlash, trait: "plain", reopened: true, boss: true, frozen: hasStatus(boss.statuses, "freeze") })
     if (boss.shield > 0) {
       ctx.strokeStyle = "rgba(255,255,255,0.8)"
       ctx.lineWidth = 4
@@ -481,7 +482,7 @@ export const makeRenderer = (canvas: HTMLCanvasElement) => {
         ctx.beginPath(); ctx.arc(x, y, bug.radius * 1.45, -time * 3, -time * 3 + Math.PI * 2); ctx.stroke()
         ctx.setLineDash([])
       }
-      drawBug(x, y, bug.radius * (0.4 + appear * 0.6), bug.resurrectedBy ? "#9dff6b" : bugKinds[bug.priority].color, heading, bug.age, { flash: bug.hitFlash, trait: bug.trait, reopened: bug.reopened || bug.resurrectedBy !== null })
+      drawBug(x, y, bug.radius * (0.4 + appear * 0.6), bug.resurrectedBy ? "#9dff6b" : bugKinds[bug.priority].color, heading, bug.age, { flash: bug.hitFlash, trait: bug.trait, reopened: bug.reopened || bug.resurrectedBy !== null, frozen: hasStatus(bug.statuses, "freeze") })
       ctx.globalAlpha = 1
       const isTarget = mission?.kind === "killTarget" && mission.target === bug.key
       if (isTarget) {
@@ -725,7 +726,7 @@ export const makeRenderer = (canvas: HTMLCanvasElement) => {
         ctx.fillText("⏪", 20 + i * 24, 122)
       }
       let row = 0
-      for (const kind of ["tools", "hotfix", "refactor", "coffee", "unitTest"] as const) {
+      for (const kind of ["tools", "hotfix", "refactor", "coffee", "unitTest", "codeFreeze"] as const) {
         const left = player.buffs[kind]
         if (left <= 0) continue
         const y = 142 + row * 22
