@@ -28,13 +28,13 @@ const inAnyWall = (arena: Arena, p: Vec, radius: number) => (arena.walls ?? []).
 /**
  * One developer at the normal arena's starting spot (900, 750) and a single
  * wall: `x` from 1100 to 1140, `y` from 400 to 1100, between the developer
- * and anything placed to the east. No bugs come in from the backlog.
+ * and anything placed to the east. No bug comes in but those a test places.
  */
 const wallAt = (x = 1100): Wall => ({ x, y: 400, width: 40, height: 700 })
 
 const scene = (wall: Wall = wallAt()) => {
-  // A bottomless draw from an empty backlog: waves come, but nothing is in them, and the boss never does.
-  const level: Level = { ...levels[0]!, arena: { ...arenas.normal, walls: [wall] }, bonus: { after: 0, tickets: 9999 }, bugs: [] }
+  // Waves of no bugs, so the backlog never empties and the boss never comes; and no client asks for anything, so no escalation either.
+  const level: Level = { ...levels[0]!, arena: { ...arenas.normal, walls: [wall] }, waveSize: 0, clientEvery: 9999 }
   const fx: Array<FxValue> = []
   let input: InputValue = { ...idleInput }
   const made = createSimulation({ level, seed: 2, locale: "en", input: { snapshot: () => input }, presentation: { fx: (e) => fx.push(e), chat: () => undefined } })
