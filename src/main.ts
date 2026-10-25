@@ -58,7 +58,7 @@ const input = makeInput(canvas, renderer, touch, {
 })
 let progress = readProgress()
 
-/** The four sprints, then endless: menu buttons and restarts index into this. */
+/** The sprints, then endless: menu buttons and restarts index into this. */
 const playable = [...levels, endlessLevel]
 
 let sim: Simulation | null = null

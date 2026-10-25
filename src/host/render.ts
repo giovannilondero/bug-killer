@@ -2,6 +2,7 @@ import { arenaOf } from "../content/arenas.ts"
 import type { Arena } from "../content/arenas.ts"
 import { bugKinds } from "../content/bugs.ts"
 import { clients } from "../content/clients.ts"
+import type { BossPattern } from "../content/levels.ts"
 import { comboMultiplier } from "../sim/systems/combat.ts"
 import { BREAKPOINT, BUFF_SECONDS, DEPLOY, PARTY, PLAYER, ROCKET, TURRET } from "../sim/constants.ts"
 import { isUnlocked } from "../sim/tiers.ts"
@@ -10,9 +11,11 @@ import { WEAPONS } from "../sim/weapons.ts"
 import type { FxValue, Vec } from "../sim/schema.ts"
 import type { View } from "../sim/simulation.ts"
 import { formatNumber, t } from "./language.ts"
-import { floorKey, fuseBlink, fuseProgress, MONO, paintBreakpoint, paintBug, paintFloor, paintFuseRing, paintHeart, paintHostile, paintLabel, paintNest, paintPickup, paintPing, paintPlayer, paintRocket, paintRocketTarget, paintTooltip, pickupIcons, pickupInfo, roundRect, SANS, shade, tooltipHeight, TOOLTIP_WIDTH, truncate } from "./paint.ts"
+import { bossHealth, conflictMarkerColors, conflictMarkers, floorKey, fuseBlink, fuseProgress, MONO, paintBreakpoint, paintBug, paintFloor, paintFuseRing, paintHeart, paintHostile, paintLabel, paintNest, paintPickup, paintPing, paintPlayer, paintRocket, paintRocketTarget, paintTooltip, pickupIcons, pickupInfo, roundRect, SANS, shade, tooltipHeight, TOOLTIP_WIDTH, truncate } from "./paint.ts"
 import type { BugLook } from "./paint.ts"
 import { touchMode } from "./touch.ts"
+
+type ViewBoss = View["bosses"][number]
 
 interface Particle {
   x: number
@@ -387,16 +390,64 @@ export const makeRenderer = (canvas: HTMLCanvasElement) => {
     ctx.globalAlpha = 1
   }
 
-  const drawBoss = (boss: View["bosses"][number]) => {
+  /** What each boss pattern adds to the plain boss: drawn under it, or over it. */
+  const bossMarks: Record<BossPattern, { readonly under?: (boss: ViewBoss, heading: number) => void; readonly over?: (boss: ViewBoss) => void }> = {
+    dispenser: {},
+    crash: {
+      // Glitches now and then, a ghost of the restart.
+      under: (boss, heading) => {
+        if (Math.sin(time * 30) <= 0.7) return
+        ctx.save()
+        ctx.globalAlpha = 0.4
+        ctx.translate(Math.random() * 10 - 5, 0)
+        drawBug(boss.position.x, boss.position.y, boss.radius, "#ff00ff", heading, boss.age, { flash: 0, trait: "plain", reopened: false, boss: true })
+        ctx.restore()
+      }
+    },
+    twoFactor: {
+      over: (boss) => {
+        if (boss.phase !== 2) return
+        ctx.font = `bold 13px ${MONO}`
+        ctx.fillStyle = "#c79bff"
+        ctx.textAlign = "center"
+        ctx.fillText(t().hud.factor, boss.position.x, boss.position.y + boss.radius * 1.6)
+      }
+    },
+    undefined: {
+      over: (boss) => {
+        ctx.font = `bold 13px ${MONO}`
+        ctx.fillStyle = "rgba(255,122,89,0.8)"
+        ctx.textAlign = "center"
+        for (let i = 0; i < 6; i++) {
+          const a = (i / 6) * Math.PI * 2 + time * 0.8
+          ctx.fillText(i % 2 ? "null" : "undefined", boss.position.x + Math.cos(a) * boss.radius * 1.6, boss.position.y + Math.sin(a) * boss.radius * 1.6)
+        }
+      }
+    },
+    mergeConflict: {
+      over: (boss) => {
+        ctx.font = `bold 13px ${MONO}`
+        ctx.textAlign = "center"
+        if (boss.side) {
+          ctx.fillStyle = boss.color
+          ctx.fillText(t().hud.sides[boss.side], boss.position.x, boss.position.y + boss.radius * 1.6)
+          return
+        }
+        // Whole, the conflict markers circle it.
+        for (const [i, marker] of conflictMarkers.entries()) {
+          const a = (i / conflictMarkers.length) * Math.PI * 2 - time * 0.6
+          ctx.fillStyle = conflictMarkerColors[i]!
+          ctx.fillText(marker, boss.position.x + Math.cos(a) * boss.radius * 1.6, boss.position.y + Math.sin(a) * boss.radius * 1.6)
+        }
+      }
+    }
+  }
+
+  const drawBoss = (boss: ViewBoss) => {
     const { x, y } = boss.position
     const heading = Math.atan2(boss.position.y - (boss.position.y - 1), 0) + Math.sin(boss.age) * 0.2 + Math.PI / 2
-    if (boss.pattern === "crash" && Math.sin(time * 30) > 0.7) {
-      ctx.save()
-      ctx.globalAlpha = 0.4
-      ctx.translate(Math.random() * 10 - 5, 0)
-      drawBug(x, y, boss.radius, "#ff00ff", heading, boss.age, { flash: 0, trait: "plain", reopened: false, boss: true })
-      ctx.restore()
-    }
+    const marks = bossMarks[boss.pattern]
+    marks.under?.(boss, heading)
     drawBug(x, y, boss.radius, boss.color, heading, boss.age, { flash: boss.hitFlash, trait: "plain", reopened: true, boss: true, frozen: hasStatus(boss.statuses, "freeze"), poisoned: hasStatus(boss.statuses, "poison"), burning: hasStatus(boss.statuses, "burn") })
     if (boss.shield > 0) {
       ctx.strokeStyle = "rgba(255,255,255,0.8)"
@@ -410,21 +461,7 @@ export const makeRenderer = (canvas: HTMLCanvasElement) => {
       ctx.textAlign = "center"
       ctx.fillText(boss.pattern === "twoFactor" ? "🔐 OTP ******" : t().hud.booting, x, y - boss.radius * 1.5)
     }
-    if (boss.pattern === "undefined") {
-      ctx.font = `bold 13px ${MONO}`
-      ctx.fillStyle = "rgba(255,122,89,0.8)"
-      ctx.textAlign = "center"
-      for (let i = 0; i < 6; i++) {
-        const a = (i / 6) * Math.PI * 2 + time * 0.8
-        ctx.fillText(i % 2 ? "null" : "undefined", x + Math.cos(a) * boss.radius * 1.6, y + Math.sin(a) * boss.radius * 1.6)
-      }
-    }
-    if (boss.pattern === "twoFactor" && boss.phase === 2) {
-      ctx.font = `bold 13px ${MONO}`
-      ctx.fillStyle = "#c79bff"
-      ctx.textAlign = "center"
-      ctx.fillText(t().hud.factor, x, y + boss.radius * 1.6)
-    }
+    marks.over?.(boss)
     ctx.font = `bold 14px ${MONO}`
     ctx.fillStyle = "#ffffff"
     ctx.textAlign = "center"
@@ -890,6 +927,7 @@ export const makeRenderer = (canvas: HTMLCanvasElement) => {
     ctx.textAlign = "center"
     const boss = view.bosses[0]
     if (boss) {
+      const health = bossHealth(view.bosses, boss.key)
       const w = Math.min(560, width - 420)
       const x = width / 2 - w / 2
       ctx.font = `bold 13px ${MONO}`
@@ -900,8 +938,8 @@ export const makeRenderer = (canvas: HTMLCanvasElement) => {
       ctx.fillText(truncate(boss.title, 80), width / 2, 42)
       ctx.fillStyle = "rgba(255,255,255,0.12)"
       roundRect(ctx, x, 52, w, 12, 6); ctx.fill()
-      ctx.fillStyle = boss.shield > 0 ? "#ffffff" : boss.color
-      roundRect(ctx, x, 52, Math.max(0, w * (boss.hp / boss.maxHp)), 12, 6); ctx.fill()
+      ctx.fillStyle = health.shielded ? "#ffffff" : boss.color
+      roundRect(ctx, x, 52, Math.max(0, w * health.left), 12, 6); ctx.fill()
     } else if (run.phase === "waves" && view.level.endless) {
       // Endless: no backlog to empty, only the next boss getting closer.
       const every = view.level.endless.every

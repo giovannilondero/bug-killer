@@ -4,7 +4,8 @@ import { arenaOf } from "../../content/arenas.ts"
 import { STORY_SUBTASKS, bugKinds, subtaskKey, ticketScales } from "../../content/bugs.ts"
 import { text } from "../../content/i18n.ts"
 import { BOMB_RADIUS, BREAKPOINT, BUFF_SECONDS, COMBO_WINDOW, DEPLOY, DT, PLAYER, ROCKET } from "../constants.ts"
-import { makeBug, makePickup, makeTurret } from "../drafts.ts"
+import { bossRules } from "../bosses.ts"
+import { makeBug, makePickup, makeTurret, spawnBoss } from "../drafts.ts"
 import { clampToArena, distanceSquared, nearest, overlaps } from "../math.ts"
 import { BossWrite, BugWrite, HostileShotWrite, PickupWrite, PlayerWrite, ShotWrite } from "../queries.ts"
 import {
@@ -103,7 +104,7 @@ export const CombatSystem = Game.System(
       hurt: Game.System.writeEvent(PlayerHurt)
     },
     commands: Game.System.commands(
-      Game.System.spawns(Bug, Pickup, Turret),
+      Game.System.spawns(Bug, Boss, Pickup, Turret),
       Game.System.despawns(Bug, Boss, Shot, HostileShot, Pickup, Rocket, Breakpoint)
     )
   },
@@ -251,19 +252,32 @@ export const CombatSystem = Game.System(
       const hp = boss.hp - damage
       run.lastProgressAt = run.time
       if (!hit.overTime) events.fx.emit(hitFx(at, boss.color, hit))
-      if (hp > 0) {
-        match.data.boss.set({ ...boss, hp, hitFlash: hit.overTime ? boss.hitFlash : 0.08, statuses: inflictAll(boss.statuses, hit, by) })
+      // Some bosses change shape instead of taking the hit: a second phase, or a split.
+      const turn = bossRules[boss.pattern].turn(boss, hp, match.data.body.get().radius)
+      if (turn) {
+        gone.add(match.entity.id)
+        commands.despawn(match.entity)
+        for (const shape of turn.into) {
+          commands.spawn(spawnBoss(shape.boss, clampToArena({ x: at.x + shape.offset.x, y: at.y + shape.offset.y }, shape.radius, arena), shape.radius))
+        }
+        events.fx.emit({ type: "bossPhase", x: at.x, y: at.y, text: strings.bossPhase[turn.announce] })
         return
       }
-      if (boss.pattern === "twoFactor" && boss.phase === 1) {
-        match.data.boss.set({ ...boss, hp: boss.maxHp, phase: 2, shield: 2.5, hitFlash: 0.3, timer: 1 })
-        events.fx.emit({ type: "bossPhase", x: at.x, y: at.y, text: strings.bossPhase.otp })
+      if (hp > 0) {
+        match.data.boss.set({ ...boss, hp, hitFlash: hit.overTime ? boss.hitFlash : 0.08, statuses: inflictAll(boss.statuses, hit, by) })
         return
       }
       gone.add(match.entity.id)
       commands.despawn(match.entity)
       const bossPoints = Math.round(BOSS_POINTS * 10 * comboMultiplier(run.combo))
       run.score += bossPoints
+      // Part of a boss that split: the ticket is fixed only with its last piece.
+      const rest = bosses.some((other) => !gone.has(other.entity.id) && other.data.boss.get().key === boss.key)
+      if (rest) {
+        credit(by, bossPoints, 0)
+        events.fx.emit({ type: "kill", x: at.x, y: at.y, color: boss.color, key: boss.key, summary: strings.bossPhase.halfResolved, points: BOSS_POINTS * 10, boss: false })
+        return
+      }
       credit(by, bossPoints, 1)
       run.fixed.push({ key: boss.key, summary: boss.title, priority: "Highest", type: "bug" })
       events.fixed.emit({ key: boss.key, priority: "Highest" })

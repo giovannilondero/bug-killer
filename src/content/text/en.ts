@@ -1,5 +1,5 @@
 import type { Strings } from "../i18n.ts"
-import { shout } from "./voice.ts"
+import { plusOne, shout } from "./voice.ts"
 
 export const en: Strings = {
   tag: "en-US",
@@ -27,7 +27,8 @@ export const en: Strings = {
       laugh: "lol",
       voice: (text) => `It worked on staging, you know. Anyway: ${text}`
     },
-    tobia: { role: "Tech Lead", laugh: "haha", voice: (text) => text }
+    tobia: { role: "Tech Lead", laugh: "haha", voice: (text) => text },
+    fabrizio: { role: "Stakeholder (cc'd on everything)", laugh: "+1", voice: plusOne }
   },
 
   tobiaLines: [
@@ -62,7 +63,8 @@ export const en: Strings = {
     tobia: {
       success: ["see? with the _tools_ it's a breeze"],
       failure: ["ok but next time use the _tools_"]
-    }
+    },
+    fabrizio: { success: ["+1"], failure: ["up"] }
   },
   missions: {
     killCount: (goal, seconds) => `I need ${goal} bugs closed within ${seconds} seconds.`,
@@ -121,7 +123,12 @@ export const en: Strings = {
     room: "MEET",
     answered: (points) => `+${points} call answered`
   },
-  bossPhase: { dispenserRestart: "timeout... restarting", otp: "Enter your OTP code" },
+  bossPhase: {
+    dispenserRestart: "timeout... restarting",
+    otp: "Enter your OTP code",
+    conflict: "CONFLICT: ours vs theirs",
+    halfResolved: "one side resolved, one to go"
+  },
 
   traits: {
     armored: "BLOCKED: takes half damage",
@@ -141,6 +148,7 @@ export const en: Strings = {
     sidequests: "Seven small projects, seven big clients.",
     keystone: "Permissions, SSO and CVEs. Did somebody say 2FA?",
     foundry: "The biggest backlog. Ugo is online.",
+    monorepo: "One repo for everything, and everyone on it. Fabrizio says +1.",
     endless: "Every bug from every project, forever. How long can you last?"
   },
   pickups: {
@@ -189,6 +197,7 @@ export const en: Strings = {
     testsPassing: "✓ tests passing",
     booting: "⏳ booting...",
     factor: "FACTOR 2/2",
+    sides: { ours: "<<<<<<< ours", theirs: ">>>>>>> theirs" },
     startBanner: "Close the backlog before the client shows up",
     audioOn: "🔊 AUDIO ON",
     audioOff: "🔇 AUDIO OFF",
