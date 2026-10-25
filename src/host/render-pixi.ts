@@ -8,6 +8,7 @@ import { arenaOf } from "../content/arenas.ts"
 import type { Arena } from "../content/arenas.ts"
 import { bugKinds } from "../content/bugs.ts"
 import { clients } from "../content/clients.ts"
+import type { BossPattern } from "../content/levels.ts"
 import { comboMultiplier } from "../sim/systems/combat.ts"
 import { BUFF_SECONDS, DEPLOY, PARTY, PLAYER, ROCKET, TURRET } from "../sim/constants.ts"
 import { hasStatus } from "../sim/statuses.ts"
@@ -15,10 +16,12 @@ import { WEAPONS } from "../sim/weapons.ts"
 import type { FxValue, PickupKind, Vec } from "../sim/schema.ts"
 import type { View } from "../sim/simulation.ts"
 import { formatNumber, locale, t } from "./language.ts"
-import { floorKey, fuseBlink, fuseProgress, MONO, paintBug, paintFloor, paintFuseRing, paintHeart, paintHostile, paintLabel, paintNest, paintPickup, paintPing, paintPlayer, paintRocket, paintRocketTarget, paintTooltip, pickupIcons, pickupInfo, SANS, shade, tooltipHeight, TOOLTIP_WIDTH, truncate } from "./paint.ts"
+import { bossHealth, conflictMarkerColors, conflictMarkers, floorKey, fuseBlink, fuseProgress, MONO, paintBug, paintFloor, paintFuseRing, paintHeart, paintHostile, paintLabel, paintNest, paintPickup, paintPing, paintPlayer, paintRocket, paintRocketTarget, paintTooltip, pickupIcons, pickupInfo, SANS, shade, tooltipHeight, TOOLTIP_WIDTH, truncate } from "./paint.ts"
 import type { BugLook, TooltipBug } from "./paint.ts"
 import type { Camera, Renderer } from "./render.ts"
 import { touchMode } from "./touch.ts"
+
+type ViewBoss = View["bosses"][number]
 
 interface Particle {
   x: number
@@ -567,12 +570,49 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
     }
   }
 
-  const drawBoss = (boss: View["bosses"][number]) => {
+  /** What each boss pattern adds to the plain boss: drawn under it, or over it. */
+  const bossMarks: Record<BossPattern, { readonly under?: (boss: ViewBoss, heading: number) => void; readonly over?: (boss: ViewBoss) => void }> = {
+    dispenser: {},
+    crash: {
+      // Glitches now and then, a ghost of the restart.
+      under: (boss, heading) => {
+        if (Math.sin(time * 30) <= 0.7) return
+        drawBug(boss.position.x + Math.random() * 10 - 5, boss.position.y, boss.radius, boss.radius, "#ff00ff", heading, boss.age, { flash: 0, trait: "plain", reopened: false, boss: true }, 0.4)
+      }
+    },
+    twoFactor: {
+      over: (boss) => {
+        if (boss.phase === 2) text(W, wres, t().hud.factor, `bold 13px ${MONO}`, "#c79bff", boss.position.x, boss.position.y + boss.radius * 1.6)
+      }
+    },
+    undefined: {
+      over: (boss) => {
+        for (let i = 0; i < 6; i++) {
+          const a = (i / 6) * TAU + time * 0.8
+          text(W, wres, i % 2 ? "null" : "undefined", `bold 13px ${MONO}`, "rgba(255,122,89,0.8)", boss.position.x + Math.cos(a) * boss.radius * 1.6, boss.position.y + Math.sin(a) * boss.radius * 1.6)
+        }
+      }
+    },
+    mergeConflict: {
+      over: (boss) => {
+        if (boss.side) {
+          text(W, wres, t().hud.sides[boss.side], `bold 13px ${MONO}`, boss.color, boss.position.x, boss.position.y + boss.radius * 1.6)
+          return
+        }
+        // Whole, the conflict markers circle it.
+        for (const [i, marker] of conflictMarkers.entries()) {
+          const a = (i / conflictMarkers.length) * TAU - time * 0.6
+          text(W, wres, marker, `bold 13px ${MONO}`, conflictMarkerColors[i]!, boss.position.x + Math.cos(a) * boss.radius * 1.6, boss.position.y + Math.sin(a) * boss.radius * 1.6)
+        }
+      }
+    }
+  }
+
+  const drawBoss = (boss: ViewBoss) => {
     const { x, y } = boss.position
     const heading = Math.atan2(boss.position.y - (boss.position.y - 1), 0) + Math.sin(boss.age) * 0.2 + Math.PI / 2
-    if (boss.pattern === "crash" && Math.sin(time * 30) > 0.7) {
-      drawBug(x + Math.random() * 10 - 5, y, boss.radius, boss.radius, "#ff00ff", heading, boss.age, { flash: 0, trait: "plain", reopened: false, boss: true }, 0.4)
-    }
+    const marks = bossMarks[boss.pattern]
+    marks.under?.(boss, heading)
     drawBug(x, y, boss.radius, boss.radius, boss.color, heading, boss.age, { flash: boss.hitFlash, trait: "plain", reopened: true, boss: true, frozen: hasStatus(boss.statuses, "freeze"), poisoned: hasStatus(boss.statuses, "poison"), burning: hasStatus(boss.statuses, "burn") }, 1)
     if (boss.shield > 0) {
       const r = boss.radius * 1.35
@@ -585,15 +625,7 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
       }), x, y)
       text(W, wres, boss.pattern === "twoFactor" ? "🔐 OTP ******" : t().hud.booting, `bold 14px ${MONO}`, "#ffffff", x, y - boss.radius * 1.5)
     }
-    if (boss.pattern === "undefined") {
-      for (let i = 0; i < 6; i++) {
-        const a = (i / 6) * TAU + time * 0.8
-        text(W, wres, i % 2 ? "null" : "undefined", `bold 13px ${MONO}`, "rgba(255,122,89,0.8)", x + Math.cos(a) * boss.radius * 1.6, y + Math.sin(a) * boss.radius * 1.6)
-      }
-    }
-    if (boss.pattern === "twoFactor" && boss.phase === 2) {
-      text(W, wres, t().hud.factor, `bold 13px ${MONO}`, "#c79bff", x, y + boss.radius * 1.6)
-    }
+    marks.over?.(boss)
     text(W, wres, boss.key, `bold 14px ${MONO}`, "#ffffff", x, y - boss.radius - 14)
   }
 
@@ -1005,11 +1037,12 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
     // Top-centre: backlog or boss.
     const boss = view.bosses[0]
     if (boss) {
+      const health = bossHealth(view.bosses, boss.key)
       const w = Math.min(560, width - 420)
       const x = width / 2 - w / 2
       text(S, res, `☠ ${boss.key}`, `bold 13px ${MONO}`, boss.color, width / 2, 24)
       text(S, res, truncate(boss.title, 80), `12px ${SANS}`, "#d8dee9", width / 2, 42)
-      bar(x, 52, w, 12, 6, boss.hp / boss.maxHp, boss.shield > 0 ? "#ffffff" : boss.color)
+      bar(x, 52, w, 12, 6, health.left, health.shielded ? "#ffffff" : boss.color)
     } else if (run.phase === "waves" && view.level.endless) {
       // Endless: no backlog to empty, only the next boss getting closer.
       const every = view.level.endless.every

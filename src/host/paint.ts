@@ -5,7 +5,7 @@ import { ticketColors } from "../content/bugs.ts"
 import type { Priority, StatusTrait, TicketType } from "../content/bugs.ts"
 import type { Level } from "../content/levels.ts"
 import { DEPLOY, PLAYER } from "../sim/constants.ts"
-import type { PickupKind } from "../sim/schema.ts"
+import type { BossValue, PickupKind } from "../sim/schema.ts"
 import { locale, t } from "./language.ts"
 
 export const MONO = `"JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace`
@@ -460,6 +460,20 @@ export const paintHeart = (ctx: CanvasRenderingContext2D, x: number, y: number, 
 export const roundRect = (ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) => {
   ctx.beginPath()
   ctx.roundRect(x, y, Math.max(0, w), h, Math.min(r, h / 2, Math.max(0, w) / 2))
+}
+
+/** The markers a merge conflict leaves in a file, circling the boss while it is whole, with the colour of each side. */
+export const conflictMarkers = ["<<<<<<<", "=======", ">>>>>>>"] as const
+export const conflictMarkerColors = ["#7ee787", "#e3b341", "#ff7b72"] as const
+
+/**
+ * What the boss bar shows: how much of the boss called `key` is left, counting
+ * every piece of a boss that split, and whether any of it is shielded.
+ */
+export const bossHealth = (bosses: ReadonlyArray<Pick<BossValue, "key" | "hp" | "maxHp" | "shield">>, key: string): { left: number; shielded: boolean } => {
+  const pieces = bosses.filter((boss) => boss.key === key)
+  const max = pieces.reduce((sum, boss) => sum + boss.maxHp, 0)
+  return { left: max > 0 ? pieces.reduce((sum, boss) => sum + Math.max(0, boss.hp), 0) / max : 0, shielded: pieces.some((boss) => boss.shield > 0) }
 }
 
 export const truncate = (text: string, max: number): string => (text.length > max ? `${text.slice(0, max - 1)}…` : text)
