@@ -2,10 +2,9 @@ import * as Random from "@typeonce/ritmo-math/Random"
 import { Ops } from "@typeonce/ritmo-math"
 
 import { arenaOf } from "../../content/arenas.ts"
-import { subtaskKey } from "../../content/bugs.ts"
 import { text } from "../../content/i18n.ts"
 import { DT, EPIC } from "../constants.ts"
-import { makeBug } from "../drafts.ts"
+import { makeBug, subtaskOf } from "../drafts.ts"
 import { clampToArena } from "../math.ts"
 import { BugWrite } from "../queries.ts"
 import { Bug, Fx, Game, Language, LevelSpec, Rng, Run } from "../schema.ts"
@@ -63,11 +62,7 @@ export const EpicSystem = Game.System(
           const centre = match.data.position.get()
           const at = clampToArena({ x: centre.x + Ops.cos(angle) * distance, y: centre.y + Ops.sin(angle) * distance }, EPIC.ring, arena)
           const priority = random.pick(EPIC.priorities) ?? "Lowest"
-          commands.spawn(makeBug(
-            { key: subtaskKey(epic.key, released), summary: strings.subtask(epic.summary), priority, status: "Open", type: "subtask" },
-            at,
-            { parent: epic.key }
-          ))
+          commands.spawn(makeBug(subtaskOf(epic, released, priority, strings), at, { parent: epic.key }))
           events.fx.emit({ type: "spawn", x: at.x, y: at.y })
           released += 1
         }

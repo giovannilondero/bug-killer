@@ -1,8 +1,9 @@
-import { bugKinds, ticketScales, traitOf } from "../content/bugs.ts"
+import { bugKinds, subtaskKey, traitOf } from "../content/bugs.ts"
 import type { Priority, TicketType } from "../content/bugs.ts"
 import type { Boss as BossContent } from "../content/levels.ts"
 import type { ClientId } from "../content/clients.ts"
-import { BREAKPOINT, EPIC, HOSTILE_SHOT, PLAYER, RESURRECT, ROCKET, SHOT, TURRET } from "./constants.ts"
+import type { Strings } from "../content/i18n.ts"
+import { BREAKPOINT, EPIC, HOSTILE_SHOT, PLAYER, RESURRECT, ROCKET, SHOT, TURRET, ticketScales } from "./constants.ts"
 import { Body, Boss, Breakpoint, Bug, Game, HostileShot, Pickup, Player, Position, Rocket, Shot, Turret, Velocity } from "./schema.ts"
 import type { BossValue, PickupKind, TeammateValue, Vec } from "./schema.ts"
 import { basicGun } from "./weapons.ts"
@@ -45,6 +46,10 @@ export interface BugSeed {
   readonly type?: TicketType
 }
 
+/** The `index`-th sub-task a Story or an Epic hands out: a smaller piece of the same work. */
+export const subtaskOf = (parent: { readonly key: string; readonly summary: string }, index: number, priority: Priority, strings: Strings): BugSeed =>
+  ({ key: subtaskKey(parent.key, index), summary: strings.subtask(parent.summary), priority, status: "Open", type: "subtask" })
+
 export const makeBug = (
   seed: BugSeed,
   at: Vec,
@@ -60,8 +65,8 @@ export const makeBug = (
   const hp = Math.ceil((resurrectedBy ? kind.hp * RESURRECT.hpFactor : reopened ? kind.hp * 0.6 : kind.hp) * toughness.hp * scale.hp)
   const speed = kind.speed * (resurrectedBy ? RESURRECT.speedFactor : reopened ? 1.25 : 1) * toughness.speed * scale.speed
   const status = traitOf(seed.status)
-  // Before its tier a Deploying ticket is just a bug.
-  const trait = status === "deploying" && options.deploys === false ? "plain" : status
+  // Before its tier a Deploying ticket is just a bug; an Epic is a still nest whatever its status.
+  const trait = type === "epic" || (status === "deploying" && options.deploys === false) ? "plain" : status
   return Game.Command.spawn(
     Game.Command.entry(Position, at),
     Game.Command.entry(Velocity, { x: 0, y: 0 }),
