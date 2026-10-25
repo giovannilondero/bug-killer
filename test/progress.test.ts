@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { bestScore, clearSprint, emptyProgress, endEndless, loadProgress, unlockEverySprint, saveProgress, sprintsCleared, sprintUnlocked } from "../src/progress.ts"
+import { bestScore, clearSprint, emptyProgress, endEndless, endlessBest, hardcoreBadge, loadProgress, unlockEverySprint, saveProgress, sprintsCleared, sprintUnlocked } from "../src/progress.ts"
 
 test("progress saved by today's version loads unchanged", () => {
   const saved = JSON.stringify({ unlocked: 3, best: { glacier: 12400, sidequests: 8100, endless: 30500 } })
@@ -80,4 +80,50 @@ test("the playtest shortcut unlocks every sprint and keeps the scores", () => {
   const progress = unlockEverySprint(loadProgress(JSON.stringify({ unlocked: 1, best: { endless: 700 } })))
   assert.equal(sprintUnlocked(progress, 3), true)
   assert.equal(bestScore(progress, "endless"), 700)
+})
+
+test("a sprint cleared in hardcore gets a badge, solo or together, and unlocks nothing extra", () => {
+  const normal = clearSprint(emptyProgress, 0, { score: 9000, solo: true })
+  assert.equal(hardcoreBadge(normal, "glacier"), false)
+
+  const hardcore = clearSprint(normal, 0, { score: 4000, solo: true, hardcore: true })
+  assert.equal(hardcoreBadge(hardcore, "glacier"), true)
+  assert.equal(hardcoreBadge(hardcore, "sidequests"), false)
+  assert.equal(sprintUnlocked(hardcore, 1), true)
+  assert.equal(sprintUnlocked(hardcore, 2), false)
+  assert.equal(bestScore(hardcore, "glacier"), 9000)
+
+  const together = clearSprint(hardcore, 1, { score: 100, solo: false, hardcore: true })
+  assert.equal(hardcoreBadge(together, "sidequests"), true)
+
+  const saved = loadProgress(saveProgress(together))
+  assert.equal(hardcoreBadge(saved, "glacier"), true)
+  assert.equal(hardcoreBadge(saved, "sidequests"), true)
+  assert.equal(hardcoreBadge(saved, "keystone"), false)
+})
+
+test("Endless keeps a separate hardcore record", () => {
+  const normal = endEndless(emptyProgress, { score: 5000, solo: true })
+  const hardcore = endEndless(normal.progress, { score: 1200, solo: true, hardcore: true })
+  assert.equal(hardcore.record, true, "the first hardcore run is a record of its own")
+  assert.equal(endlessBest(hardcore.progress, { hardcore: true }), 1200)
+  assert.equal(endlessBest(hardcore.progress, { hardcore: false }), 5000)
+
+  const better = endEndless(hardcore.progress, { score: 6000, solo: true, hardcore: true })
+  assert.equal(endlessBest(better.progress, { hardcore: true }), 6000)
+  assert.equal(endlessBest(better.progress, { hardcore: false }), 5000, "a hardcore run does not touch the normal record")
+
+  const saved = loadProgress(saveProgress(better.progress))
+  assert.equal(endlessBest(saved, { hardcore: true }), 6000)
+  assert.equal(endlessBest(saved, { hardcore: false }), 5000)
+})
+
+test("progress saved by today's version has no badges and its Endless best is the normal record", () => {
+  const progress = loadProgress(JSON.stringify({ unlocked: 3, best: { glacier: 12400, endless: 30500 } }))
+  assert.equal(hardcoreBadge(progress, "glacier"), false)
+  assert.equal(endlessBest(progress, { hardcore: false }), 30500)
+  assert.equal(endlessBest(progress, { hardcore: true }), undefined)
+  const broken = loadProgress(JSON.stringify({ unlocked: 2, best: {}, badges: "glacier" }))
+  assert.equal(hardcoreBadge(broken, "glacier"), false)
+  assert.equal(sprintUnlocked(broken, 1), true)
 })

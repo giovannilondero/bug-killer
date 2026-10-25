@@ -46,6 +46,7 @@ interface Room {
   readonly code: string
   level: LevelId
   locale: Locale
+  hardcore: boolean
   host: number
   seats: Array<Seat>
   sim: Simulation | null
@@ -78,6 +79,7 @@ export const makeRooms = (options: RoomsOptions = {}) => {
     code: room.code,
     state: room.sim && !over(room) ? "playing" : "lobby",
     level: room.level,
+    hardcore: room.hardcore,
     host: room.host,
     members: room.seats.map((seat): Member => ({ slot: seat.slot, name: seat.name, color: colorOf(seat.slot), connected: seat.peer !== null }))
   })
@@ -153,10 +155,11 @@ export const makeRooms = (options: RoomsOptions = {}) => {
     announce(room)
   }
 
-  const start = (room: Room, level: LevelId) => {
+  const start = (room: Room, level: LevelId, hardcore: boolean) => {
     // Whoever left between runs does not get a seat in the next one.
     room.seats = room.seats.filter((seat) => seat.peer !== null)
     room.level = level
+    room.hardcore = hardcore
     const party = room.seats.map((seat) => ({ slot: seat.slot, name: seat.name, color: colorOf(seat.slot) }))
     room.inputs = []
     for (const seat of room.seats) room.inputs[seat.slot] = idleInput
@@ -166,6 +169,7 @@ export const makeRooms = (options: RoomsOptions = {}) => {
       level: levelOf(level),
       seed: Math.floor(random() * 2 ** 31),
       locale: room.locale,
+      hardcore,
       party,
       inputs: { snapshot: () => room.inputs.map((input) => input ?? idleInput) },
       presentation: { fx: (event) => room.fx.push(event), chat: (event) => room.chat.push(event) }
@@ -207,6 +211,7 @@ export const makeRooms = (options: RoomsOptions = {}) => {
           code: newCode(),
           level: message.level,
           locale: message.locale,
+          hardcore: message.hardcore === true,
           host: 0,
           seats: [],
           sim: null,
@@ -258,7 +263,7 @@ export const makeRooms = (options: RoomsOptions = {}) => {
         if (!at) return
         if (at.room.host !== at.slot) return fail(peer, "notHost")
         if (at.room.sim && !over(at.room)) return
-        start(at.room, message.level ?? at.room.level)
+        start(at.room, message.level ?? at.room.level, message.hardcore ?? at.room.hardcore)
         return
       }
       case "input": {

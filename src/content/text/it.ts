@@ -304,5 +304,14 @@ export const it: Strings = {
       notHost: "Solo l'host può iniziare.",
       busy: "Troppe run aperte in questo momento: riprova tra poco, o gioca da solo."
     }
+  },
+  hardcore: {
+    name: "Hardcore",
+    rules: "1 di sanità · niente Pizza · si torna in piedi con 1",
+    on: "attivo",
+    off: "spento",
+    hud: "HARDCORE",
+    badge: "Completato in hardcore",
+    run: "☠ Partita hardcore"
   }
 }

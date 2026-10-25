@@ -716,6 +716,12 @@ export const makeRenderer = (canvas: HTMLCanvasElement) => {
       for (let i = 0; i < player.maxHp; i++) {
         paintHeart(ctx, 20 + i * 24, 58, i < player.hp ? "#ff4d6d" : "rgba(255,255,255,0.15)")
       }
+      if (view.hardcore) {
+        // Hardcore: said right of the single heart, in its colour.
+        ctx.font = `bold 11px ${MONO}`
+        ctx.fillStyle = "#ff4d6d"
+        ctx.fillText(`☠ ${t().hardcore.hud}`, 26 + player.maxHp * 24, 71)
+      }
       ctx.font = `11px ${MONO}`
       ctx.fillStyle = "#9aa4b8"
       ctx.textAlign = "left"

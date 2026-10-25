@@ -186,3 +186,41 @@ test("when the run ends the room goes back to the lobby, and the host starts the
   assert.equal(ada.last("started")?.level, "sidequests")
   assert.equal(ada.last("frame")!.view.run.phase, "waves")
 })
+
+test("the host sets hardcore in the lobby, and it reaches every teammate's run", () => {
+  const rooms = makeRooms({ random: seeded() })
+  const ada = browser()
+  const bob = browser()
+  send(rooms, ada, { t: "create", name: "Ada", level: "glacier", locale: "en", hardcore: true })
+  const code = ada.last("room")!.room.code
+  send(rooms, bob, { t: "join", code, name: "Bob" })
+  assert.equal(bob.last("room")?.room.hardcore, true, "teammates see it in the lobby")
+  send(rooms, ada, { t: "start" })
+  for (const who of [ada, bob]) {
+    const view = who.last("frame")!.view
+    assert.equal(view.hardcore, true)
+    assert.deepEqual(view.players.map((p) => p.maxHp), [1, 1])
+  }
+
+  // Back in the lobby the host may turn it off for the next run; a teammate cannot.
+  for (let i = 0; i < 60 * 120 && ada.last("frame")!.view.run.phase !== "dead"; i++) rooms.advance(1 / 60)
+  assert.equal(ada.last("room")?.room.state, "lobby")
+  send(rooms, bob, { t: "start", hardcore: false })
+  assert.equal(bob.last("error")?.code, "notHost")
+  send(rooms, ada, { t: "start", hardcore: false })
+  assert.equal(bob.last("room")?.room.hardcore, false)
+  assert.equal(bob.last("frame")!.view.hardcore, false)
+  assert.deepEqual(bob.last("frame")!.view.players.map((p) => p.maxHp), [6, 6])
+})
+
+test("a run is not hardcore unless the host says so, and only a real true counts", () => {
+  const rooms = makeRooms({ random: seeded() })
+  const ada = browser()
+  send(rooms, ada, { t: "create", name: "Ada", level: "glacier", locale: "en" })
+  assert.equal(ada.last("room")?.room.hardcore, false)
+  const cara = browser()
+  send(rooms, cara, { t: "create", name: "Cara", level: "glacier", locale: "en", hardcore: "yes" })
+  assert.equal(cara.last("room"), undefined, "a malformed flag is refused")
+  send(rooms, ada, { t: "start", hardcore: 1 })
+  assert.equal(ada.last("started"), undefined, "a malformed flag is refused")
+})

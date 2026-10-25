@@ -304,5 +304,14 @@ export const en: Strings = {
       notHost: "Only the host can start.",
       busy: "Too many runs open right now: try again in a bit, or play solo."
     }
+  },
+  hardcore: {
+    name: "Hardcore",
+    rules: "1 sanity · no Pizza · back on your feet with 1",
+    on: "on",
+    off: "off",
+    hud: "HARDCORE",
+    badge: "Cleared in hardcore",
+    run: "☠ Hardcore run"
   }
 }

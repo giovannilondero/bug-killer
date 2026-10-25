@@ -5,6 +5,7 @@ import { bugKinds } from "../../content/bugs.ts"
 import { text } from "../../content/i18n.ts"
 import { BOMB_RADIUS, BUFF_SECONDS, COMBO_WINDOW, PLAYER } from "../constants.ts"
 import { makeBug, makePickup, makeTurret } from "../drafts.ts"
+import { allowedPickups } from "../hardcore.ts"
 import { clampToArena, distanceSquared, overlaps } from "../math.ts"
 import { BossWrite, BugWrite, HostileShotWrite, PickupWrite, PlayerWrite, ShotWrite } from "../queries.ts"
 import {
@@ -14,6 +15,7 @@ import {
   BugFixed,
   Fx,
   Game,
+  Hardcore,
   HostileShot,
   Language,
   LevelSpec,
@@ -61,7 +63,8 @@ export const CombatSystem = Game.System(
       rng: Game.System.writeResource(Rng),
       language: Game.System.readResource(Language),
       level: Game.System.readResource(LevelSpec),
-      tiers: Game.System.readResource(Tiers)
+      tiers: Game.System.readResource(Tiers),
+      hardcore: Game.System.readResource(Hardcore)
     },
     events: {
       bombs: Game.System.readEvent(BombBlast),
@@ -79,6 +82,7 @@ export const CombatSystem = Game.System(
     const random = Random.draw(resources.rng)
     const strings = text[resources.language.get()]
     const arena = arenaOf(resources.level.get())
+    const drops = allowedPickups(pickupKinds, resources.hardcore.get())
     const gone = new Set<number>()
     const playing = run.phase === "waves" || run.phase === "boss"
 
@@ -131,9 +135,9 @@ export const CombatSystem = Game.System(
       }
 
       if (random.next() < dropChance[bug.priority]) {
-        // Only what the level has unlocked so far can drop.
+        // Only what the level has unlocked so far can drop, and no Pizza in hardcore.
         const tier = tierOf(resources.level.get(), run.wave)
-        const kindDropped = random.weighted(pickupKinds, (k) => (isUnlocked(k, tier, resources.tiers.get()) ? dropWeights[k] : 0))
+        const kindDropped = random.weighted(drops, (k) => (isUnlocked(k, tier, resources.tiers.get()) ? dropWeights[k] : 0))
         if (kindDropped) commands.spawn(makePickup(kindDropped, at))
       }
     }

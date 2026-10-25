@@ -18,7 +18,7 @@ import { createRenderer } from "./host/renderer.ts"
 import { makeTouchControls, onTouchMode, touchMode } from "./host/touch.ts"
 import { codePattern, NAME_MAX } from "./net/protocol.ts"
 import type { ErrorCode, RoomInfo, ServerMessage } from "./net/protocol.ts"
-import { bestScore, clearSprint, endEndless, loadProgress, saveProgress, sprintsCleared, sprintUnlocked, unlockEverySprint } from "./progress.ts"
+import { bestScore, clearSprint, endEndless, endlessBest, hardcoreBadge, loadProgress, saveProgress, sprintsCleared, sprintUnlocked, unlockEverySprint } from "./progress.ts"
 import type { Progress } from "./progress.ts"
 import { PARTY, STEP } from "./sim/constants.ts"
 import { makePickup } from "./sim/drafts.ts"
@@ -57,6 +57,14 @@ const input = makeInput(canvas, renderer, touch, {
   targets: () => (view ? [...view.bugs, ...view.bosses].map((target) => target.position) : [])
 })
 let progress = readProgress()
+/** The menu's hardcore toggle: every solo run, and every run this browser hosts, until it is turned off. */
+let hardcore = localStorage.getItem("bugkiller:hardcore") === "on"
+const setHardcore = (on: boolean) => {
+  hardcore = on
+  localStorage.setItem("bugkiller:hardcore", on ? "on" : "off")
+}
+/** The toggle's rules, under its name: the menu and the lobby say the same thing. */
+const hardcoreRules = () => html`<span class="hardcore-name">☠ ${t().hardcore.name}</span><span class="hardcore-rules">${escape(t().hardcore.rules)}</span>`
 
 /** The four sprints, then endless: menu buttons and restarts index into this. */
 const playable = [...levels, endlessLevel]
@@ -167,21 +175,22 @@ const showTitle = () => {
     // No project names or ticket keys here: the menu is what ends up in screenshots.
     return html`
       <button class="level ${locked ? "locked" : ""}" data-level="${i}" ${locked ? "disabled" : ""} style="--accent:${level.theme.accent}">
-        <span class="level-name">${level.sprint}</span>
+        <span class="level-name">${level.sprint}${hardcoreBadge(progress, level.id) ? html` <span class="hardcore-badge" title="${t().hardcore.badge}" aria-label="${t().hardcore.badge}">☠</span>` : ""}</span>
         <span class="level-tagline">${escape(t().taglines[level.id])}</span>
         <span class="level-meta">${t().menu.openBugs(level.bugs.length)}</span>
         <span class="level-clients">${avatars(level.clients)}</span>
         <span class="level-best">${locked ? t().menu.locked : best ? t().menu.best(formatNumber(best)) : t().menu.fresh}</span>
       </button>`
   }).join("")
-  const endlessBest = bestScore(progress, endlessLevel.id)
+  // The record of the mode the toggle is on: hardcore keeps its own.
+  const endlessRecord = endlessBest(progress, { hardcore })
   const endlessCard = html`
     <button class="level endless" data-level="${levels.length}" style="--accent:${endlessLevel.theme.accent}">
       <span class="level-name">∞ ${endlessLevel.name}</span>
       <span class="level-tagline">${escape(t().taglines.endless)}</span>
       <span class="level-meta">${t().menu.endless(endlessLevel.endless?.every ?? 0)}</span>
       <span class="level-clients">${avatars(endlessLevel.clients)}</span>
-      <span class="level-best">${endlessBest ? t().menu.best(formatNumber(endlessBest)) : t().menu.fresh}</span>
+      <span class="level-best">${endlessRecord ? t().menu.best(formatNumber(endlessRecord)) : t().menu.fresh}${hardcore ? " ☠" : ""}</span>
     </button>`
   const multiCard = html`
     <button class="level together" data-multi style="--accent:#7fdcff">
@@ -196,6 +205,7 @@ const showTitle = () => {
     <div class="title">
       <div class="logo" data-text="BUG KILLER">BUG KILLER</div>
       <p class="subtitle">${t().menu.subtitle}</p>
+      <button class="hardcore-toggle" data-hardcore aria-pressed="${hardcore}">${hardcoreRules()}<span class="hardcore-state">${hardcore ? t().hardcore.on : t().hardcore.off}</span></button>
       <section class="group">
         <h3 class="group-title"><span>${t().menu.campaign}</span><span class="group-progress">${t().menu.campaignProgress(cleared, levels.length)}</span></h3>
         <div class="levels">${cards}</div>
@@ -232,6 +242,11 @@ const showTitle = () => {
     })
   )
   overlay.querySelector<HTMLButtonElement>("[data-multi]")?.addEventListener("click", () => showMulti())
+  overlay.querySelector<HTMLButtonElement>("[data-hardcore]")?.addEventListener("click", () => {
+    setHardcore(!hardcore)
+    showTitle()
+    overlay.querySelector<HTMLButtonElement>("[data-hardcore]")?.focus()
+  })
 }
 
 // --- Playing together -----------------------------------------------------
@@ -389,7 +404,7 @@ const showMulti = (error?: ErrorCode, code = new URLSearchParams(location.search
     if (!name) return
     audio.unlock()
     const level = form.querySelector<HTMLSelectElement>("[name=level]")!.value
-    openRemote().connection.send({ t: "create", name, level: playable.find((l) => l.id === level)?.id ?? "glacier", locale: locale() })
+    openRemote().connection.send({ t: "create", name, level: playable.find((l) => l.id === level)?.id ?? "glacier", locale: locale(), hardcore })
   })
   form.querySelector("[data-join]")!.addEventListener("click", join)
   // Two text fields and no submit button: the browser would not send the form on Enter by itself.
@@ -433,8 +448,10 @@ const showLobby = () => {
       <div class="share"><code>${escape(shareLink(room.code))}</code><button data-copy>${t().multi.copyLink}</button></div>
       <ul class="members">${members(room, r.you)}</ul>
       ${isHost
-        ? html`<label class="field"><span>${t().multi.level}</span><select name="level">${levelOptions(room.level)}</select></label>`
+        ? html`<label class="field"><span>${t().multi.level}</span><select name="level">${levelOptions(room.level)}</select></label>
+          <label class="hardcore-check"><input type="checkbox" name="hardcore" ${room.hardcore ? "checked" : ""} />${hardcoreRules()}</label>`
         : html`<p class="lobby-level"><b>${level.endless ? "∞" : escape(level.sprint)} · ${escape(level.name)}</b> — ${escape(t().taglines[level.id])}</p>
+          ${room.hardcore ? html`<p class="hardcore-check">${hardcoreRules()}</p>` : ""}
           <p class="waiting">${escape(t().multi.waiting(host))}</p>`}
       <p class="multi-error" role="alert"></p>
       <div class="actions">
@@ -452,7 +469,8 @@ const showLobby = () => {
     audio.unlock()
     const chosen = overlay.querySelector<HTMLSelectElement>("[name=level]")?.value
     const level = playable.find((l) => l.id === chosen)?.id ?? room.level
-    r.connection.send({ t: "start", level })
+    const hardcoreChosen = overlay.querySelector<HTMLInputElement>("[name=hardcore]")?.checked ?? room.hardcore
+    r.connection.send({ t: "start", level, hardcore: hardcoreChosen })
   })
   overlay.querySelector<HTMLButtonElement>("[data-leave]")?.addEventListener("click", () => {
     leaveRemote()
@@ -503,6 +521,7 @@ const startLevel = (index: number) => {
     level,
     locale: locale(),
     seed: (Date.now() ^ (index * 7919)) >>> 0,
+    hardcore,
     input,
     presentation: { fx: playFx, chat: (event) => chat.push(event) }
   })
@@ -521,6 +540,7 @@ const startLevel = (index: number) => {
       <div class="intro-sprint">${level.sprint}</div>
       <div class="intro-name">${level.name}</div>
       <div class="intro-tagline">${escape(t().taglines[level.id])}</div>
+      ${hardcore ? html`<div class="intro-hardcore">${hardcoreRules()}</div>` : ""}
       <div class="intro-meta">${level.endless ? t().menu.endless(level.endless.every) : t().menu.openBugs(level.bugs.length)} · ${t().intro.clientsOnline} ${avatars(level.clients)}</div>
       <div class="intro-go">${touchMode() ? t().intro.startTouch : t().intro.start}</div>
     </div>`, "intro-overlay")
@@ -569,6 +589,7 @@ const showPause = () => {
 }
 
 const stats = (v: View) => html`
+  ${v.hardcore ? html`<p class="hardcore-run">${t().hardcore.run}</p>` : ""}
   <div class="stats">
     <div><b>${formatNumber(v.run.score)}</b><span>${t().stats.points}</span></div>
     <div><b>${v.run.fixed.length}</b><span>${t().stats.closed}</span></div>
@@ -600,7 +621,7 @@ const markdownNotes = (v: View) =>
 const showCleared = (v: View) => {
   setMode("over")
   // A sprint cleared together unlocks the next one here too; best scores stay solo.
-  progress = clearSprint(progress, levelIndex, { score: v.run.score, solo: !remote })
+  progress = clearSprint(progress, levelIndex, { score: v.run.score, solo: !remote, hardcore: v.hardcore })
   writeProgress(progress)
   const last = levelIndex === levels.length - 1
   show(html`
@@ -628,7 +649,7 @@ const showCleared = (v: View) => {
 const showDead = (v: View) => {
   setMode("over")
   // Endless only ends here, so this is where its best score is kept.
-  const ended = v.level.endless !== undefined ? endEndless(progress, { score: v.run.score, solo: !remote }) : undefined
+  const ended = v.level.endless !== undefined ? endEndless(progress, { score: v.run.score, solo: !remote, hardcore: v.hardcore }) : undefined
   const record = ended?.record ?? false
   if (ended && record) {
     progress = ended.progress

@@ -7,6 +7,7 @@ import type { Level } from "../src/content/levels.ts"
 import { createSimulation, idleInput } from "../src/sim/simulation.ts"
 import type { View } from "../src/sim/simulation.ts"
 import { makePickup } from "../src/sim/drafts.ts"
+import { PlayerWrite } from "../src/sim/queries.ts"
 import { contentTiers } from "../src/sim/tiers.ts"
 import { Game, Pickup, pickupKinds } from "../src/sim/schema.ts"
 import type { ChatValue, FxValue, InputValue } from "../src/sim/schema.ts"
@@ -423,4 +424,88 @@ test("drops, mission rewards and call rewards never offer a pickup above the lev
   const open = offered(levels[2]!)
   assert.equal(open.view.tier, 2)
   assert.ok(open.kinds.some((kind) => !kept.includes(kind)), "a level offers what its tier unlocks")
+})
+
+// --- Hardcore ----------------------------------------------------------------
+
+/** Keeps the given seats from being hurt: a run long enough to see what drops, or to revive someone. */
+const shield = (slots: ReadonlyArray<number>) =>
+  Game.Schedule(Game.System("Test/Shield", { queries: { player: PlayerWrite } }, ({ queries }) => {
+    for (const { data } of queries.player.each()) {
+      const state = data.player.get()
+      if (slots.includes(state.slot)) data.player.set({ ...state, invulnerable: 1 })
+    }
+  }))
+
+/** A hardcore (or not) run where `shielded` seats cannot be hurt, watching every frame. */
+const hardcoreRun = (level: Level, seconds: number, pilots: ReadonlyArray<Pilot>, options: { hardcore: boolean; shielded: ReadonlyArray<number>; seed?: number }, onFrame: (v: View) => void) => {
+  let current: View | null = null
+  let frame = 0
+  const seats = pilots.map((pilot, slot) => pilot(() => seat(current, slot), () => frame))
+  const made = createSimulation({
+    level,
+    seed: options.seed ?? 7,
+    locale: "en",
+    hardcore: options.hardcore,
+    party: crew(pilots.map((_, slot) => `dev${slot}`)),
+    inputs: { snapshot: () => seats.map((s) => s.snapshot()) },
+    presentation: { fx: () => undefined, chat: () => undefined }
+  })
+  if (!made.ok) throw new Error(JSON.stringify(made.error))
+  const sim = made.value
+  const protect = shield(options.shielded)
+  current = sim.view()
+  for (; frame < seconds * 60; frame++) {
+    assert.ok(sim.runtime.tick(protect).ok)
+    assert.ok(sim.step().ok)
+    current = sim.view()
+    onFrame(current)
+    if (current.run.phase === "cleared" || current.run.phase === "dead") break
+  }
+  return sim.view()
+}
+
+test("in hardcore a developer has one sanity, and one hit ends a solo run", () => {
+  for (const level of [levels[0]!, endlessLevel]) {
+    const view = hardcoreRun(level, 120, [idlePilot], { hardcore: true, shielded: [] }, () => undefined)
+    assert.equal(view.hardcore, true)
+    assert.equal(view.players[0]!.maxHp, 1)
+    assert.equal(view.run.phase, "dead", `${level.id} ends`)
+    assert.equal(view.run.hitsTaken, 1, `${level.id}: one hit is enough`)
+  }
+  const normal = hardcoreRun(levels[0]!, 5, [idlePilot], { hardcore: false, shielded: [] }, () => undefined)
+  assert.equal(normal.hardcore, false)
+  assert.equal(normal.players[0]!.maxHp, 6)
+})
+
+test("Pizza never drops in hardcore, from bugs, missions or calls; the other power-ups still do", () => {
+  const seen = (hardcore: boolean) => {
+    const kinds = new Set<string>()
+    for (const seed of [1, 2, 3]) {
+      hardcoreRun(levels[1]!, 180, [answeringPilot], { hardcore, shielded: [0], seed }, (v) => {
+        for (const pickup of v.pickups) kinds.add(pickup.kind)
+      })
+    }
+    return kinds
+  }
+  const normal = seen(false)
+  assert.ok(normal.has("pizza"), `the same runs drop Pizza without hardcore: ${[...normal].join(", ")}`)
+  const hardcore = seen(true)
+  assert.equal(hardcore.has("pizza"), false)
+  assert.ok(hardcore.has("unitTest"), `Green tests still drop: ${[...hardcore].join(", ")}`)
+})
+
+test("in hardcore a revived teammate comes back with 1 sanity", () => {
+  const revivedWith: Array<number> = []
+  let down = false
+  hardcoreRun(levels[0]!, 120, [rescuer(0), idlePilot], { hardcore: true, shielded: [0] }, (v) => {
+    const hp = v.players[1]!.hp
+    if (hp <= 0) down = true
+    else if (down) {
+      revivedWith.push(hp)
+      down = false
+    }
+  })
+  assert.ok(revivedWith.length > 0, "the idle developer goes down and is revived")
+  assert.deepEqual([...new Set(revivedWith)], [1])
 })
