@@ -1,5 +1,5 @@
 import type { ArenaId } from "./content/arenas.ts"
-import { bonusLevels, endlessArenas, levels } from "./content/levels.ts"
+import { bonusLevels, endlessArenas, levelIds, levels } from "./content/levels.ts"
 import type { Level, LevelId } from "./content/levels.ts"
 
 /**
@@ -12,14 +12,16 @@ export interface Progress {
   /** Best solo score per level. */
   readonly best: Readonly<Partial<Record<string, number>>>
   /** Levels cleared in hardcore at least once: a badge on their card. */
-  readonly badges: ReadonlyArray<string>
+  readonly badges: ReadonlyArray<LevelId>
 }
 
 export const emptyProgress: Progress = { unlocked: 1, best: {}, badges: [] }
 
+const isLevelId = (id: unknown): id is LevelId => (levelIds as ReadonlyArray<unknown>).includes(id)
+
 const isScore = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value) && value > 0
 
-/** Reads saved progress; anything missing or malformed falls back to a fresh start. */
+/** Reads saved progress; anything missing or malformed falls back to a fresh start, and a badge for an unknown level is dropped. */
 export const loadProgress = (saved: string | null): Progress => {
   let raw: unknown
   try {
@@ -34,7 +36,7 @@ export const loadProgress = (saved: string | null): Progress => {
     best: typeof best === "object" && best !== null
       ? Object.fromEntries(Object.entries(best).filter(([, score]) => isScore(score)))
       : {},
-    badges: Array.isArray(badges) ? badges.filter((id): id is string => typeof id === "string") : []
+    badges: Array.isArray(badges) ? badges.filter(isLevelId) : []
   }
 }
 

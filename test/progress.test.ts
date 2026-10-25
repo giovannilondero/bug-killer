@@ -129,6 +129,12 @@ test("progress saved by today's version has no badges and its Endless best is th
   assert.equal(sprintUnlocked(broken, 1), true)
 })
 
+test("a saved badge for a level this version doesn't know, or one that isn't a name, loads as no badge", () => {
+  const progress = loadProgress(JSON.stringify({ unlocked: 2, best: {}, badges: ["glacier", "moonbase", 7, null] }))
+  assert.equal(hardcoreBadge(progress, "glacier"), true)
+  assert.deepEqual(JSON.parse(saveProgress(progress)).badges, ["glacier"])
+})
+
 test("Hotdesk unlocks after sprint 3", () => {
   const hotdesk = bonusLevels.find((level) => level.id === "hotdesk")!
   assert.equal(bonusUnlocked(emptyProgress, hotdesk), false)
