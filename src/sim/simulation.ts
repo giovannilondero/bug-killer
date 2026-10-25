@@ -14,8 +14,9 @@ import type { Locale } from "../content/i18n.ts"
 import type { Level } from "../content/levels.ts"
 import { ARENA, CALLS, FIRST_CLIENT_DELAY, TOBIA, PARTY, RESURRECT, WAVE_INTERVAL } from "./constants.ts"
 import { makePlayer } from "./drafts.ts"
+import { HARDCORE } from "./hardcore.ts"
 import { BossRead, BugRead, HostileShotRead, PickupRead, PlayerRead, ShotRead } from "./queries.ts"
-import { Calls, Chat, Fx, Game, Input, InputSource, Interruptions, Language, LevelSpec, Missions, Party, Player, Position, Presentation, Run, Turret } from "./schema.ts"
+import { Calls, Chat, Fx, Game, Hardcore, Input, InputSource, Interruptions, Language, LevelSpec, Missions, Party, Player, Position, Presentation, Run, Turret } from "./schema.ts"
 import type { CallsValue, ChatValue, FxValue, InputValue, InputsValue, InterruptionsValue, MissionsValue, RunValue, TeammateValue } from "./schema.ts"
 import { BossBrainSystem } from "./systems/boss.ts"
 import { CallSystem } from "./systems/calls.ts"
@@ -37,13 +38,14 @@ const CaptureInputSystem = InputCapture.system(Game, {
 const SetupSystem = Game.System(
   "BugKiller/Setup",
   {
-    resources: { party: Game.System.readResource(Party) },
+    resources: { party: Game.System.readResource(Party), hardcore: Game.System.readResource(Hardcore) },
     commands: Game.System.commands(Game.System.spawns(Player))
   },
   ({ resources, commands }) => {
     const party = resources.party.get()
+    const maxHp = resources.hardcore.get() ? HARDCORE.maxHp : undefined
     party.forEach((teammate, i) => {
-      commands.spawn(makePlayer({ x: ARENA.width / 2 + (i - (party.length - 1) / 2) * 90, y: ARENA.height / 2 + 150 }, { ...teammate }))
+      commands.spawn(makePlayer({ x: ARENA.width / 2 + (i - (party.length - 1) / 2) * 90, y: ARENA.height / 2 + 150 }, { ...teammate }, maxHp))
     })
   }
 )
@@ -101,7 +103,8 @@ export const ViewInspector = Game.Inspector(
       interruptions: Game.System.readResource(Interruptions),
       calls: Game.System.readResource(Calls),
       level: Game.System.readResource(LevelSpec),
-      language: Game.System.readResource(Language)
+      language: Game.System.readResource(Language),
+      hardcore: Game.System.readResource(Hardcore)
     }
   },
   ({ queries, resources }) => {
@@ -123,7 +126,8 @@ export const ViewInspector = Game.Inspector(
       interruptions: resources.interruptions.get(),
       calls: resources.calls.get(),
       level: resources.level.get(),
-      language: resources.language.get()
+      language: resources.language.get(),
+      hardcore: resources.hardcore.get()
     }
   }
 )
@@ -141,7 +145,7 @@ export const idleInput: InputValue = { move: { x: 0, y: 0 }, aim: { x: ARENA.wid
 export const soloParty: Array<TeammateValue> = [{ slot: 0, name: "", color: PARTY.colors[0] }]
 
 /** The world a level starts from. */
-export const initialResources = (level: Level, seed: number, locale: Locale = defaultLocale, party: Array<TeammateValue> = soloParty) => {
+export const initialResources = (level: Level, seed: number, locale: Locale = defaultLocale, party: Array<TeammateValue> = soloParty, hardcore = false) => {
   const run: RunValue = {
     time: 0,
     phase: "waves",
@@ -166,7 +170,7 @@ export const initialResources = (level: Level, seed: number, locale: Locale = de
   const interruptions: InterruptionsValue = { resurrectIn: RESURRECT.first, tobiaIn: TOBIA.firstCooldown, tobiaLine: 0, resurrections: 0 }
   const calls: CallsValue = { active: null, nextIn: CALLS.first, answered: 0, missed: 0 }
   const input: InputsValue = party.map(() => idleInput)
-  return { Input: input, Party: party.map((teammate) => ({ ...teammate })), LevelSpec: level, Language: locale, Rng: Random.seed(seed), Run: run, Missions: missions, Interruptions: interruptions, Calls: calls }
+  return { Input: input, Party: party.map((teammate) => ({ ...teammate })), LevelSpec: level, Language: locale, Hardcore: hardcore, Rng: Random.seed(seed), Run: run, Missions: missions, Interruptions: interruptions, Calls: calls }
 }
 
 export interface SimulationOptions {
@@ -175,6 +179,8 @@ export interface SimulationOptions {
   readonly locale?: Locale
   /** Who plays: one developer by default. */
   readonly party?: Array<TeammateValue>
+  /** One sanity and no Pizza for the whole run; off by default. */
+  readonly hardcore?: boolean
   /** Every seat's input by slot; `input` is the shorthand for one developer. */
   readonly inputs?: { snapshot: () => InputsValue }
   readonly input?: { snapshot: () => InputValue }
@@ -189,7 +195,7 @@ export const createSimulation = (options: SimulationOptions) => {
       Game.Runtime.service(InputSource, inputs),
       Game.Runtime.service(Presentation, options.presentation)
     ),
-    resources: initialResources(options.level, options.seed, options.locale, options.party)
+    resources: initialResources(options.level, options.seed, options.locale, options.party, options.hardcore)
   })
   if (!made.ok) {
     return Result.failure(made.error)

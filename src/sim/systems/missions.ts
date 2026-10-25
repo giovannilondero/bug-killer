@@ -8,9 +8,10 @@ import { text } from "../../content/i18n.ts"
 import type { Strings } from "../../content/i18n.ts"
 import { ARENA, DT } from "../constants.ts"
 import { makeBug, makePickup } from "../drafts.ts"
+import { allowedPickups } from "../hardcore.ts"
 import { clamp, edgePoint } from "../math.ts"
 import { BugRead, PlayerRead, standing } from "../queries.ts"
-import { Bug, BugFixed, Chat, Fx, Game, Language, LevelSpec, Missions, Pickup, PlayerHurt, Rng, Run } from "../schema.ts"
+import { Bug, BugFixed, Chat, Fx, Game, Hardcore, Language, LevelSpec, Missions, Pickup, PlayerHurt, Rng, Run } from "../schema.ts"
 import type { BugValue, MissionValue, PickupKind } from "../schema.ts"
 import { Ops } from "@typeonce/ritmo-math"
 
@@ -94,6 +95,7 @@ export const MissionDirectorSystem = Game.System(
     resources: {
       level: Game.System.readResource(LevelSpec),
       language: Game.System.readResource(Language),
+      hardcore: Game.System.readResource(Hardcore),
       missions: Game.System.writeResource(Missions),
       run: Game.System.writeResource(Run),
       rng: Game.System.writeResource(Rng)
@@ -196,7 +198,7 @@ export const MissionDirectorSystem = Game.System(
         run.score += MISSION_POINTS
         const line = random.pick(strings.outcomes[mission.client].success) ?? "ok"
         events.chat.emit({ type: "outcome", client: mission.client, text: say(mission.client, line), success: true })
-        const reward = random.pick(rewards) ?? "hotfix"
+        const reward = random.pick(allowedPickups(rewards, resources.hardcore.get())) ?? "hotfix"
         const angle = random.range(0, Math.PI * 2)
         commands.spawn(makePickup(reward, {
           x: clamp(playerAt.x + Ops.cos(angle) * 90, 40, ARENA.width - 40),

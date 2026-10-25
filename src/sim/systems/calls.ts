@@ -4,10 +4,11 @@ import { Ops } from "@typeonce/ritmo-math"
 import { text } from "../../content/i18n.ts"
 import { ARENA, CALLS, DT } from "../constants.ts"
 import { makePickup } from "../drafts.ts"
+import { allowedPickups } from "../hardcore.ts"
 import { clamp, distanceSquared } from "../math.ts"
 import { PlayerRead, standing } from "../queries.ts"
 import { callKinds } from "../../content/clients.ts"
-import { Calls, Chat, Fx, Game, Language, LevelSpec, Pickup, Rng, Run } from "../schema.ts"
+import { Calls, Chat, Fx, Game, Hardcore, Language, LevelSpec, Pickup, Rng, Run } from "../schema.ts"
 import type { CallValue, PickupKind, Vec } from "../schema.ts"
 
 const rewards: ReadonlyArray<PickupKind> = ["hotfix", "refactor", "coffee", "unitTest", "revert", "pizza"]
@@ -38,6 +39,7 @@ export const CallSystem = Game.System(
     resources: {
       level: Game.System.readResource(LevelSpec),
       language: Game.System.readResource(Language),
+      hardcore: Game.System.readResource(Hardcore),
       run: Game.System.writeResource(Run),
       calls: Game.System.writeResource(Calls),
       rng: Game.System.writeResource(Rng)
@@ -131,7 +133,7 @@ export const CallSystem = Game.System(
         events.chat.emit({ type: "outcome", client: call.client, text: say(call.client, random.pick(lines.answered) ?? "ok"), success: true })
         events.fx.emit({ type: "callDone", x: me.x, y: me.y, kind: call.kind, points })
         const angle = random.range(0, Math.PI * 2)
-        commands.spawn(makePickup(random.pick(rewards) ?? "coffee", {
+        commands.spawn(makePickup(random.pick(allowedPickups(rewards, resources.hardcore.get())) ?? "coffee", {
           x: clamp(me.x + Ops.cos(angle) * 90, 40, ARENA.width - 40),
           y: clamp(me.y + Ops.sin(angle) * 90, 40, ARENA.height - 40)
         }))

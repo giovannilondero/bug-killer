@@ -7,7 +7,7 @@ import { Body, Boss, Bug, Game, HostileShot, Pickup, Player, Position, Shot, Tur
 import type { PickupKind, TeammateValue, Vec } from "./schema.ts"
 import { Ops } from "@typeonce/ritmo-math"
 
-export const makePlayer = (at: Vec, teammate: TeammateValue) =>
+export const makePlayer = (at: Vec, teammate: TeammateValue, maxHp: number = PLAYER.maxHp) =>
   Game.Command.spawn(
     Game.Command.entry(Position, at),
     Game.Command.entry(Velocity, { x: 0, y: 0 }),
@@ -16,8 +16,8 @@ export const makePlayer = (at: Vec, teammate: TeammateValue) =>
       slot: teammate.slot,
       name: teammate.name,
       color: teammate.color,
-      hp: PLAYER.maxHp,
-      maxHp: PLAYER.maxHp,
+      hp: maxHp,
+      maxHp,
       invulnerable: 1.5,
       fireCooldown: 0,
       dashCooldown: 0,

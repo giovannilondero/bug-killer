@@ -4,6 +4,7 @@ import { bugKinds } from "../../content/bugs.ts"
 import { text } from "../../content/i18n.ts"
 import { BOMB_RADIUS, BUFF_SECONDS, COMBO_WINDOW, PLAYER } from "../constants.ts"
 import { makeBug, makePickup, makeTurret } from "../drafts.ts"
+import { allowedPickups } from "../hardcore.ts"
 import { distanceSquared, overlaps } from "../math.ts"
 import { BossWrite, BugWrite, HostileShotWrite, PickupWrite, PlayerWrite, ShotWrite } from "../queries.ts"
 import {
@@ -13,6 +14,7 @@ import {
   BugFixed,
   Fx,
   Game,
+  Hardcore,
   HostileShot,
   Language,
   Pickup,
@@ -55,7 +57,8 @@ export const CombatSystem = Game.System(
     resources: {
       run: Game.System.writeResource(Run),
       rng: Game.System.writeResource(Rng),
-      language: Game.System.readResource(Language)
+      language: Game.System.readResource(Language),
+      hardcore: Game.System.readResource(Hardcore)
     },
     events: {
       bombs: Game.System.readEvent(BombBlast),
@@ -72,6 +75,7 @@ export const CombatSystem = Game.System(
     const run: RunValue = { ...resources.run.get(), fixed: [...resources.run.get().fixed] }
     const random = Random.draw(resources.rng)
     const strings = text[resources.language.get()]
+    const drops = allowedPickups(pickupKinds, resources.hardcore.get())
     const gone = new Set<number>()
     const playing = run.phase === "waves" || run.phase === "boss"
 
@@ -124,7 +128,7 @@ export const CombatSystem = Game.System(
       }
 
       if (random.next() < dropChance[bug.priority]) {
-        const kindDropped = random.weighted(pickupKinds, (k) => dropWeights[k]) ?? "hotfix"
+        const kindDropped = random.weighted(drops, (k) => dropWeights[k]) ?? "hotfix"
         commands.spawn(makePickup(kindDropped, at))
       }
     }
