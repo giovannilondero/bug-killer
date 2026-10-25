@@ -213,6 +213,7 @@ export const en: Strings = {
     threads: { main: "thread: main", worker: "thread: worker" },
     lap: (lap) => `LAP ${lap}`,
     depth: (frames) => `STACK DEPTH ${frames}`,
+    stackGuard: "🧱 close the dropped frames first",
     restarting: (seconds) => `⟳ restarting in ${seconds.toFixed(1)}s`,
     startBanner: "Close the backlog before the client shows up",
     audioOn: "🔊 AUDIO ON",

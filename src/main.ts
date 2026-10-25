@@ -20,6 +20,7 @@ import { codePattern, NAME_MAX } from "./net/protocol.ts"
 import type { ErrorCode, RoomInfo, ServerMessage } from "./net/protocol.ts"
 import { bestScore, clearSprint, endEndless, loadProgress, saveProgress, sprintsCleared, sprintUnlocked, unlockEverySprint } from "./progress.ts"
 import type { Progress } from "./progress.ts"
+import { FRAME_PREFIX } from "./sim/bosses.ts"
 import { PARTY, STEP } from "./sim/constants.ts"
 import { makePickup } from "./sim/drafts.ts"
 import { Game, Pickup } from "./sim/schema.ts"
@@ -586,7 +587,7 @@ const stats = (v: View) => html`
 
 const releaseNotes = (v: View) => {
   const items = v.run.fixed
-    .filter((f) => !f.key.startsWith("ESC-") && !f.key.startsWith("CRASH-") && !f.key.startsWith("NULL-"))
+    .filter((f) => !f.key.startsWith("ESC-") && !f.key.startsWith("CRASH-") && !f.key.startsWith("NULL-") && !f.key.startsWith(FRAME_PREFIX))
     .map((f) => html`<li><b style="color:${bugKinds[f.priority].color}">${f.key}</b>${f.type === "bug" ? "" : html`<em class="notes-type" style="color:${ticketColors[f.type]}">${escape(t().ticketTypes[f.type].label)}</em>`} ${escape(f.summary)}</li>`)
     .join("")
   const creep = v.run.fixed.filter((f) => f.key.startsWith("ESC-"))
@@ -601,7 +602,7 @@ const releaseNotes = (v: View) => {
 }
 
 const markdownNotes = (v: View) =>
-  [`## Release notes — ${v.level.name}`, "", ...v.run.fixed.filter((f) => !/^(ESC|CRASH|NULL)-/.test(f.key)).map((f) => `- **${f.key}**${f.type === "bug" ? "" : ` _${t().ticketTypes[f.type].label}_`} ${f.summary}`), ...(v.run.subtasks ? ["", t().notes.subtasks(v.run.subtasks)] : [])].join("\n")
+  [`## Release notes — ${v.level.name}`, "", ...v.run.fixed.filter((f) => !/^(ESC|CRASH|NULL|FRAME)-/.test(f.key)).map((f) => `- **${f.key}**${f.type === "bug" ? "" : ` _${t().ticketTypes[f.type].label}_`} ${f.summary}`), ...(v.run.subtasks ? ["", t().notes.subtasks(v.run.subtasks)] : [])].join("\n")
 
 const showCleared = (v: View) => {
   setMode("over")

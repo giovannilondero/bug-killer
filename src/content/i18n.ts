@@ -112,6 +112,8 @@ export interface Strings {
     readonly lap: (lap: number) => string
     /** Under a stack overflow: how many frames its tower has left. */
     readonly depth: (frames: number) => string
+    /** Over a stack overflow shielded while its dropped frames run. */
+    readonly stackGuard: string
     readonly startBanner: string
     readonly audioOn: string
     readonly audioOff: string
