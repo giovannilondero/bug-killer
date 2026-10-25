@@ -653,6 +653,31 @@ test("Code freeze: a boss is only slowed, never stopped", () => {
   assert.ok(slowed < free * 0.7, `slowed ${slowed.toFixed(1)} px vs ${free.toFixed(1)} px free: about half as fast`)
 })
 
+test("git reset --hard is not a weapon: under Code freeze and Memory leak it hurts a boss but applies nothing", () => {
+  let bomb = false
+  const made = createSimulation({ level: levels[3]!, seed: 4, input: { snapshot: () => ({ ...idleInput, bomb }) }, presentation: { fx: () => undefined, chat: () => undefined } })
+  if (!made.ok) throw new Error(JSON.stringify(made.error))
+  const sim = made.value
+  const me = sim.view().player!.position
+  const Drop = Game.System("Test/Drop", { commands: Game.System.commands(Game.System.spawns(Pickup, Boss)) }, ({ commands }) => {
+    commands.spawn(makePickup("codeFreeze", { x: me.x, y: me.y }))
+    commands.spawn(makePickup("memoryLeak", { x: me.x, y: me.y }))
+    commands.spawn(makeBoss({ ...levels[0]!.boss, key: "BOSS-1" }, { x: me.x + 400, y: me.y - 300 }))
+  })
+  assert.ok(sim.runtime.tick(Game.Schedule(Drop, Game.Schedule.applyDeferred())).ok)
+  // Past the boss's boot shield.
+  for (let frame = 0; frame < 2.5 * 60; frame++) assert.ok(sim.step().ok)
+  const { buffs } = sim.view().player!
+  assert.ok(buffs.codeFreeze > 0 && buffs.memoryLeak > 0, "the developer holds both")
+  const hp = sim.view().bosses[0]!.hp
+  bomb = true
+  assert.ok(sim.step().ok)
+  bomb = false
+  const boss = sim.view().bosses[0]!
+  assert.ok(boss.hp < hp, "the blast hurts the boss")
+  assert.deepEqual(boss.statuses, [], "but neither freezes nor poisons it")
+})
+
 test("Code freeze arrives with sprint 3 (Keystone) and not before", () => {
   assert.equal(isUnlocked("codeFreeze", levels[1]!.tier), false)
   assert.equal(isUnlocked("codeFreeze", levels[2]!.tier), true)

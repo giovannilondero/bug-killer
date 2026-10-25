@@ -288,15 +288,15 @@ export const CombatSystem = Game.System(
       }
     }
 
-    // git reset --hard
+    // git reset --hard: not a weapon, so the hitter's statuses stay out of it.
     for (const blast of events.bombs.all()) {
       for (const match of bugs) {
         if (!gone.has(match.entity.id) && distanceSquared(match.data.position.get(), blast) < BOMB_RADIUS ** 2) {
-          damageBug(match, 99, blast.slot, hitBy(blast.slot))
+          damageBug(match, 99, blast.slot)
         }
       }
       for (const match of bosses) {
-        if (!gone.has(match.entity.id)) damageBoss(match, 18, blast.slot, hitBy(blast.slot))
+        if (!gone.has(match.entity.id)) damageBoss(match, 18, blast.slot)
       }
       for (const shot of queries.hostile.each()) {
         if (!gone.has(shot.entity.id)) {
