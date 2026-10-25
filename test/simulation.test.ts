@@ -745,6 +745,15 @@ test("a Highest bug still leaves its 3 regressions, a Story its 2 sub-tasks", ()
   assert.equal(done.run.subtasks, 2)
 })
 
+test("a Highest Story leaves both its 2 sub-tasks and the 3 regressions, and its sub-tasks leave none", () => {
+  const shooting = dropIn([{ key: "QUIZ-911", summary: "As a host I want live scores", priority: "Highest", status: "To Do", type: "story" }])
+  const keys = new Set<string>()
+  const done = shooting.until((v) => v.bugs.length === 0, 60, (v) => v.bugs.forEach((bug) => keys.add(bug.key)))
+  assert.equal(done.run.phase, "waves", "closed by the developer, not lost")
+  assert.deepEqual([...keys].sort(), ["QUIZ-911", "QUIZ-911-1", "QUIZ-911-2", "QUIZ-911-REG1", "QUIZ-911-REG2", "QUIZ-911-REG3"])
+  assert.equal(done.run.subtasks, 2)
+})
+
 test("Stories come with Side Quests: none in Glacier, none before their tier, in Endless from its second tier", () => {
   assert.ok(levels[0]!.bugs.every((bug) => (bug.type ?? "bug") === "bug"), "Glacier's backlog has no Stories")
   assert.ok(levels[1]!.bugs.some((bug) => bug.type === "story"), "Side Quests' backlog has some")

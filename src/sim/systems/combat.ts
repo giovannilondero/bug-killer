@@ -178,7 +178,9 @@ export const CombatSystem = Game.System(
             { x: at.x + Ops.cos(angle) * 24, y: at.y + Ops.sin(angle) * 24 }
           ))
         }
-      } else if (kind.splits > 0 && !bug.regression && bug.type === "bug") {
+      }
+      // Regressions follow the priority, whatever the type; a sub-task's parent has already left its own.
+      if (kind.splits > 0 && !bug.regression && bug.type !== "subtask") {
         for (let i = 0; i < kind.splits; i++) {
           const angle = (i / kind.splits) * Math.PI * 2
           commands.spawn(makeBug(
