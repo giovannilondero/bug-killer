@@ -95,6 +95,8 @@ export interface BugLook {
   boss?: boolean
   /** Code freeze: iced over, legs still. */
   frozen?: boolean
+  /** This is fine 🔥: scorched orange, with a flame on top drawn by the renderer. */
+  burning?: boolean
 }
 
 /** A bug facing +x, centred on the origin: legs, antennae, glowing body, spots, eyes, armour. */
@@ -147,6 +149,11 @@ export const paintBug = (ctx: CanvasRenderingContext2D, r: number, color: string
     ctx.setLineDash([6, 4])
     ctx.beginPath(); ctx.ellipse(-r * 0.15, 0, r * 0.95, r * 0.8, 0, 0, Math.PI * 2); ctx.stroke()
     ctx.setLineDash([])
+  }
+  if (options.burning) {
+    // Scorched: an orange glow over the shell.
+    ctx.fillStyle = "rgba(255, 120, 30, 0.45)"
+    ctx.beginPath(); ctx.ellipse(-r * 0.15, 0, r * 0.9, r * 0.72, 0, 0, Math.PI * 2); ctx.fill()
   }
   if (options.frozen) {
     // A block of ice over the whole bug, with a few frost glints.
