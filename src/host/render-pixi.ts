@@ -10,6 +10,7 @@ import { bugKinds } from "../content/bugs.ts"
 import { clients } from "../content/clients.ts"
 import { comboMultiplier } from "../sim/systems/combat.ts"
 import { BUFF_SECONDS, PARTY, PLAYER, TURRET } from "../sim/constants.ts"
+import { WEAPONS } from "../sim/weapons.ts"
 import type { FxValue, PickupKind, Vec } from "../sim/schema.ts"
 import type { View } from "../sim/simulation.ts"
 import { formatNumber, locale, t } from "./language.ts"
@@ -896,6 +897,16 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
       text(S, res, "GIT RESET --HARD  [Q]", `11px ${MONO}`, "#9aa4b8", 20, 100, "left")
       for (let i = 0; i < player.bombs; i++) text(S, res, "⏪", `16px ${SANS}`, "#9aa4b8", 20 + i * 24, 122, "left")
       let row = 0
+      const weapon = player.weapon
+      if (weapon.kind !== "gun") {
+        // The weapon in hand: its icon, how long it lasts, and its name.
+        const y = 142
+        text(S, res, pickupIcons[weapon.kind], `14px ${SANS}`, "#ffffff", 20, y + 4, "left")
+        S.rect(44, y - 6, 100, 8, 0xffffff, 0.15)
+        S.rect(44, y - 6, 100 * (weapon.seconds / WEAPONS[weapon.kind].seconds), 8, "#ffd84a")
+        text(S, res, `${t().pickups[weapon.kind].label.toUpperCase()}  ${Math.ceil(weapon.seconds)}s`, `bold 11px ${MONO}`, "#ffd84a", 152, y + 2, "left")
+        row++
+      }
       for (const kind of ["tools", "hotfix", "refactor", "coffee", "unitTest"] as const) {
         const left = player.buffs[kind]
         if (left <= 0) continue

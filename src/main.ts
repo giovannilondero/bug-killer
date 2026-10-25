@@ -106,7 +106,7 @@ const syncMusic = () => {
 const playFx = (event: FxValue) => {
   renderer.fx(event)
   switch (event.type) {
-    case "shoot": audio.shoot(); break
+    case "shoot": audio.shoot(event.weapon); break
     case "hit": audio.hit(); break
     case "kill":
       if (event.boss) audio.bossDown()

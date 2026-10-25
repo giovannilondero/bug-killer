@@ -4,6 +4,7 @@ import { bugKinds } from "../content/bugs.ts"
 import { clients } from "../content/clients.ts"
 import { comboMultiplier } from "../sim/systems/combat.ts"
 import { BUFF_SECONDS, PARTY, PLAYER, TURRET } from "../sim/constants.ts"
+import { WEAPONS } from "../sim/weapons.ts"
 import type { FxValue, Vec } from "../sim/schema.ts"
 import type { View } from "../sim/simulation.ts"
 import { formatNumber, t } from "./language.ts"
@@ -725,6 +726,21 @@ export const makeRenderer = (canvas: HTMLCanvasElement) => {
         ctx.fillText("⏪", 20 + i * 24, 122)
       }
       let row = 0
+      const weapon = player.weapon
+      if (weapon.kind !== "gun") {
+        // The weapon in hand: its icon, how long it lasts, and its name.
+        const y = 142
+        ctx.font = `14px ${SANS}`
+        ctx.fillStyle = "#ffffff"
+        ctx.fillText(pickupIcons[weapon.kind], 20, y + 4)
+        ctx.fillStyle = "rgba(255,255,255,0.15)"
+        ctx.fillRect(44, y - 6, 100, 8)
+        ctx.fillStyle = "#ffd84a"
+        ctx.fillRect(44, y - 6, 100 * (weapon.seconds / WEAPONS[weapon.kind].seconds), 8)
+        ctx.font = `bold 11px ${MONO}`
+        ctx.fillText(`${t().pickups[weapon.kind].label.toUpperCase()}  ${Math.ceil(weapon.seconds)}s`, 152, y + 2)
+        row++
+      }
       for (const kind of ["tools", "hotfix", "refactor", "coffee", "unitTest"] as const) {
         const left = player.buffs[kind]
         if (left <= 0) continue
