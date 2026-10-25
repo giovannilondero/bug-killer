@@ -7,6 +7,7 @@ import { bonusLevels, endlessArenas, levels } from "../src/content/levels.ts"
 import type { Level } from "../src/content/levels.ts"
 import { stackTop } from "../src/sim/bosses.ts"
 import { BREAKPOINT, PLAYER, TURRET } from "../src/sim/constants.ts"
+import { clampToArena } from "../src/sim/math.ts"
 import { makeBug, makeHostileShot, makePickup } from "../src/sim/drafts.ts"
 import { createSimulation, idleInput } from "../src/sim/simulation.ts"
 import type { View } from "../src/sim/simulation.ts"
@@ -268,4 +269,25 @@ test("Cubicles is the normal floor with walls, ends with the crash boss, and its
   assert.equal(cubicles.bonus!.after, 5)
   assert.equal(arenaOf(cubicles), arenas.walls)
   assert.ok(endlessArenas.some((arena) => arena.id === "walls" && arena.unlockedBy === "cubicles"))
+})
+
+test("whatever spot a body is put at, it ends up clear of every wall and inside the arena", () => {
+  for (const [id, arena] of Object.entries(arenas) as Array<[string, Arena]>) {
+    const walls = arena.walls ?? []
+    // A grid over the floor, plus the inside, the corners and the middle of every wall: where two walls meet, the corner of an L.
+    const spots: Array<Vec> = []
+    for (let x = 0; x <= arena.width; x += 15) for (let y = 0; y <= arena.height; y += 15) spots.push({ x, y })
+    for (const wall of walls) {
+      for (const fx of [0, 0.01, 0.25, 0.5, 0.75, 0.99, 1]) for (const fy of [0, 0.01, 0.25, 0.5, 0.75, 0.99, 1]) spots.push({ x: wall.x + wall.width * fx, y: wall.y + wall.height * fy })
+    }
+    // Up to bodies bigger than any the game has, where the passes alone leave some in a wall.
+    for (const radius of [PLAYER.radius, 40, 90, 130]) {
+      for (const spot of spots) {
+        const at = clampToArena(spot, radius, arena)
+        const where = `${id}: (${spot.x}, ${spot.y}) r${radius} → (${at.x.toFixed(1)}, ${at.y.toFixed(1)})`
+        assert.ok(!inAnyWall(arena, at, radius), `${where} is in a wall`)
+        assert.ok(at.x >= radius && at.x <= arena.width - radius && at.y >= radius && at.y <= arena.height - radius, `${where} is off the floor`)
+      }
+    }
+  }
 })

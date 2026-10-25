@@ -24,17 +24,45 @@ const withinEdges = (p: Vec, radius: number, arena: Arena): Vec => ({
   y: clamp(p.y, radius, arena.height - radius)
 })
 
+/** How far apart the spots `freeSpot` tries are, ring after ring. */
+const SEARCH_STEP = 10
+
+/**
+ * The spot nearest `p`, ring by ring outwards, where a body of `radius` fits
+ * inside the edges and clear of every wall; `p` itself when there is none.
+ */
+const freeSpot = (p: Vec, radius: number, arena: Arena): Vec => {
+  const rings = Math.ceil(Math.max(arena.width, arena.height) / SEARCH_STEP)
+  for (let ring = 1; ring <= rings; ring++) {
+    let best: Vec | null = null
+    let bestDistance = Infinity
+    for (let i = -ring; i <= ring; i++) {
+      for (const [dx, dy] of [[i, -ring], [i, ring], [-ring, i], [ring, i]] as const) {
+        const spot = withinEdges({ x: p.x + dx * SEARCH_STEP, y: p.y + dy * SEARCH_STEP }, radius, arena)
+        const d = distanceSquared(spot, p)
+        if (d < bestDistance && !inWall(arena, spot, radius)) {
+          best = spot
+          bestDistance = d
+        }
+      }
+    }
+    if (best) return best
+  }
+  return p
+}
+
 /**
  * The closest spot to `p` where a body of `radius` fits: inside the arena's
  * edges and out of its walls. Every placement and every move ends here.
  */
 export const clampToArena = (p: Vec, radius: number, arena: Arena): Vec => {
   let at = withinEdges(p, radius, arena)
-  // Walls stand well apart and away from the edges, so a couple of passes settle any body.
+  // Pushing out of one wall can land in the next (a cubicle's L is two walls that overlap at its corner),
+  // so a few passes settle almost every body, and a search outwards settles the rest.
   for (let pass = 0; pass < 3 && inWall(arena, at, radius); pass++) {
     at = withinEdges(outOfWalls(arena, at, radius), radius, arena)
   }
-  return at
+  return inWall(arena, at, radius) ? freeSpot(at, radius, arena) : at
 }
 
 export const angleTo = (from: Vec, to: Vec): number => Ops.atan2(to.y - from.y, to.x - from.x)
