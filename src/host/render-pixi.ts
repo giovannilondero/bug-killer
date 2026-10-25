@@ -10,6 +10,7 @@ import { bugKinds } from "../content/bugs.ts"
 import { clients } from "../content/clients.ts"
 import type { BossPattern } from "../content/levels.ts"
 import { comboMultiplier } from "../sim/systems/combat.ts"
+import { raceSpot } from "../sim/bosses.ts"
 import { BREAKPOINT, BUFF_SECONDS, DEPLOY, PARTY, PLAYER, ROCKET, TURRET } from "../sim/constants.ts"
 import { isUnlocked } from "../sim/tiers.ts"
 import { hasStatus } from "../sim/statuses.ts"
@@ -17,7 +18,7 @@ import { WEAPONS } from "../sim/weapons.ts"
 import type { FxValue, PickupKind, Vec } from "../sim/schema.ts"
 import type { View } from "../sim/simulation.ts"
 import { formatNumber, locale, t } from "./language.ts"
-import { bossHealth, conflictMarkerColors, conflictMarkers, floorKey, fuseBlink, fuseProgress, MONO, paintBreakpoint, paintBug, paintFloor, paintFuseRing, paintHeart, paintHostile, paintLabel, paintNest, paintPickup, paintPing, paintPlayer, paintRocket, paintRocketTarget, paintTooltip, pickupIcons, pickupInfo, SANS, shade, tooltipHeight, TOOLTIP_WIDTH, truncate } from "./paint.ts"
+import { bossHealth, conflictMarkerColors, conflictMarkers, floorKey, fuseBlink, fuseProgress, MONO, paintBreakpoint, paintBug, paintFloor, paintFuseRing, paintHeart, paintHostile, paintLabel, paintNest, paintPickup, paintPing, paintPlayer, paintRestartGhost, paintRocket, paintRocketTarget, paintTooltip, pickupIcons, pickupInfo, SANS, shade, tooltipHeight, TOOLTIP_WIDTH, truncate } from "./paint.ts"
 import type { BugLook, TooltipBug } from "./paint.ts"
 import type { Camera, Renderer } from "./render.ts"
 import { touchMode } from "./touch.ts"
@@ -583,7 +584,7 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
   }
 
   /** What each boss pattern adds to the plain boss: drawn under it, or over it. */
-  const bossMarks: Record<BossPattern, { readonly under?: (boss: ViewBoss, heading: number) => void; readonly over?: (boss: ViewBoss) => void }> = {
+  const bossMarks: Record<BossPattern, { readonly under?: (boss: ViewBoss, heading: number) => void; readonly over?: (boss: ViewBoss, arena: Arena) => void }> = {
     dispenser: {},
     crash: {
       // Glitches now and then, a ghost of the restart.
@@ -617,10 +618,21 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
           text(W, wres, marker, `bold 13px ${MONO}`, conflictMarkerColors[i]!, boss.position.x + Math.cos(a) * boss.radius * 1.6, boss.position.y + Math.sin(a) * boss.radius * 1.6)
         }
       }
+    },
+    raceCondition: {
+      over: (boss, arena) => {
+        if (!boss.thread) return
+        text(W, wres, t().hud.threads[boss.thread], `bold 13px ${MONO}`, boss.color, boss.position.x, boss.position.y + boss.radius * 1.6)
+        if (boss.revive <= 0) return
+        // Its twin was fixed: a ghost where it restarts, and the seconds left to stop it.
+        const spot = raceSpot(arena, boss.age, boss.thread === "main" ? "worker" : "main")
+        W.sprite(bakery.bake(`restartGhost|${boss.radius}`, wres, around(boss.radius + 3), (g) => paintRestartGhost(g, boss.radius, "#ffffff")), spot.x, spot.y, { rotation: time * 1.5 })
+        text(W, wres, t().hud.restarting(boss.revive), `bold 14px ${MONO}`, Math.sin(time * 12) > 0 ? "#ffffff" : boss.color, spot.x, spot.y)
+      }
     }
   }
 
-  const drawBoss = (boss: ViewBoss) => {
+  const drawBoss = (boss: ViewBoss, arena: Arena) => {
     const { x, y } = boss.position
     const heading = Math.atan2(boss.position.y - (boss.position.y - 1), 0) + Math.sin(boss.age) * 0.2 + Math.PI / 2
     const marks = bossMarks[boss.pattern]
@@ -637,7 +649,7 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
       }), x, y)
       text(W, wres, boss.pattern === "twoFactor" ? "🔐 OTP ******" : t().hud.booting, `bold 14px ${MONO}`, "#ffffff", x, y - boss.radius * 1.5)
     }
-    marks.over?.(boss)
+    marks.over?.(boss, arena)
     text(W, wres, boss.key, `bold 14px ${MONO}`, "#ffffff", x, y - boss.radius - 14)
   }
 
@@ -803,7 +815,7 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
       }
     }
 
-    for (const boss of view.bosses) drawBoss(boss)
+    for (const boss of view.bosses) drawBoss(boss, arena)
 
     // Shots
     for (const shot of view.shots) {

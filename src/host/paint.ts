@@ -481,6 +481,17 @@ export const roundRect = (ctx: CanvasRenderingContext2D, x: number, y: number, w
 export const conflictMarkers = ["<<<<<<<", "=======", ">>>>>>>"] as const
 export const conflictMarkerColors = ["#7ee787", "#e3b341", "#ff7b72"] as const
 
+/** Where a race condition's fixed twin comes back, centred on the origin: a dashed outline in its colour. */
+export const paintRestartGhost = (ctx: CanvasRenderingContext2D, radius: number, color: string) => {
+  ctx.strokeStyle = color
+  ctx.globalAlpha = 0.6
+  ctx.lineWidth = 3
+  ctx.setLineDash([12, 9])
+  ctx.beginPath(); ctx.arc(0, 0, radius, 0, Math.PI * 2); ctx.stroke()
+  ctx.setLineDash([])
+  ctx.globalAlpha = 1
+}
+
 /**
  * What the boss bar shows: how much of the boss called `key` is left, counting
  * every piece of a boss that split, and whether any of it is shielded.
