@@ -134,6 +134,7 @@ export const it: Strings = {
     conflict: "CONFLITTO: nostri contro loro",
     halfResolved: "un lato risolto, manca l'altro",
     threadDown: "un thread giù: chiudi l'altro, svelto",
+    faster: "GOTO 10: un altro giro, più veloce",
     restarted: "race persa: il thread è ripartito"
   },
 
@@ -157,6 +158,7 @@ export const it: Strings = {
     foundry: "Il backlog più grande. Ugo è online.",
     monorepo: "Un solo repo per tutto, e tutti dentro. Fabrizio mette +1.",
     microservices: "Quaranta servizi, un bug in ognuno. Debora lo vuole più pop entro venerdì.",
+    legacy: "Schermo verde, COBOL e un loop che nessuno osa toccare. Più dura che mai.",
     endless: "Tutti i bug di tutti i progetti, per sempre. Quanto resisti?"
   },
   pickups: {
@@ -207,6 +209,7 @@ export const it: Strings = {
     factor: "FATTORE 2/2",
     sides: { ours: "<<<<<<< nostri", theirs: ">>>>>>> loro" },
     threads: { main: "thread: main", worker: "thread: worker" },
+    lap: (lap) => `GIRO ${lap}`,
     restarting: (seconds) => `⟳ riavvio tra ${seconds.toFixed(1)}s`,
     startBanner: "Chiudi il backlog prima che arrivi il cliente",
     audioOn: "🔊 AUDIO ON",

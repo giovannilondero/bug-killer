@@ -106,3 +106,10 @@ export const ENDLESS = {
 
 /** A race condition's twins: one fixed alone comes back unless the other is fixed within `window` seconds. */
 export const RACE = { window: 4, rebootShield: 1 } as const
+
+/**
+ * An infinite loop's circuit: `speed` radians a second on its first lap, `speedup`
+ * more of that for every lap run, up to `maxSpeed`. It drops a shot every `trail`
+ * radians, `drift` px/s slow.
+ */
+export const LOOP = { speed: 0.36, speedup: 0.15, maxSpeed: 0.9, trail: (Math.PI * 2) / 44, drift: 18 } as const

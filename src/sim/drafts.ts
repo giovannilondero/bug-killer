@@ -122,7 +122,8 @@ export const makeBoss = (boss: BossContent, at: Vec, hpFactor = 1) =>
       statuses: [],
       side: null,
       thread: null,
-      revive: 0
+      revive: 0,
+      course: 0
     },
     at,
     boss.radius

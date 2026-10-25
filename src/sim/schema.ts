@@ -99,6 +99,8 @@ export interface BossValue {
   thread: RaceThread | null
   /** Seconds until its fixed twin comes back; 0 while the twin is running, or for any other boss. */
   revive: number
+  /** How far an infinite loop has run round its circuit, in radians: a lap every 2π. 0 for any other boss. */
+  course: number
 }
 export const Boss = Descriptor.Component<BossValue>()("BugKiller/Boss")
 

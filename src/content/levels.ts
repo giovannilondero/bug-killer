@@ -6,7 +6,7 @@ import type { ClientId } from "./clients.ts"
 import type { Tier } from "../sim/tiers.ts"
 
 /** How a boss fights; each pattern is one branch of the boss system. */
-export const bossPatterns = ["dispenser", "crash", "twoFactor", "undefined", "mergeConflict", "raceCondition"] as const
+export const bossPatterns = ["dispenser", "crash", "twoFactor", "undefined", "mergeConflict", "raceCondition", "infiniteLoop"] as const
 export type BossPattern = (typeof bossPatterns)[number]
 
 /** The two halves a merge conflict splits into. */
@@ -28,7 +28,7 @@ export interface Boss {
   readonly shotText: string
 }
 
-export const levelIds = ["glacier", "sidequests", "keystone", "foundry", "monorepo", "microservices", "endless"] as const
+export const levelIds = ["glacier", "sidequests", "keystone", "foundry", "monorepo", "microservices", "legacy", "endless"] as const
 export type LevelId = (typeof levelIds)[number]
 
 export interface Level {
@@ -36,7 +36,8 @@ export interface Level {
   readonly sprint: string
   readonly name: string
   readonly projects: ReadonlyArray<string>
-  readonly theme: { readonly background: string; readonly grid: string; readonly accent: string }
+  /** `crt`: an old terminal's floor, with phosphor glow and scanlines. */
+  readonly theme: { readonly background: string; readonly grid: string; readonly accent: string; readonly crt?: boolean }
   readonly clients: ReadonlyArray<ClientId>
   /** Seconds between client messages. */
   readonly clientEvery: number
@@ -176,6 +177,26 @@ export const levels: ReadonlyArray<Level> = [
       radius: 50,
       color: "#3ee6c4",
       shotText: "409"
+    }
+  }),
+  level({
+    id: "legacy",
+    sprint: "Sprint 7",
+    name: "Legacy",
+    projects: ["LGC"],
+    theme: { background: "#020a03", grid: "#0b2a10", accent: "#33ff66", crt: true },
+    clients: ["gualtiero", "ugo", "ornella", "debora", "fabrizio"],
+    clientEvery: 9,
+    waveSize: 8,
+    tier: 5,
+    boss: {
+      key: "LGC-1983",
+      title: "10 GOTO 10",
+      pattern: "infiniteLoop",
+      hp: 170,
+      radius: 48,
+      color: "#33ff66",
+      shotText: "GOTO"
     }
   })
 ]

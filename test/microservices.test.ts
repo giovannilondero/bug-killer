@@ -133,8 +133,7 @@ test("Debora assigns missions in Microservices", () => {
   assert.match(mission.text, /pop/i)
 })
 
-test("Endless rotates 6 bosses, Race condition last", () => {
-  assert.equal(endlessLevel.endless!.bosses.length, 6)
+test("Endless rotates Race condition sixth", () => {
   assert.equal(endlessLevel.endless!.bosses[5]!.pattern, "raceCondition")
   assert.ok(endlessLevel.clients.includes("debora"))
   assert.ok(endlessLevel.bugs.some((bug) => bug.key.startsWith("MSVC-")))

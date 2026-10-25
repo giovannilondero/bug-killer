@@ -5,7 +5,7 @@ import { arenas } from "../content/arenas.ts"
 import type { Arena } from "../content/arenas.ts"
 import type { Strings } from "../content/i18n.ts"
 import type { BossPattern, ConflictSide, RaceThread } from "../content/levels.ts"
-import { DT, RACE } from "./constants.ts"
+import { DT, LOOP, RACE } from "./constants.ts"
 import type { BugSeed } from "./drafts.ts"
 import { clamp, normalize, openPoint } from "./math.ts"
 import type { BossValue, Vec } from "./schema.ts"
@@ -99,6 +99,18 @@ const otherThread = (thread: RaceThread): RaceThread => (thread === "main" ? "wo
  */
 export const raceSpot = (arena: Arena, age: number, thread: RaceThread): Vec =>
   orbit(arena, age * 0.6 + (thread === "worker" ? Math.PI : 0), 380, 240)
+
+/** How many laps an infinite loop has run, `course` radians round its circuit. */
+export const lapOf = (course: number): number => Math.floor(course / (Math.PI * 2))
+
+/**
+ * Where an infinite loop is `course` radians round its circuit: an ∞ across
+ * the arena, through the centre twice a lap.
+ */
+export const loopSpot = (arena: Arena, course: number): Vec => ({
+  x: arena.width / 2 + Ops.cos(course) * 600 * (arena.width / arenas.normal.width),
+  y: arena.height / 2 + Ops.sin(course * 2) * 300 * (arena.height / arenas.normal.height)
+})
 
 /**
  * Every boss pattern, in one table: each is one of the level's worst tickets
@@ -278,6 +290,35 @@ export const bossRules: Record<BossPattern, BossRules> = {
     },
     turn: () => null,
     piece: "threadDown"
+  },
+
+  // 10 GOTO 10. Runs an ∞ round the arena, faster every lap, and what it
+  // leaves behind keeps hurting for a while.
+  infiniteLoop: {
+    fight: ({ boss, position, aim, rage, arena, strings, fire, ring, announce }) => {
+      const lap = lapOf(boss.course)
+      const before = boss.course
+      boss.course += Math.min(LOOP.maxSpeed, LOOP.speed * (1 + LOOP.speedup * lap)) * DT
+      const goal = loopSpot(arena, boss.course)
+      if (Math.floor(boss.course / LOOP.trail) !== Math.floor(before / LOOP.trail)) {
+        const back = loopSpot(arena, before)
+        fire(Ops.atan2(back.y - goal.y, back.x - goal.x), LOOP.drift)
+      }
+      if (lapOf(boss.course) > lap) {
+        // GOTO 10: one more lap, and a ring for the road.
+        ring(10 + Math.round(rage * 8), 200, boss.age)
+        announce(strings.bossPhase.faster)
+      }
+      if (boss.timer <= 0) {
+        for (let i = -1; i <= 1; i++) fire(aim + i * 0.18, 260)
+        boss.volley += 1
+        boss.timer = 1.6 - rage * 0.5
+      }
+      // Stays on the circuit: straight to where it should be, but never in a blink.
+      const gap = Ops.hypot(goal.x - position.x, goal.y - position.y)
+      return toward(position, goal, Math.min(gap / DT, 700))
+    },
+    turn: () => null
   }
 }
 

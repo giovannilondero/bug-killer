@@ -64,6 +64,8 @@ export interface Strings {
     readonly threadDown: string
     /** The twin left running restarted the one that was fixed. */
     readonly restarted: string
+    /** An infinite loop starts another lap, faster. */
+    readonly faster: string
   }
 
   // --- What the host draws --------------------------------------------------
@@ -99,6 +101,8 @@ export interface Strings {
     readonly threads: Record<RaceThread, string>
     /** Over the spot where a fixed twin comes back, with the seconds left. */
     readonly restarting: (seconds: number) => string
+    /** Under an infinite loop: the lap it is running. */
+    readonly lap: (lap: number) => string
     readonly startBanner: string
     readonly audioOn: string
     readonly audioOff: string
