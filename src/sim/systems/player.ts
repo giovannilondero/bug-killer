@@ -3,10 +3,35 @@ import { makeShot } from "../drafts.ts"
 import { distanceSquared, length, normalize } from "../math.ts"
 import { PlayerWrite } from "../queries.ts"
 import { BombBlast, Fx, Game, Input, Run, Shot, pickupKinds } from "../schema.ts"
-import type { InputValue } from "../schema.ts"
+import type { InputValue, Vec } from "../schema.ts"
+import { HOTFIX_COOLDOWN, WEAPONS, basicGun } from "../weapons.ts"
+import type { WeaponKind } from "../weapons.ts"
 import { Ops } from "@typeonce/ritmo-math"
 
 const still: InputValue = { move: { x: 0, y: 0 }, aim: { x: 0, y: 0 }, fire: false, dash: false, bomb: false }
+
+/**
+ * One pull of the trigger, whatever the weapon: where it fires from and
+ * toward, whose kill it is, and the power-ups that change its shots. Refactor
+ * and Tools are already off here for a weapon they don't apply to.
+ */
+interface Trigger {
+  muzzle: Vec
+  /** Unit vector toward the crosshair. */
+  aim: Vec
+  /** The crosshair itself, in world coordinates. */
+  target: Vec
+  owner: number
+  refactor: boolean
+  tools: boolean
+}
+
+/** `direction` turned by `angle` radians. */
+const turn = (direction: Vec, angle: number): Vec => {
+  const cos = Ops.cos(angle)
+  const sin = Ops.sin(angle)
+  return { x: direction.x * cos - direction.y * sin, y: direction.x * sin + direction.y * cos }
+}
 
 /**
  * Moving, aiming, shooting, dashing, and bombing: everything each
@@ -32,6 +57,24 @@ export const PlayerControlSystem = Game.System(
     const inputs = resources.input.get()
     const team = queries.player.each()
     const up = team.filter((match) => match.data.player.get().hp > 0).map((match) => match.data.position.get())
+
+    /** Bullets from `lanes` barrels side by side (pixels off the aim line), fanned out by Refactor. */
+    const bullets = (trigger: Trigger, lanes: ReadonlyArray<number>) => {
+      const side = { x: -trigger.aim.y, y: trigger.aim.x }
+      for (const offset of trigger.refactor ? [-0.2, 0, 0.2] : [0]) {
+        const direction = turn(trigger.aim, offset)
+        for (const lane of lanes) {
+          const at = { x: trigger.muzzle.x + side.x * lane, y: trigger.muzzle.y + side.y * lane }
+          commands.spawn(makeShot(at, direction, trigger.refactor ? 1 : 0, trigger.tools, trigger.owner))
+        }
+      }
+    }
+
+    /** What each weapon does with one pull of the trigger. */
+    const fire: Record<WeaponKind, (trigger: Trigger) => void> = {
+      gun: (trigger) => bullets(trigger, [0]),
+      pairProgramming: (trigger) => bullets(trigger, [-8, 8])
+    }
 
     for (const { data } of team) {
       const position = data.position.get()
@@ -62,6 +105,10 @@ export const PlayerControlSystem = Game.System(
         buffs[kind] = Math.max(0, buffs[kind] - DT)
       }
 
+      // The weapon in hand runs out like a power-up, and the basic gun comes back.
+      const left = state.weapon.seconds - DT
+      const weapon = state.weapon.kind === "gun" || left > 0 ? { ...state.weapon, seconds: Math.max(0, left) } : basicGun
+
       let { fireCooldown, dashCooldown, dashTime, dashDirection, invulnerable, bombs } = state
       fireCooldown = Math.max(0, fireCooldown - DT)
       dashCooldown = Math.max(0, dashCooldown - DT)
@@ -86,15 +133,18 @@ export const PlayerControlSystem = Game.System(
 
       const aim = normalize({ x: input.aim.x - position.x, y: input.aim.y - position.y })
       if (input.fire && fireCooldown === 0 && (aim.x !== 0 || aim.y !== 0)) {
-        fireCooldown = buffs.hotfix > 0 ? PLAYER.rapidCooldown : PLAYER.fireCooldown
+        const spec = WEAPONS[weapon.kind]
+        fireCooldown = buffs.hotfix > 0 ? spec.cooldown * HOTFIX_COOLDOWN : spec.cooldown
         const muzzle = { x: position.x + aim.x * 22, y: position.y + aim.y * 22 }
-        const spread = buffs.refactor > 0 ? [-0.2, 0, 0.2] : [0]
-        for (const offset of spread) {
-          const cos = Ops.cos(offset)
-          const sin = Ops.sin(offset)
-          commands.spawn(makeShot(muzzle, { x: aim.x * cos - aim.y * sin, y: aim.x * sin + aim.y * cos }, buffs.refactor > 0 ? 1 : 0, buffs.tools > 0, state.slot))
-        }
-        events.fx.emit({ type: "shoot", x: muzzle.x, y: muzzle.y })
+        fire[weapon.kind]({
+          muzzle,
+          aim,
+          target: input.aim,
+          owner: state.slot,
+          refactor: spec.upgradable && buffs.refactor > 0,
+          tools: spec.upgradable && buffs.tools > 0
+        })
+        events.fx.emit({ type: "shoot", x: muzzle.x, y: muzzle.y, weapon: weapon.kind })
       }
 
       if (input.bomb && bombs > 0) {
@@ -106,6 +156,7 @@ export const PlayerControlSystem = Game.System(
       data.player.set({
         ...state,
         buffs,
+        weapon,
         fireCooldown,
         dashCooldown,
         dashTime,
