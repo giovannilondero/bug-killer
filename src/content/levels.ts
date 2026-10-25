@@ -3,6 +3,7 @@ import { backlog } from "./backlog.ts"
 import { projectOf } from "./bugs.ts"
 import type { BacklogBug } from "./bugs.ts"
 import type { ClientId } from "./clients.ts"
+import type { Tier } from "../sim/tiers.ts"
 
 /** How a boss fights; each pattern is one branch of the boss system. */
 export const bossPatterns = ["dispenser", "crash", "twoFactor", "undefined"] as const
@@ -34,7 +35,7 @@ export interface Level {
   /** Bugs released per wave. */
   readonly waveSize: number
   /** The highest content tier this level offers (see `src/sim/tiers.ts`); Endless climbs to it. */
-  readonly tier: number
+  readonly tier: Tier
   readonly boss: Boss
   readonly bugs: ReadonlyArray<BacklogBug>
   /** Endless mode: waves never run out, and every `every` waves the next boss steps in. */
