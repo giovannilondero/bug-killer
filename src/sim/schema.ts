@@ -1,7 +1,7 @@
 import { Descriptor, Schema } from "@typeonce/ritmo"
 import * as Random from "@typeonce/ritmo-math/Random"
 
-import type { Priority, StatusTrait } from "../content/bugs.ts"
+import type { Priority, StatusTrait, TicketType } from "../content/bugs.ts"
 import type { CallKind, ClientId, MissionKind } from "../content/clients.ts"
 import type { Locale } from "../content/i18n.ts"
 import type { BossPattern, Level } from "../content/levels.ts"
@@ -57,6 +57,8 @@ export interface BugValue {
   resurrectedBy: ClientId | null
   /** A regression spawned by a Highest bug's death. */
   regression: boolean
+  /** Bug, Story, or a Story's sub-task. */
+  type: TicketType
 }
 export const Bug = Descriptor.Component<BugValue>()("BugKiller/Bug")
 
@@ -147,7 +149,10 @@ export interface RunValue {
   /** Extra bugs added by failed missions ("scope creep"). */
   escalations: number
   hitsTaken: number
-  fixed: Array<{ key: string; summary: string; priority: Priority }>
+  /** The release notes: every ticket closed, except regressions and sub-tasks. */
+  fixed: Array<{ key: string; summary: string; priority: Priority; type: TicketType }>
+  /** Sub-tasks closed: the release notes count them instead of listing them. */
+  subtasks: number
   missionsWon: number
   missionsLost: number
   /** Seconds since the phase changed: the host times banners with it. */

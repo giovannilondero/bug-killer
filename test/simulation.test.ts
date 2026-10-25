@@ -6,9 +6,10 @@ import type { Locale } from "../src/content/i18n.ts"
 import type { Level } from "../src/content/levels.ts"
 import { createSimulation, idleInput } from "../src/sim/simulation.ts"
 import type { View } from "../src/sim/simulation.ts"
-import { makePickup } from "../src/sim/drafts.ts"
+import { makeBug, makePickup } from "../src/sim/drafts.ts"
+import type { BugSeed } from "../src/sim/drafts.ts"
 import { contentTiers } from "../src/sim/tiers.ts"
-import { Game, Pickup, pickupKinds } from "../src/sim/schema.ts"
+import { Bug, Game, Pickup, pickupKinds } from "../src/sim/schema.ts"
 import type { ChatValue, FxValue, InputValue } from "../src/sim/schema.ts"
 
 /** A bot that kites the nearest bug and shoots at it: the same intents a player sends. */
@@ -409,4 +410,64 @@ test("drops, mission rewards and call rewards never offer a pickup above the lev
   const open = offered(levels[2]!)
   assert.equal(open.view.tier, 2)
   assert.ok(open.kinds.some((kind) => !kept.includes(kind)), "a level offers what its tier unlocks")
+})
+
+// --- Ticket types ----------------------------------------------------------
+
+/** Stands still and shoots the nearest ticket. */
+const gunner: Pilot = (view) => ({
+  snapshot: () => {
+    const v = view()
+    const me = v?.player?.position
+    const targets = v ? [...v.bugs, ...v.bosses].map((t) => t.position) : []
+    if (!me || targets.length === 0) return idleInput
+    const nearest = [...targets].sort((a, b) => Math.hypot(a.x - me.x, a.y - me.y) - Math.hypot(b.x - me.x, b.y - me.y))[0]!
+    return { ...idleInput, aim: nearest, fire: true }
+  }
+})
+
+/** A level with no backlog of its own: only the tickets a test drops in, 200 px above the developer. */
+const range = (tickets: ReadonlyArray<BugSeed>, level: Level = levels[1]!) => {
+  let current: View | null = null
+  const made = createSimulation({ level: { ...level, bugs: [] }, seed: 4, locale: "en", input: gunner(() => current, () => 0), presentation: { fx: () => undefined, chat: () => undefined } })
+  if (!made.ok) throw new Error(JSON.stringify(made.error))
+  const sim = made.value
+  const me = sim.view().player!.position
+  const Place = Game.System("Test/Place", { commands: Game.System.commands(Game.System.spawns(Bug)) }, ({ commands }) => {
+    tickets.forEach((ticket, i) => commands.spawn(makeBug(ticket, { x: me.x + (i - (tickets.length - 1) / 2) * 120, y: me.y - 200 })))
+  })
+  assert.ok(sim.runtime.tick(Game.Schedule(Place, Game.Schedule.applyDeferred())).ok)
+  current = sim.view()
+  return {
+    view: () => current!,
+    /** Steps until `done` holds (or the seconds run out), handing every view to `see`. */
+    until: (done: (view: View) => boolean, seconds = 30, see: (view: View) => void = () => undefined) => {
+      for (let frame = 0; frame < seconds * 60 && !done(current!); frame++) {
+        assert.ok(sim.step().ok)
+        current = sim.view()
+        see(current)
+      }
+      return current!
+    }
+  }
+}
+
+test("a closed Story splits into 2 smaller, faster sub-tasks keyed after it; the notes only count them", () => {
+  const story: BugSeed = { key: "MEOW-900", summary: "As a cat I want a bigger box", priority: "Medium", status: "To Do", type: "story" }
+  const shooting = range([story])
+  const before = shooting.view().bugs[0]!
+  assert.equal(before.type, "story")
+
+  const split = shooting.until((v) => !v.bugs.some((bug) => bug.key === story.key))
+  const children = split.bugs.filter((bug) => bug.key.startsWith(`${story.key}-`))
+  assert.deepEqual(children.map((bug) => bug.key).sort(), ["MEOW-900-1", "MEOW-900-2"])
+  for (const child of children) {
+    assert.equal(child.type, "subtask")
+    assert.ok(child.radius < before.radius, `sub-task radius ${child.radius} vs ${before.radius}`)
+    assert.ok(child.speed > before.speed, `sub-task speed ${child.speed} vs ${before.speed}`)
+  }
+
+  const done = shooting.until((v) => v.bugs.length === 0)
+  assert.deepEqual(done.run.fixed.map((f) => [f.key, f.type]), [["MEOW-900", "story"]])
+  assert.equal(done.run.subtasks, 2)
 })

@@ -1,7 +1,7 @@
 import * as Random from "@typeonce/ritmo-math/Random"
 
 import { arenaOf } from "../../content/arenas.ts"
-import { bugKinds } from "../../content/bugs.ts"
+import { STORY_SUBTASKS, bugKinds, subtaskKey, ticketScales } from "../../content/bugs.ts"
 import { text } from "../../content/i18n.ts"
 import { BOMB_RADIUS, BUFF_SECONDS, COMBO_WINDOW, PLAYER } from "../constants.ts"
 import { makeBug, makePickup, makeTurret } from "../drafts.ts"
@@ -96,7 +96,7 @@ export const CombatSystem = Game.System(
       gone.add(match.entity.id)
       commands.despawn(match.entity)
       const kind = bugKinds[bug.priority]
-      const points = Math.round(kind.points * 10 * comboMultiplier(run.combo))
+      const points = Math.round(kind.points * ticketScales[bug.type].points * 10 * comboMultiplier(run.combo))
       run.score += points
       run.combo += 1
       run.bestCombo = Math.max(run.bestCombo, run.combo)
@@ -115,11 +115,22 @@ export const CombatSystem = Game.System(
       events.fx.emit({ type: "kill", x: at.x, y: at.y, color: kind.color, key: bug.key, summary: bug.summary, points, boss: false })
       events.fixed.emit({ key: bug.key, priority: bug.priority })
       credit(by, 0, 1)
-      if (!bug.key.includes("-REG")) {
-        run.fixed.push({ key: bug.key, summary: bug.summary, priority: bug.priority })
+      if (bug.type === "subtask") {
+        run.subtasks += 1
+      } else if (!bug.key.includes("-REG")) {
+        run.fixed.push({ key: bug.key, summary: bug.summary, priority: bug.priority, type: bug.type })
       }
 
-      if (kind.splits > 0 && !bug.regression) {
+      if (bug.type === "story") {
+        // A Story is closed by closing its sub-tasks: smaller, faster pieces of the same work.
+        for (let i = 0; i < STORY_SUBTASKS; i++) {
+          const angle = (i / STORY_SUBTASKS) * Math.PI * 2
+          commands.spawn(makeBug(
+            { key: subtaskKey(bug.key, i), summary: strings.subtask(bug.summary), priority: bug.priority, status: "Open", type: "subtask" },
+            { x: at.x + Ops.cos(angle) * 24, y: at.y + Ops.sin(angle) * 24 }
+          ))
+        }
+      } else if (kind.splits > 0 && !bug.regression && bug.type === "bug") {
         for (let i = 0; i < kind.splits; i++) {
           const angle = (i / kind.splits) * Math.PI * 2
           commands.spawn(makeBug(
@@ -174,7 +185,7 @@ export const CombatSystem = Game.System(
       const bossPoints = Math.round(BOSS_POINTS * 10 * comboMultiplier(run.combo))
       run.score += bossPoints
       credit(by, bossPoints, 1)
-      run.fixed.push({ key: boss.key, summary: boss.title, priority: "Highest" })
+      run.fixed.push({ key: boss.key, summary: boss.title, priority: "Highest", type: "bug" })
       events.fixed.emit({ key: boss.key, priority: "Highest" })
       events.fx.emit({ type: "kill", x: at.x, y: at.y, color: boss.color, key: boss.key, summary: boss.title, points: BOSS_POINTS * 10, boss: true })
       // The boss's projectiles die with it.
