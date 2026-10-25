@@ -19,7 +19,7 @@ import { WEAPONS } from "../sim/weapons.ts"
 import type { FxValue, PickupKind, Vec } from "../sim/schema.ts"
 import type { View } from "../sim/simulation.ts"
 import { formatNumber, locale, t } from "./language.ts"
-import { bossHealth, conflictMarkerColors, conflictMarkers, floorKey, fuseBlink, fuseProgress, MONO, paintBreakpoint, paintBug, paintFloor, paintFuseRing, paintHeart, paintHostile, paintLabel, paintNest, paintPickup, paintPing, paintPlayer, paintCircuit, paintRestartGhost, paintRocket, paintRocketTarget, paintTooltip, pickupIcons, pickupInfo, SANS, shade, tooltipHeight, TOOLTIP_WIDTH, truncate } from "./paint.ts"
+import { bossHealth, conflictMarkerColors, conflictMarkers, floorKey, fuseBlink, fuseProgress, MONO, paintBreakpoint, paintBug, paintFloor, paintFuseRing, paintHeart, paintHostile, paintLabel, paintNest, paintPickup, paintPing, paintPlayer, paintCircuit, paintRestartGhost, paintRocket, paintRocketTarget, paintMinimapWalls, paintTooltip, pickupIcons, pickupInfo, SANS, shade, tooltipHeight, TOOLTIP_WIDTH, truncate } from "./paint.ts"
 import type { BugLook, TooltipBug } from "./paint.ts"
 import type { Camera, Renderer } from "./render.ts"
 import { touchMode } from "./touch.ts"
@@ -1134,13 +1134,15 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
       disc(S, res, m.x, m.y, r, color, alpha)
     }
 
-    S.sprite(bakery.bake(`minimap|${w}|${h}`, res, { left: -1, top: -1, right: w + 1, bottom: h + 1 }, (g) => {
+    // The walls are part of the map's background: a floor's walls never move.
+    S.sprite(bakery.bake(`minimap|${w}|${h}|${arena.width}x${arena.height}|${arena.walls?.length ?? 0}`, res, { left: -1, top: -1, right: w + 1, bottom: h + 1 }, (g) => {
       g.globalAlpha = 0.9
       g.fillStyle = "rgba(10,12,20,0.78)"
       g.strokeStyle = "rgba(255,255,255,0.18)"
       g.lineWidth = 1
       g.beginPath(); g.roundRect(0, 0, w, h, 6)
       g.fill(); g.stroke()
+      paintMinimapWalls(g, arena, k)
     }), x, y)
 
     // What is on screen right now, clipped to the map: only the edges that fall inside it.

@@ -13,7 +13,7 @@ import { WEAPONS } from "../sim/weapons.ts"
 import type { FxValue, Vec } from "../sim/schema.ts"
 import type { View } from "../sim/simulation.ts"
 import { formatNumber, t } from "./language.ts"
-import { bossHealth, conflictMarkerColors, conflictMarkers, floorKey, fuseBlink, fuseProgress, MONO, paintBreakpoint, paintBug, paintFloor, paintFuseRing, paintHeart, paintHostile, paintLabel, paintNest, paintPickup, paintPing, paintPlayer, paintCircuit, paintRestartGhost, paintRocket, paintRocketTarget, paintTooltip, pickupIcons, pickupInfo, roundRect, SANS, shade, tooltipHeight, TOOLTIP_WIDTH, truncate } from "./paint.ts"
+import { bossHealth, conflictMarkerColors, conflictMarkers, floorKey, fuseBlink, fuseProgress, MONO, paintBreakpoint, paintBug, paintFloor, paintFuseRing, paintHeart, paintHostile, paintLabel, paintNest, paintPickup, paintPing, paintPlayer, paintCircuit, paintRestartGhost, paintRocket, paintRocketTarget, paintMinimapWalls, paintTooltip, pickupIcons, pickupInfo, roundRect, SANS, shade, tooltipHeight, TOOLTIP_WIDTH, truncate } from "./paint.ts"
 import type { BugLook } from "./paint.ts"
 import { touchMode } from "./touch.ts"
 
@@ -1045,6 +1045,10 @@ export const makeRenderer = (canvas: HTMLCanvasElement) => {
     roundRect(ctx, x, y, w, h, 6)
     ctx.fill(); ctx.stroke()
     ctx.clip()
+    ctx.save()
+    ctx.translate(x, y)
+    paintMinimapWalls(ctx, arena, k)
+    ctx.restore()
 
     // What is on screen right now.
     ctx.strokeStyle = "rgba(255,255,255,0.35)"
