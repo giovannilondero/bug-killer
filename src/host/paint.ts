@@ -1,9 +1,10 @@
 // Canvas 2D painters shared by the renderers: the Canvas renderer draws with them every frame,
 // the Pixi renderer bakes them into textures once. Each paints in its own local coordinates.
 import { arenaOf } from "../content/arenas.ts"
-import type { Priority, StatusTrait } from "../content/bugs.ts"
+import { ticketColors } from "../content/bugs.ts"
+import type { Priority, StatusTrait, TicketType } from "../content/bugs.ts"
 import type { Level } from "../content/levels.ts"
-import { PLAYER } from "../sim/constants.ts"
+import { DEPLOY, PLAYER } from "../sim/constants.ts"
 import type { PickupKind } from "../sim/schema.ts"
 import { locale, t } from "./language.ts"
 
@@ -98,10 +99,32 @@ export interface BugLook {
   boss?: boolean
   /** Code freeze: iced over, legs still. */
   frozen?: boolean
+  /** Bug when absent. */
+  type?: TicketType
+  /** A Deploying bug's fuse, in seconds left, once lit. */
+  fuse?: number | null
   /** Memory leak: oozing green, with bubbles. */
   poisoned?: boolean
   /** This is fine 🔥: scorched orange, with a flame on top drawn by the renderer. */
   burning?: boolean
+}
+
+/** How far a Deploying bug's fuse has burnt, from 0 to 1, or `null` while it is not lit. */
+export const fuseProgress = (fuse: number | null | undefined): number | null =>
+  fuse === null || fuse === undefined ? null : 1 - fuse / DEPLOY.fuse
+
+/** A lit fuse flashes the bug white, faster and faster as it burns down. */
+export const fuseBlink = (progress: number, age: number): boolean => Math.sin(age * (14 + progress * 46)) > 0
+
+/** The blast radius of a lit Deploying bug, centred on the origin: everyone inside loses sanity when it goes off. */
+export const paintFuseRing = (ctx: CanvasRenderingContext2D, radius: number) => {
+  ctx.fillStyle = "rgba(255, 90, 60, 0.12)"
+  ctx.beginPath(); ctx.arc(0, 0, radius, 0, Math.PI * 2); ctx.fill()
+  ctx.strokeStyle = "#ff5a3c"
+  ctx.lineWidth = 3
+  ctx.setLineDash([10, 8])
+  ctx.beginPath(); ctx.arc(0, 0, radius, 0, Math.PI * 2); ctx.stroke()
+  ctx.setLineDash([])
 }
 
 /** A bug facing +x, centred on the origin: legs, antennae, glowing body, spots, eyes, armour. */
@@ -155,6 +178,41 @@ export const paintBug = (ctx: CanvasRenderingContext2D, r: number, color: string
     ctx.beginPath(); ctx.ellipse(-r * 0.15, 0, r * 0.95, r * 0.8, 0, 0, Math.PI * 2); ctx.stroke()
     ctx.setLineDash([])
   }
+  if (options.type === "story") {
+    // A green rim and a bookmark on the back.
+    ctx.strokeStyle = ticketColors.story
+    ctx.lineWidth = Math.max(2, r * 0.1)
+    ctx.beginPath(); ctx.ellipse(-r * 0.15, 0, r * 0.9, r * 0.73, 0, 0, Math.PI * 2); ctx.stroke()
+    const w = r * 0.32
+    ctx.fillStyle = ticketColors.story
+    ctx.strokeStyle = "#ffffff"
+    ctx.lineWidth = 1.5
+    ctx.beginPath()
+    ctx.moveTo(-r * 0.75, -w); ctx.lineTo(-r * 0.15, -w); ctx.lineTo(-r * 0.3, 0); ctx.lineTo(-r * 0.15, w); ctx.lineTo(-r * 0.75, w)
+    ctx.closePath(); ctx.fill(); ctx.stroke()
+  } else if (options.type === "epic") {
+    // A purple rim and a lightning bolt on the back.
+    ctx.strokeStyle = ticketColors.epic
+    ctx.lineWidth = Math.max(2, r * 0.08)
+    ctx.beginPath(); ctx.ellipse(-r * 0.15, 0, r * 0.9, r * 0.73, 0, 0, Math.PI * 2); ctx.stroke()
+    const s = r * 0.3
+    ctx.fillStyle = ticketColors.epic
+    ctx.strokeStyle = "#ffffff"
+    ctx.lineWidth = 1.5
+    ctx.beginPath()
+    ctx.moveTo(-r * 0.3 + s * 0.3, -s); ctx.lineTo(-r * 0.3 - s * 0.5, s * 0.15); ctx.lineTo(-r * 0.3, s * 0.15)
+    ctx.lineTo(-r * 0.3 - s * 0.3, s); ctx.lineTo(-r * 0.3 + s * 0.5, -s * 0.15); ctx.lineTo(-r * 0.3, -s * 0.15)
+    ctx.closePath(); ctx.fill(); ctx.stroke()
+  } else if (options.type === "subtask") {
+    // Two linked boxes on the back.
+    const s = Math.max(3, r * 0.26)
+    ctx.strokeStyle = ticketColors.subtask
+    ctx.lineWidth = 2
+    ctx.fillStyle = "#ffffff"
+    for (const [bx, by] of [[-r * 0.6, -s * 0.9], [-r * 0.6 + s * 0.9, s * 0.1]] as const) {
+      ctx.fillRect(bx, by, s, s); ctx.strokeRect(bx, by, s, s)
+    }
+  }
   if (options.burning) {
     // Scorched: an orange glow over the shell.
     ctx.fillStyle = "rgba(255, 120, 30, 0.45)"
@@ -185,6 +243,27 @@ export const paintBug = (ctx: CanvasRenderingContext2D, r: number, color: string
       ctx.beginPath(); ctx.arc(bx * r, by * r, Math.max(1.5, br * r), 0, Math.PI * 2); ctx.fill()
     }
   }
+}
+
+/** The nest an Epic sits in, centred on the origin, as wide as `r` times 1.35: a bowl of woven twigs. */
+export const paintNest = (ctx: CanvasRenderingContext2D, r: number) => {
+  const outer = r * 1.35
+  ctx.fillStyle = "#3a2618"
+  ctx.beginPath(); ctx.arc(0, 0, outer, 0, Math.PI * 2); ctx.fill()
+  ctx.lineCap = "round"
+  // Twigs laid round and round the rim, a little off each other.
+  for (let i = 0; i < 18; i++) {
+    const from = i * 2.4
+    const radius = outer * (0.72 + ((i * 7) % 5) * 0.06)
+    ctx.strokeStyle = i % 3 === 0 ? "#8a6240" : i % 3 === 1 ? "#6e4a2c" : "#a57a4e"
+    ctx.lineWidth = Math.max(2, r * (0.08 + (i % 2) * 0.04))
+    ctx.beginPath(); ctx.arc(0, 0, radius, from, from + 1.4); ctx.stroke()
+  }
+  ctx.strokeStyle = ticketColors.epic
+  ctx.lineWidth = Math.max(2, r * 0.06)
+  ctx.globalAlpha = 0.8
+  ctx.beginPath(); ctx.arc(0, 0, outer - 1, 0, Math.PI * 2); ctx.stroke()
+  ctx.globalAlpha = 1
 }
 
 /** A developer aiming along +x, centred on the origin: laptop-gun, hoodie in their colour, head and headphones. */
@@ -351,16 +430,20 @@ export interface TooltipBug {
   priority: Priority
   summary: string
   trait: StatusTrait
+  type: TicketType
 }
 
 export const TOOLTIP_WIDTH = 300
 
-export const tooltipHeight = (bug: TooltipBug) => 44 + wrap(bug.summary, 44).length * 16 + (t().traits[bug.trait] ? 16 : 0)
+/** What the ticket does beyond its priority: its type's hint and its status trait, the ones that have one. */
+const tooltipHints = (bug: TooltipBug) => [t().ticketTypes[bug.type].hint, t().traits[bug.trait]].filter(Boolean)
+
+export const tooltipHeight = (bug: TooltipBug) => 44 + wrap(bug.summary, 44).length * 16 + tooltipHints(bug).length * 16
 
 /** The ticket you are aiming at, with its top-left corner on the origin. */
 export const paintTooltip = (ctx: CanvasRenderingContext2D, bug: TooltipBug, color: string) => {
   const lines = wrap(bug.summary, 44)
-  const trait = t().traits[bug.trait]
+  const hints = tooltipHints(bug)
   ctx.fillStyle = "rgba(10,12,20,0.92)"
   ctx.strokeStyle = color
   ctx.lineWidth = 1.5
@@ -369,15 +452,15 @@ export const paintTooltip = (ctx: CanvasRenderingContext2D, bug: TooltipBug, col
   ctx.textAlign = "left"
   ctx.font = `bold 12px ${MONO}`
   ctx.fillStyle = color
-  ctx.fillText(`${bug.key}  ·  ${bug.priority}`, 12, 20)
+  ctx.fillText(`${bug.key}  ·  ${t().ticketTypes[bug.type].label}  ·  ${bug.priority}`, 12, 20)
   ctx.font = `13px ${SANS}`
   ctx.fillStyle = "#e8ecf4"
   lines.forEach((line, i) => ctx.fillText(line, 12, 40 + i * 16))
-  if (trait) {
-    ctx.font = `bold 10px ${MONO}`
-    ctx.fillStyle = "#9aa4b8"
-    ctx.fillText(trait, 12, 40 + lines.length * 16 + 4)
-  }
+  ctx.font = `bold 10px ${MONO}`
+  hints.forEach((hint, i) => {
+    ctx.fillStyle = i === 0 && bug.type !== "bug" ? ticketColors[bug.type] : "#9aa4b8"
+    ctx.fillText(hint, 12, 40 + (lines.length + i) * 16 + 4)
+  })
 }
 
 export const paintHeart = (ctx: CanvasRenderingContext2D, x: number, y: number, color: string) => {

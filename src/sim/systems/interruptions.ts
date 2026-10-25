@@ -62,7 +62,8 @@ export const ResurrectionSystem = Game.System(
       x: clamp(me.x + Ops.cos(angle) * RESURRECT.distance, 60, arena.width - 60),
       y: clamp(me.y + Ops.sin(angle) * RESURRECT.distance, 60, arena.height - 60)
     }
-    commands.spawn(makeBug(seed, at, { resurrectedBy: client }))
+    // As it was closed: a Story that played as a plain bug comes back as one.
+    commands.spawn(makeBug({ ...seed, type: victim.type }, at, { resurrectedBy: client }))
     const index = run.fixed.findIndex((fixed) => fixed.key === victim.key)
     resources.run.set({ ...run, fixed: run.fixed.filter((_, i) => i !== index) })
 

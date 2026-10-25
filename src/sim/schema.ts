@@ -1,7 +1,7 @@
 import { Descriptor, Schema } from "@typeonce/ritmo"
 import * as Random from "@typeonce/ritmo-math/Random"
 
-import type { Priority, StatusTrait } from "../content/bugs.ts"
+import type { Priority, StatusTrait, TicketType } from "../content/bugs.ts"
 import type { CallKind, ClientId, MissionKind } from "../content/clients.ts"
 import type { Locale } from "../content/i18n.ts"
 import type { BossPattern, Level } from "../content/levels.ts"
@@ -65,6 +65,14 @@ export interface BugValue {
   regression: boolean
   /** Code freeze and the other status effects on it, with who applied them. */
   statuses: ReadonlyArray<StatusValue>
+  /** Bug, Story, Epic, or a Story's or Epic's sub-task. */
+  type: TicketType
+  /** An Epic's nest: seconds to its next sub-task and how many it has released. `null` for every other ticket. */
+  nest: { next: number; released: number } | null
+  /** The key of the Epic that released this sub-task; `null` for every other ticket. */
+  parent: string | null
+  /** Seconds left before a Deploying bug goes off; `null` until its fuse is lit. */
+  fuse: number | null
 }
 export const Bug = Descriptor.Component<BugValue>()("BugKiller/Bug")
 
@@ -165,7 +173,10 @@ export interface RunValue {
   /** Extra bugs added by failed missions ("scope creep"). */
   escalations: number
   hitsTaken: number
-  fixed: Array<{ key: string; summary: string; priority: Priority }>
+  /** The release notes: every ticket closed, except regressions and sub-tasks. */
+  fixed: Array<{ key: string; summary: string; priority: Priority; type: TicketType }>
+  /** Sub-tasks closed: the release notes count them instead of listing them. */
+  subtasks: number
   missionsWon: number
   missionsLost: number
   /** Seconds since the phase changed: the host times banners with it. */
@@ -259,6 +270,8 @@ export type FxValue =
   | { type: "revived"; x: number; y: number; slot: number; name: string }
   | { type: "turret"; x: number; y: number }
   | { type: "hallucination"; x: number; y: number }
+  | { type: "fuse"; x: number; y: number }
+  | { type: "deploy"; x: number; y: number }
   | { type: "explosion"; x: number; y: number; radius: number }
   /** One puff of Flame war: from `x, y` along `angle`, as far and as wide as the cone it burns. */
   | { type: "flame"; x: number; y: number; angle: number; range: number; spread: number }

@@ -1,9 +1,9 @@
 import * as Random from "@typeonce/ritmo-math/Random"
 
 import { arenaOf } from "../../content/arenas.ts"
-import { bugKinds } from "../../content/bugs.ts"
+import { STORY_SUBTASKS, bugKinds, subtaskKey, ticketScales } from "../../content/bugs.ts"
 import { text } from "../../content/i18n.ts"
-import { BOMB_RADIUS, BREAKPOINT, BUFF_SECONDS, COMBO_WINDOW, DT, PLAYER, ROCKET } from "../constants.ts"
+import { BOMB_RADIUS, BREAKPOINT, BUFF_SECONDS, COMBO_WINDOW, DEPLOY, DT, PLAYER, ROCKET } from "../constants.ts"
 import { makeBug, makePickup, makeTurret } from "../drafts.ts"
 import { clampToArena, distanceSquared, nearest, overlaps } from "../math.ts"
 import { BossWrite, BugWrite, HostileShotWrite, PickupWrite, PlayerWrite, ShotWrite } from "../queries.ts"
@@ -113,6 +113,8 @@ export const CombatSystem = Game.System(
     const strings = text[resources.language.get()]
     const arena = arenaOf(resources.level.get())
     const gone = new Set<number>()
+    // Where Deploying bugs went off this tick: developers in the radius lose sanity below.
+    const blasts: Array<Vec> = []
     const playing = run.phase === "waves" || run.phase === "boss"
 
     const bugs = queries.bugs.each()
@@ -129,7 +131,7 @@ export const CombatSystem = Game.System(
       gone.add(match.entity.id)
       commands.despawn(match.entity)
       const kind = bugKinds[bug.priority]
-      const points = Math.round(kind.points * 10 * comboMultiplier(run.combo))
+      const points = Math.round(kind.points * ticketScales[bug.type].points * 10 * comboMultiplier(run.combo))
       run.score += points
       run.combo += 1
       run.bestCombo = Math.max(run.bestCombo, run.combo)
@@ -161,11 +163,22 @@ export const CombatSystem = Game.System(
       events.fx.emit({ type: "kill", x: at.x, y: at.y, color: kind.color, key: bug.key, summary: bug.summary, points, boss: false })
       events.fixed.emit({ key: bug.key, priority: bug.priority })
       credit(by, 0, 1)
-      if (!bug.key.includes("-REG")) {
-        run.fixed.push({ key: bug.key, summary: bug.summary, priority: bug.priority })
+      if (bug.type === "subtask") {
+        run.subtasks += 1
+      } else if (!bug.key.includes("-REG")) {
+        run.fixed.push({ key: bug.key, summary: bug.summary, priority: bug.priority, type: bug.type })
       }
 
-      if (kind.splits > 0 && !bug.regression) {
+      if (bug.type === "story") {
+        // A Story is closed by closing its sub-tasks: smaller, faster pieces of the same work.
+        for (let i = 0; i < STORY_SUBTASKS; i++) {
+          const angle = (i / STORY_SUBTASKS) * Math.PI * 2
+          commands.spawn(makeBug(
+            { key: subtaskKey(bug.key, i), summary: strings.subtask(bug.summary), priority: bug.priority, status: "Open", type: "subtask" },
+            { x: at.x + Ops.cos(angle) * 24, y: at.y + Ops.sin(angle) * 24 }
+          ))
+        }
+      } else if (kind.splits > 0 && !bug.regression && bug.type === "bug") {
         for (let i = 0; i < kind.splits; i++) {
           const angle = (i / kind.splits) * Math.PI * 2
           commands.spawn(makeBug(
@@ -175,6 +188,8 @@ export const CombatSystem = Game.System(
           ))
         }
       }
+
+      if (bug.trait === "deploying") deploy(at, by)
 
       if (random.next() < dropChance[bug.priority]) {
         // Only what the level has unlocked so far can drop.
@@ -203,6 +218,29 @@ export const CombatSystem = Game.System(
       }
     }
 
+    /** A Deploying bug goes off: it hurts the bugs around it and lights any other Deploying bug's fuse. */
+    const deploy = (at: Vec, by: number): void => {
+      blasts.push(at)
+      events.fx.emit({ type: "deploy", x: at.x, y: at.y })
+      for (const other of bugs) {
+        if (gone.has(other.entity.id) || distanceSquared(other.data.position.get(), at) >= DEPLOY.radius ** 2) continue
+        damageBug(other, DEPLOY.damage, by)
+        const left = other.data.bug.get()
+        if (!gone.has(other.entity.id) && left.trait === "deploying" && (left.fuse === null || left.fuse > DEPLOY.chainFuse)) {
+          other.data.bug.set({ ...left, fuse: DEPLOY.chainFuse })
+        }
+      }
+    }
+
+    // Deploying bugs whose fuse ran out go to production by themselves: nobody gets the fix.
+    for (const match of bugs) {
+      const bug = match.data.bug.get()
+      if (gone.has(match.entity.id) || bug.trait !== "deploying" || bug.fuse === null || bug.fuse > 0) continue
+      gone.add(match.entity.id)
+      commands.despawn(match.entity)
+      deploy(match.data.position.get(), -1)
+    }
+
     const damageBoss = (match: (typeof bosses)[number], damage: number, by: number, hit: Hit = {}): void => {
       const boss = match.data.boss.get()
       const at = match.data.position.get()
@@ -227,7 +265,7 @@ export const CombatSystem = Game.System(
       const bossPoints = Math.round(BOSS_POINTS * 10 * comboMultiplier(run.combo))
       run.score += bossPoints
       credit(by, bossPoints, 1)
-      run.fixed.push({ key: boss.key, summary: boss.title, priority: "Highest" })
+      run.fixed.push({ key: boss.key, summary: boss.title, priority: "Highest", type: "bug" })
       events.fixed.emit({ key: boss.key, priority: "Highest" })
       events.fx.emit({ type: "kill", x: at.x, y: at.y, color: boss.color, key: boss.key, summary: boss.title, points: BOSS_POINTS * 10, boss: true })
       // The boss's projectiles die with it.
@@ -401,6 +439,9 @@ export const CombatSystem = Game.System(
         return true
       }
 
+      for (const blast of blasts) {
+        if (overlaps(at, radius, blast, DEPLOY.radius)) hurt(blast)
+      }
       for (const match of bugs) {
         if (!gone.has(match.entity.id) && overlaps(at, radius * 0.8, match.data.position.get(), match.data.body.get().radius * 0.8)) {
           hurt(match.data.position.get())

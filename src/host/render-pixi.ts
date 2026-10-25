@@ -9,14 +9,14 @@ import type { Arena } from "../content/arenas.ts"
 import { bugKinds } from "../content/bugs.ts"
 import { clients } from "../content/clients.ts"
 import { comboMultiplier } from "../sim/systems/combat.ts"
-import { BREAKPOINT, BUFF_SECONDS, PARTY, PLAYER, ROCKET, TURRET } from "../sim/constants.ts"
+import { BREAKPOINT, BUFF_SECONDS, DEPLOY, PARTY, PLAYER, ROCKET, TURRET } from "../sim/constants.ts"
 import { isUnlocked } from "../sim/tiers.ts"
 import { hasStatus } from "../sim/statuses.ts"
 import { WEAPONS } from "../sim/weapons.ts"
 import type { FxValue, PickupKind, Vec } from "../sim/schema.ts"
 import type { View } from "../sim/simulation.ts"
 import { formatNumber, locale, t } from "./language.ts"
-import { floorKey, MONO, paintBreakpoint, paintBug, paintFloor, paintHeart, paintHostile, paintLabel, paintPickup, paintPing, paintPlayer, paintRocket, paintRocketTarget, paintTooltip, pickupIcons, pickupInfo, SANS, shade, tooltipHeight, TOOLTIP_WIDTH, truncate } from "./paint.ts"
+import { floorKey, fuseBlink, fuseProgress, MONO, paintBreakpoint, paintBug, paintFloor, paintFuseRing, paintHeart, paintHostile, paintLabel, paintNest, paintPickup, paintPing, paintPlayer, paintRocket, paintRocketTarget, paintTooltip, pickupIcons, pickupInfo, SANS, shade, tooltipHeight, TOOLTIP_WIDTH, truncate } from "./paint.ts"
 import type { BugLook, TooltipBug } from "./paint.ts"
 import type { Camera, Renderer } from "./render.ts"
 import { touchMode } from "./touch.ts"
@@ -306,6 +306,16 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
         burst(event.x, event.y, "#9dffb0", 16, 200, 3)
         break
       }
+      case "fuse":
+        burst(event.x, event.y, "#ff5a3c", 10, 140, 2)
+        break
+      case "deploy":
+        shake = Math.max(shake, 14)
+        flash = Math.max(flash, 0.35)
+        burst(event.x, event.y, "#ffb347", 46, DEPLOY.radius * 3.2, 4)
+        burst(event.x, event.y, "#ff5a3c", 24, DEPLOY.radius * 2, 3)
+        floaters.push({ x: event.x, y: event.y - 30, life: 1.4, max: 1.4, text: t().hud.deployed, sub: t().hud.deployedSub, color: "#ffb347", big: false })
+        break
       case "reopen":
         floaters.push({ x: event.x, y: event.y - 24, life: 1.6, max: 1.6, text: "REOPENED", sub: t().hud.reopenedSub(event.key), color: "#ff4d6d", big: false })
         burst(event.x, event.y, "#ff4d6d", 14, 180, 3)
@@ -416,12 +426,20 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
     const k = options.frozen ? 0 : Math.floor((((age % period) + period) % period) / period * frames) % frames
     const blur = options.boss ? 30 : 12
     const half = Math.max(r * 1.45 + 4, r + blur * 1.6)
-    const look = `${options.flash > 0 ? "f" : ""}${options.reopened ? "r" : ""}${options.trait === "armored" ? "a" : ""}${options.boss ? "b" : ""}${options.frozen ? "i" : ""}${options.poisoned ? "p" : ""}${options.burning ? "n" : ""}`
+    const look = `${options.flash > 0 ? "f" : ""}${options.reopened ? "r" : ""}${options.trait === "armored" ? "a" : ""}${options.boss ? "b" : ""}${options.type === "story" ? "s" : options.type === "subtask" ? "t" : options.type === "epic" ? "e" : ""}${options.frozen ? "i" : ""}${options.poisoned ? "p" : ""}${options.burning ? "n" : ""}`
     return bakery.bake(`bug|${color}|${r}|${look}|${k}`, wres, around(half), (g) => paintBug(g, r, color, (k * period) / frames, options))
   }
 
   /** `full` is the radius the frames are baked at; `r` the one drawn, smaller while the bug spawns in. */
-  const drawBug = (x: number, y: number, r: number, full: number, color: string, heading: number, age: number, options: BugLook, alpha: number) => {
+  const drawBug = (x: number, y: number, r: number, full: number, color: string, heading: number, age: number, look: BugLook, alpha: number) => {
+    const lit = fuseProgress(look.fuse)
+    const options = lit !== null && fuseBlink(lit, age) ? { ...look, flash: 1 } : look
+    if (lit !== null) {
+      // The blast radius, and a ring closing in on the bug as the fuse burns down.
+      const ring = bakery.bake(`fuseRing|${DEPLOY.radius}`, wres, around(DEPLOY.radius + 3), (g) => paintFuseRing(g, DEPLOY.radius))
+      W.sprite(ring, x, y, { alpha: 0.45 + lit * 0.5 })
+      W.sprite(ring, x, y, { scale: 1 - lit, alpha: 0.8 })
+    }
     let body = alpha
     if (options.trait === "jittery" && Math.sin(age * 40) > 0.6) {
       // Glitchy RGB split for bugs that are "In development".
@@ -451,6 +469,10 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
         g.beginPath(); g.arc(0, 0, full * 1.35, 0, Math.PI * 1.6); g.stroke()
       })
       W.sprite(arc, x, y, { rotation: age * 2, scale: r / full, alpha })
+    }
+    if (options.trait === "deploying") {
+      const size = Math.round(full * 0.7)
+      W.sprite(bakery.text(wres, "🚀", `${size}px ${SANS}`, "#ffffff"), x, y + r * 0.25, { scale: r / full, alpha })
     }
   }
 
@@ -700,6 +722,10 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
       const { x, y } = bug.position
       const heading = view.player ? Math.atan2(view.player.position.y - y, view.player.position.x - x) : 0
       const appear = Math.min(1, bug.age / 0.4)
+      if (bug.type === "epic") {
+        // An Epic sits in its nest.
+        W.sprite(bakery.bake(`nest|${bug.radius}`, wres, around(bug.radius * 1.35 + 4), (g) => paintNest(g, bug.radius)), x, y, { alpha: appear })
+      }
       if (bug.resurrectedBy) {
         // A zombie ticket: a sickly green aura and the client's colour around it.
         const r = bug.radius
@@ -719,7 +745,7 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
         }), x, y, { rotation: -time * 3, alpha: appear })
       }
       const color = bug.resurrectedBy ? "#9dff6b" : bugKinds[bug.priority].color
-      drawBug(x, y, bug.radius * (0.4 + appear * 0.6), bug.radius, color, heading, bug.age, { flash: bug.hitFlash, trait: bug.trait, reopened: bug.reopened || bug.resurrectedBy !== null, frozen: hasStatus(bug.statuses, "freeze"), poisoned: hasStatus(bug.statuses, "poison"), burning: hasStatus(bug.statuses, "burn") }, appear)
+      drawBug(x, y, bug.radius * (0.4 + appear * 0.6), bug.radius, color, heading, bug.age, { flash: bug.hitFlash, trait: bug.trait, reopened: bug.reopened || bug.resurrectedBy !== null, frozen: hasStatus(bug.statuses, "freeze"), poisoned: hasStatus(bug.statuses, "poison"), burning: hasStatus(bug.statuses, "burn"), type: bug.type, fuse: bug.fuse }, appear)
       const isTarget = mission?.kind === "killTarget" && mission.target === bug.key
       if (isTarget) {
         const pulse = bug.radius * 1.6 + Math.sin(time * 8) * 4
@@ -734,7 +760,7 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
       const name = bug.resurrectedBy ? `🧟 ${bug.key}` : bug.reopened ? `${bug.key} ↺` : bug.key
       if (bug === chip) {
         const trait = t().traits[bug.trait].split(":")[0]
-        label(W, wres, [name, bug.priority, trait].filter(Boolean).join(" · "), x, y - bug.radius - 10, bugKinds[bug.priority].color, 16, bugKinds[bug.priority].color)
+        label(W, wres, [name, bug.type === "bug" ? "" : t().ticketTypes[bug.type].label, bug.priority, trait].filter(Boolean).join(" · "), x, y - bug.radius - 10, bugKinds[bug.priority].color, 16, bugKinds[bug.priority].color)
       } else {
         label(W, wres, name, x, y - bug.radius - 10, isTarget ? "#ff6b81" : bug.resurrectedBy ? "#9dff6b" : bug.reopened ? "#ff6b81" : "#e8ecf4")
       }
@@ -940,7 +966,7 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
   }
 
   const bakeTooltip = (bug: TooltipBug, color: string, boxH: number) =>
-    bakery.bake(`tooltip|${bug.key}|${bug.priority}|${bug.trait}|${locale()}|${bug.summary}`, dpr, { left: -2, top: -2, right: TOOLTIP_WIDTH + 2, bottom: boxH + 2 }, (g) => paintTooltip(g, bug, color))
+    bakery.bake(`tooltip|${bug.key}|${bug.type}|${bug.priority}|${bug.trait}|${locale()}|${bug.summary}`, dpr, { left: -2, top: -2, right: TOOLTIP_WIDTH + 2, bottom: boxH + 2 }, (g) => paintTooltip(g, bug, color))
 
   const drawHud = (view: View, width: number, height: number, accent: string) => {
     const res = dpr

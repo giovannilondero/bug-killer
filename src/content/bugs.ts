@@ -8,7 +8,44 @@ export interface BacklogBug {
   readonly summary: string
   readonly priority: Priority
   readonly status: string
+  /** Bug when absent. */
+  readonly type?: BacklogType
 }
+
+/**
+ * What kind of ticket it is. A Story splits into sub-tasks when it is closed;
+ * an Epic stays put and keeps releasing sub-tasks until it is closed.
+ * Sub-tasks only ever come from a Story or an Epic, never from the backlog.
+ */
+export const ticketTypes = ["bug", "story", "subtask", "epic"] as const
+export type TicketType = (typeof ticketTypes)[number]
+/** The types a backlog row may have. */
+export type BacklogType = Exclude<TicketType, "subtask">
+
+/** How a ticket's type scales its priority's stats. */
+export interface TicketScale {
+  readonly hp: number
+  readonly speed: number
+  readonly radius: number
+  readonly points: number
+}
+
+export const ticketScales = {
+  bug: { hp: 1, speed: 1, radius: 1, points: 1 },
+  story: { hp: 1.5, speed: 0.9, radius: 1.2, points: 1.5 },
+  subtask: { hp: 0.5, speed: 1.4, radius: 0.7, points: 0.5 },
+  // An Epic never moves: a big nest that has to be dug out.
+  epic: { hp: 8, speed: 0, radius: 2, points: 4 }
+} as const satisfies Record<TicketType, TicketScale>
+
+/** Jira's own colours: a Story is a green bookmark, a sub-task a blue pair of boxes, an Epic a purple bolt. */
+export const ticketColors = { story: "#63ba3c", subtask: "#4bade8", epic: "#904ee2" } as const satisfies Record<Exclude<TicketType, "bug">, string>
+
+/** How many sub-tasks a closed Story splits into. */
+export const STORY_SUBTASKS = 2
+
+/** A sub-task's key derives from its parent's: `KEY-123-1`, `KEY-123-2`. */
+export const subtaskKey = (parent: string, index: number): string => `${parent}-${index + 1}`
 
 /** How each priority fights. */
 export interface BugKind {
@@ -31,7 +68,7 @@ export const bugKinds = {
 } as const satisfies Record<Priority, BugKind>
 
 /** Workflow statuses grouped by how the bug behaves in the arena. */
-export type StatusTrait = "armored" | "reopens" | "jittery" | "plain"
+export type StatusTrait = "armored" | "reopens" | "jittery" | "deploying" | "plain"
 
 const statusTraits: Partial<Record<string, StatusTrait>> = {
   "Blocked": "armored",
@@ -41,7 +78,8 @@ const statusTraits: Partial<Record<string, StatusTrait>> = {
   "Ready for UAT": "reopens",
   "Ready for review": "reopens",
   "Ready for release": "reopens",
-  "In development": "jittery"
+  "In development": "jittery",
+  "Deploying": "deploying"
 }
 
 export const traitOf = (status: string): StatusTrait => statusTraits[status] ?? "plain"

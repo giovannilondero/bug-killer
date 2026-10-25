@@ -84,6 +84,7 @@ export const it: Strings = {
     "Mancano i dati (quali dati?)"
   ],
   regression: (key) => `Regressione introdotta dal fix di ${key}`,
+  subtask: (summary) => `Sotto-task: ${summary}`,
   minions: { crash: "Crash report senza stack trace", null: "Cannot read properties of null" },
   calls: {
     meetTitles: [
@@ -126,7 +127,14 @@ export const it: Strings = {
     armored: "BLOCCATO: dimezza i danni",
     reopens: "IN QA: può riaprirsi",
     jittery: "IN SVILUPPO: si muove a scatti",
+    deploying: "IN DEPLOY: si ferma accanto a te ed esplode",
     plain: ""
+  },
+  ticketTypes: {
+    bug: { label: "Bug", hint: "" },
+    story: { label: "Story", hint: "STORY: si divide in 2 sotto-task" },
+    subtask: { label: "Sotto-task", hint: "SOTTO-TASK: piccolo e veloce" },
+    epic: { label: "Epic", hint: "EPIC: un nido di sotto-task, l'ondata aspetta che sia chiusa" }
   },
   taglines: {
     glacier: "Si parte col freddo: tutto in Ready for QA, niente è davvero finito.",
@@ -174,6 +182,8 @@ export const it: Strings = {
     bossFixed: "BOSS FIXATO",
     movedToDone: (key) => `${key} spostato in Done`,
     reopenedSub: (key) => `${key} non passa la QA`,
+    deployed: "DEPLOYATO",
+    deployedSub: "dritto in produzione",
     resurrected: (key) => `🧟 ${key} RESUSCITATO`,
     resurrectedSub: (name) => `${name} dice che non è fixato`,
     testsPassing: "✓ test verdi",
@@ -248,6 +258,7 @@ export const it: Strings = {
   notes: {
     title: "📦 Release notes",
     scopeCreep: (n) => (n === 1 ? `+ 1 richiesta extra dei clienti gestita "al volo"` : `+ ${n} richieste extra dei clienti gestite "al volo"`),
+    subtasks: (n) => `+ ${n} sotto-task`,
     resurrections: (n) => (n === 1 ? `🧟 1 bug "non ancora fixato" secondo i clienti (e rifixato)` : `🧟 ${n} bug "non ancora fixati" secondo i clienti (e rifixati)`)
   },
   cleared: {

@@ -2,7 +2,7 @@ import { BrowserTickSource } from "@typeonce/ritmo-browser"
 import * as FixedLoop from "@typeonce/ritmo/FixedLoop"
 import * as Result from "@typeonce/ritmo/Result"
 
-import { bugKinds } from "./content/bugs.ts"
+import { bugKinds, ticketColors } from "./content/bugs.ts"
 import { clients } from "./content/clients.ts"
 import { locales } from "./content/i18n.ts"
 import { endlessLevel, levels } from "./content/levels.ts"
@@ -122,6 +122,8 @@ const playFx = (event: FxValue) => {
     case "breakpointSet": audio.breakpointSet(); break
     case "breakpoint": audio.breakpoint(); break
     case "reopen": audio.reopen(); break
+    case "fuse": audio.fuse(); break
+    case "deploy": audio.deploy(); break
     case "teleport": audio.teleport(); break
     case "resurrect": break
     case "bossPhase": audio.boss(); break
@@ -585,20 +587,21 @@ const stats = (v: View) => html`
 const releaseNotes = (v: View) => {
   const items = v.run.fixed
     .filter((f) => !f.key.startsWith("ESC-") && !f.key.startsWith("CRASH-") && !f.key.startsWith("NULL-"))
-    .map((f) => html`<li><b style="color:${bugKinds[f.priority].color}">${f.key}</b> ${escape(f.summary)}</li>`)
+    .map((f) => html`<li><b style="color:${bugKinds[f.priority].color}">${f.key}</b>${f.type === "bug" ? "" : html`<em class="notes-type" style="color:${ticketColors[f.type]}">${escape(t().ticketTypes[f.type].label)}</em>`} ${escape(f.summary)}</li>`)
     .join("")
   const creep = v.run.fixed.filter((f) => f.key.startsWith("ESC-"))
   return html`
     <div class="notes">
       <div class="notes-title">${t().notes.title} · ${escape(v.level.name)} v${levelIndex + 1}.${v.run.wave}.${v.run.fixed.length}</div>
       <ul>${items}</ul>
+      ${v.run.subtasks ? html`<div class="notes-creep">${escape(t().notes.subtasks(v.run.subtasks))}</div>` : ""}
       ${creep.length ? html`<div class="notes-creep">${escape(t().notes.scopeCreep(creep.length))}</div>` : ""}
       ${v.interruptions.resurrections ? html`<div class="notes-creep">${escape(t().notes.resurrections(v.interruptions.resurrections))}</div>` : ""}
     </div>`
 }
 
 const markdownNotes = (v: View) =>
-  [`## Release notes — ${v.level.name}`, "", ...v.run.fixed.filter((f) => !/^(ESC|CRASH|NULL)-/.test(f.key)).map((f) => `- **${f.key}** ${f.summary}`)].join("\n")
+  [`## Release notes — ${v.level.name}`, "", ...v.run.fixed.filter((f) => !/^(ESC|CRASH|NULL)-/.test(f.key)).map((f) => `- **${f.key}**${f.type === "bug" ? "" : ` _${t().ticketTypes[f.type].label}_`} ${f.summary}`), ...(v.run.subtasks ? ["", t().notes.subtasks(v.run.subtasks)] : [])].join("\n")
 
 const showCleared = (v: View) => {
   setMode("over")
