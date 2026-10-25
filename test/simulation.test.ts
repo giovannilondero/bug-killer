@@ -473,3 +473,25 @@ test("a Highest bug still leaves its 3 regressions, a Story its 2 sub-tasks", ()
   assert.deepEqual(done.run.fixed.map((f) => f.key).sort(), ["QUIZ-901", "QUIZ-902"])
   assert.equal(done.run.subtasks, 2)
 })
+
+test("Stories come with Side Quests: none in Glacier, none before their tier, in Endless from its second tier", () => {
+  assert.ok(levels[0]!.bugs.every((bug) => (bug.type ?? "bug") === "bug"), "Glacier's backlog has no Stories")
+  assert.ok(levels[1]!.bugs.some((bug) => bug.type === "story"), "Side Quests' backlog has some")
+
+  /** The tier the run was at when each Story first showed up. */
+  const stories = (options: Omit<Parameters<typeof createSimulation>[0], "presentation" | "input">, seconds: number) => {
+    const seen = new Map<number, number>()
+    watch(options, seconds, (v) => {
+      for (const bug of v.bugs) if (bug.type === "story" && !seen.has(bug.id)) seen.set(bug.id, v.tier)
+    })
+    return [...seen.values()]
+  }
+
+  assert.ok(stories({ level: levels[1]!, seed: 5 }, 150).length > 0, "Side Quests releases Stories")
+  assert.deepEqual(stories({ level: { ...levels[1]!, tier: 0 }, seed: 5 }, 150), [], "held at tier 0 its Stories are plain bugs")
+
+  const quick = { ...endlessLevel, waveSize: 2, endless: { ...endlessLevel.endless!, every: 100 } }
+  const endless = stories({ level: quick, seed: 5 }, 200)
+  assert.ok(endless.length > 0, "Endless releases Stories once it gets there")
+  assert.ok(endless.every((tier) => tier >= contentTiers.story), `tiers at first sight: ${endless.join(", ")}`)
+})

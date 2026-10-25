@@ -44,7 +44,7 @@ const draftMission = (kind: MissionKind, bugs: ReadonlyArray<BugValue>, random: 
       return { kind, goal, duration, target: null, priority: null, text: (seconds) => say.killCount(goal, seconds) }
     }
     case "killTarget": {
-      const candidates = bugs.filter((bug) => !bug.regression)
+      const candidates = bugs.filter((bug) => !bug.regression && bug.type !== "subtask")
       if (candidates.length === 0) return null
       const worst = Math.max(...candidates.map((bug) => rank(bug.priority)))
       const bug = random.pick(candidates.filter((b) => rank(b.priority) === worst))
