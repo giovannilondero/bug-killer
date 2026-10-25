@@ -142,6 +142,25 @@ code { font-family: var(--mono); color: #ffd84a; }
 .group-title::after { content: ""; flex: 1; height: 1px; background: var(--line); order: 1; }
 .group-progress { order: 2; letter-spacing: 0.04em; text-transform: none; font-weight: 500; }
 .levels.extras { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+/* Endless's arena picker, under its card: locked arenas say what opens them. */
+.arena-picker { --gold: #ffd84a; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; font: 12px var(--mono); }
+.arena-label { color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+.arena-picker button {
+  padding: 5px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--muted);
+  font: 700 12px var(--mono);
+  cursor: pointer;
+}
+.arena-picker button[aria-pressed="true"] { border-color: var(--gold); background: color-mix(in oklch, var(--gold) 14%, transparent); color: var(--text); }
+.arena-picker button:disabled { cursor: not-allowed; opacity: 0.6; }
+.arena-picker button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+@media (hover: hover) and (pointer: fine) {
+  .arena-picker button:not(:disabled):hover { color: var(--text); }
+}
+.arena-locked { font-weight: 400; }
 /* Bonus levels: outside the campaign, so a dashed card with a corner tag. */
 .level.bonus { position: relative; border-style: dashed; border-width: 2px; }
 .level-tag {
@@ -268,6 +287,7 @@ code { font-family: var(--mono); color: #ffd84a; }
 }
 .field input:focus, .field select:focus { outline: 2px solid #3a6df0; outline-offset: 1px; }
 .field input[name="code"] { font-family: var(--mono); letter-spacing: 0.08em; }
+.field[hidden] { display: none; }
 
 .multi-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 6px; }
 .multi-box { display: flex; flex-direction: column; justify-content: space-between; gap: 12px; padding: 4px 14px 14px; border-radius: 12px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--line); }

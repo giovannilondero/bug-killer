@@ -319,4 +319,10 @@ export const it: Strings = {
     badge: "Completato in hardcore",
     run: "☠ Partita hardcore"
   }
+,
+  arena: {
+    label: "Arena",
+    names: { normal: "Normale", small: "Piccola" },
+    locked: (bonus) => `🔒 si apre con ${bonus}`
+  }
 }

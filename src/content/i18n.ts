@@ -1,3 +1,4 @@
+import type { ArenaId } from "./arenas.ts"
 import type { Priority, StatusTrait } from "./bugs.ts"
 import type { CallKind, ClientId, MissionKind } from "./clients.ts"
 import type { LevelId } from "./levels.ts"
@@ -187,6 +188,13 @@ export interface Strings {
     readonly badge: string
     /** On the end-of-run screen. */
     readonly run: string
+  }
+  /** Endless's arena picker, in the menu and the lobby. */
+  readonly arena: {
+    readonly label: string
+    readonly names: Record<ArenaId, string>
+    /** On a locked arena: the bonus level that opens it. */
+    readonly locked: (bonus: string) => string
   }
 }
 
