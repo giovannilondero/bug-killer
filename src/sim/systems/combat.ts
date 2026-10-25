@@ -1,9 +1,9 @@
 import * as Random from "@typeonce/ritmo-math/Random"
 
 import { arenaOf } from "../../content/arenas.ts"
-import { STORY_SUBTASKS, bugKinds, subtaskKey, ticketScales } from "../../content/bugs.ts"
+import { bugKinds, subtaskKey } from "../../content/bugs.ts"
 import { text } from "../../content/i18n.ts"
-import { BOMB_RADIUS, BREAKPOINT, BUFF_SECONDS, COMBO_WINDOW, DEPLOY, DT, PLAYER, ROCKET } from "../constants.ts"
+import { BOMB_RADIUS, BREAKPOINT, BUFF_SECONDS, COMBO_WINDOW, DEPLOY, DT, PLAYER, ROCKET, STORY_SUBTASKS, ticketScales } from "../constants.ts"
 import { makeBug, makePickup, makeTurret } from "../drafts.ts"
 import { clampToArena, distanceSquared, nearest, overlaps } from "../math.ts"
 import { BossWrite, BugWrite, HostileShotWrite, PickupWrite, PlayerWrite, ShotWrite } from "../queries.ts"
