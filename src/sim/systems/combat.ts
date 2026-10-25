@@ -3,7 +3,7 @@ import * as Random from "@typeonce/ritmo-math/Random"
 import { arenaOf } from "../../content/arenas.ts"
 import { bugKinds } from "../../content/bugs.ts"
 import { text } from "../../content/i18n.ts"
-import { BOMB_RADIUS, BUFF_SECONDS, COMBO_WINDOW, PLAYER } from "../constants.ts"
+import { BOMB_RADIUS, BUFF_SECONDS, COMBO_WINDOW, DT, PLAYER } from "../constants.ts"
 import { makeBug, makePickup, makeTurret } from "../drafts.ts"
 import { clampToArena, distanceSquared, overlaps } from "../math.ts"
 import { BossWrite, BugWrite, HostileShotWrite, PickupWrite, PlayerWrite, ShotWrite } from "../queries.ts"
@@ -27,6 +27,8 @@ import {
   pickupKinds
 } from "../schema.ts"
 import type { BugValue, PickupKind, PlayerValue, RunValue, Vec } from "../schema.ts"
+import { applyStatus, inflictedBy, tickStatuses } from "../statuses.ts"
+import type { StatusKind, StatusValue } from "../statuses.ts"
 import { isUnlocked, tierOf } from "../tiers.ts"
 import { Ops } from "@typeonce/ritmo-math"
 
@@ -38,7 +40,20 @@ export const comboMultiplier = (combo: number): number => Math.min(4, 1 + Math.f
 const dropChance = { Lowest: 0.05, Low: 0.07, Medium: 0.09, High: 0.2, Highest: 1 } as const satisfies Record<BugValue["priority"], number>
 
 /** Pickups that drop from bugs; reverts and pizza are rarer, the AI turret rarest, and only Tobia hands out the _strumenti_. */
-const dropWeights = { hotfix: 3, refactor: 3, coffee: 2, unitTest: 2, revert: 1, pizza: 1.5, tools: 0, ai: 0.5 } as const satisfies Record<PickupKind, number>
+const dropWeights = { hotfix: 3, refactor: 3, coffee: 2, unitTest: 2, revert: 1, pizza: 1.5, tools: 0, ai: 0.5, codeFreeze: 2 } as const satisfies Record<PickupKind, number>
+
+/**
+ * How a hit lands: the statuses it applies (Code freeze from the hitter's
+ * buffs, or whatever the weapon itself carries), and whether it is a status
+ * ticking, which flashes nothing and applies nothing new.
+ */
+interface Hit {
+  readonly inflict?: ReadonlyArray<StatusKind>
+  readonly overTime?: boolean
+}
+
+const inflictAll = (statuses: ReadonlyArray<StatusValue>, hit: Hit, by: number): Array<StatusValue> =>
+  (hit.inflict ?? []).reduce<Array<StatusValue>>((next, kind) => applyStatus(next, kind, by), [...statuses])
 
 /**
  * Every collision in the arena: shots fix bugs, bugs and their projectiles
@@ -138,30 +153,37 @@ export const CombatSystem = Game.System(
       }
     }
 
-    const damageBug = (match: (typeof bugs)[number], damage: number, by: number): void => {
+    /** The statuses a developer's hits apply right now, whatever the weapon. */
+    const hitBy = (slot: number): Hit => {
+      const state = states.get(slot)
+      return state ? { inflict: inflictedBy(state.buffs) } : {}
+    }
+
+    const damageBug = (match: (typeof bugs)[number], damage: number, by: number, hit: Hit = {}): void => {
       const bug = match.data.bug.get()
       const at = match.data.position.get()
       const dealt = bug.trait === "armored" ? damage * 0.5 : damage
       const hp = bug.hp - dealt
-      match.data.bug.set({ ...bug, hp, hitFlash: 0.1 })
-      events.fx.emit({ type: "hit", x: at.x, y: at.y, color: bugKinds[bug.priority].color })
+      const next: BugValue = { ...bug, hp, hitFlash: hit.overTime ? bug.hitFlash : 0.1, statuses: inflictAll(bug.statuses, hit, by) }
+      match.data.bug.set(next)
+      if (!hit.overTime) events.fx.emit({ type: "hit", x: at.x, y: at.y, color: bugKinds[bug.priority].color })
       if (hp <= 0) {
-        fixBug(match, bug, at, by)
+        fixBug(match, next, at, by)
       }
     }
 
-    const damageBoss = (match: (typeof bosses)[number], damage: number, by: number): void => {
+    const damageBoss = (match: (typeof bosses)[number], damage: number, by: number, hit: Hit = {}): void => {
       const boss = match.data.boss.get()
       const at = match.data.position.get()
       if (boss.shield > 0) {
-        events.fx.emit({ type: "hit", x: at.x, y: at.y, color: "#ffffff" })
+        if (!hit.overTime) events.fx.emit({ type: "hit", x: at.x, y: at.y, color: "#ffffff" })
         return
       }
       const hp = boss.hp - damage
       run.lastProgressAt = run.time
-      events.fx.emit({ type: "hit", x: at.x, y: at.y, color: boss.color })
+      if (!hit.overTime) events.fx.emit({ type: "hit", x: at.x, y: at.y, color: boss.color })
       if (hp > 0) {
-        match.data.boss.set({ ...boss, hp, hitFlash: 0.08 })
+        match.data.boss.set({ ...boss, hp, hitFlash: hit.overTime ? boss.hitFlash : 0.08, statuses: inflictAll(boss.statuses, hit, by) })
         return
       }
       if (boss.pattern === "twoFactor" && boss.phase === 1) {
@@ -186,15 +208,31 @@ export const CombatSystem = Game.System(
       }
     }
 
+    // Statuses wear off; the ones that hurt do it for whoever applied them.
+    for (const match of bugs) {
+      const ticked = tickStatuses(match.data.bug.get().statuses, DT)
+      match.data.bug.set({ ...match.data.bug.get(), statuses: ticked.statuses })
+      for (const damage of ticked.damage) {
+        if (!gone.has(match.entity.id)) damageBug(match, damage.amount, damage.by, { overTime: true })
+      }
+    }
+    for (const match of bosses) {
+      const ticked = tickStatuses(match.data.boss.get().statuses, DT)
+      match.data.boss.set({ ...match.data.boss.get(), statuses: ticked.statuses })
+      for (const damage of ticked.damage) {
+        if (!gone.has(match.entity.id)) damageBoss(match, damage.amount, damage.by, { overTime: true })
+      }
+    }
+
     // git reset --hard
     for (const blast of events.bombs.all()) {
       for (const match of bugs) {
         if (!gone.has(match.entity.id) && distanceSquared(match.data.position.get(), blast) < BOMB_RADIUS ** 2) {
-          damageBug(match, 99, blast.slot)
+          damageBug(match, 99, blast.slot, hitBy(blast.slot))
         }
       }
       for (const match of bosses) {
-        if (!gone.has(match.entity.id)) damageBoss(match, 18, blast.slot)
+        if (!gone.has(match.entity.id)) damageBoss(match, 18, blast.slot, hitBy(blast.slot))
       }
       for (const shot of queries.hostile.each()) {
         if (!gone.has(shot.entity.id)) {
@@ -224,14 +262,14 @@ export const CombatSystem = Game.System(
         if (gone.has(shot.entity.id)) break
         if (gone.has(match.entity.id)) continue
         if (overlaps(at, radius, match.data.position.get(), match.data.body.get().radius)) {
-          hit(() => damageBug(match, state.damage, state.owner))
+          hit(() => damageBug(match, state.damage, state.owner, hitBy(state.owner)))
         }
       }
       for (const match of bosses) {
         if (gone.has(shot.entity.id)) break
         if (gone.has(match.entity.id)) continue
         if (overlaps(at, radius, match.data.position.get(), match.data.body.get().radius)) {
-          hit(() => damageBoss(match, state.damage, state.owner))
+          hit(() => damageBoss(match, state.damage, state.owner, hitBy(state.owner)))
         }
       }
     }

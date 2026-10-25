@@ -143,7 +143,8 @@ export const en: Strings = {
     revert: { label: "git reset", hint: "+1 bomb" },
     pizza: { label: "Pizza", hint: "+2 sanity" },
     tools: { label: "Tools", hint: "homing shots" },
-    ai: { label: "AI", hint: "auto turret" }
+    ai: { label: "AI", hint: "auto turret" },
+    codeFreeze: { label: "Code freeze", hint: "hits freeze" }
   },
   floorCode: [
     "console.log('does it get here?')",

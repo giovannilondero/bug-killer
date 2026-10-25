@@ -9,6 +9,7 @@ import { angleTo, clamp, nearest, normalize, openPoint } from "../math.ts"
 import { BossWrite, BugRead, PlayerRead, standing } from "../queries.ts"
 import { Bug, Fx, Game, HostileShot, Language, LevelSpec, Rng } from "../schema.ts"
 import type { BossValue, Vec } from "../schema.ts"
+import { speedFactor } from "../statuses.ts"
 import { Ops } from "@typeonce/ritmo-math"
 
 const minion = (key: string, summary: string, priority: BugSeed["priority"]): BugSeed => ({ key, summary, priority, status: "Open" })
@@ -41,8 +42,10 @@ export const BossBrainSystem = Game.System(
       const position = match.data.position.get()
       const target = nearest(position, team) ?? team[0]!
       const boss: BossValue = { ...match.data.boss.get() }
+      // Code freeze slows a boss, its attacks included, but never stops it.
+      const slow = speedFactor(boss.statuses, true)
       boss.age += DT
-      boss.timer -= DT
+      boss.timer -= DT * slow
       boss.shield = Math.max(0, boss.shield - DT)
       boss.hitFlash = Math.max(0, boss.hitFlash - DT)
       const rage = 1 - boss.hp / boss.maxHp
@@ -142,7 +145,7 @@ export const BossBrainSystem = Game.System(
         }
       }
 
-      match.data.velocity.set(velocity)
+      match.data.velocity.set({ x: velocity.x * slow, y: velocity.y * slow })
       match.data.boss.set(boss)
     }
   }

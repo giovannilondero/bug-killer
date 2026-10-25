@@ -27,7 +27,8 @@ export const contentTiers = {
   revert: 0,
   pizza: 0,
   tools: 0,
-  ai: 0
+  ai: 0,
+  codeFreeze: 2
 } as const satisfies Record<Unlockable, Tier>
 
 export type TierTable = Readonly<Record<Unlockable, Tier>>
