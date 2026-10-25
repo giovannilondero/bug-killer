@@ -241,7 +241,7 @@ export const CombatSystem = Game.System(
 
     // Statuses wear off; the ones that hurt do it for whoever applied them.
     for (const match of bugs) {
-      const ticked = tickStatuses(match.data.bug.get().statuses, DT)
+      const ticked = tickStatuses(match.data.bug.get().statuses, DT, false)
       match.data.bug.set({ ...match.data.bug.get(), statuses: ticked.statuses })
       for (const damage of ticked.damage) {
         if (!gone.has(match.entity.id)) damageBug(match, damage.amount, damage.by, { overTime: true })
@@ -262,7 +262,7 @@ export const CombatSystem = Game.System(
       }
     }
     for (const match of bosses) {
-      const ticked = tickStatuses(match.data.boss.get().statuses, DT)
+      const ticked = tickStatuses(match.data.boss.get().statuses, DT, true)
       match.data.boss.set({ ...match.data.boss.get(), statuses: ticked.statuses })
       for (const damage of ticked.damage) {
         if (!gone.has(match.entity.id)) damageBoss(match, damage.amount, damage.by, { overTime: true })

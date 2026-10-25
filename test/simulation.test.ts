@@ -10,6 +10,7 @@ import { makeBoss, makeBug, makePickup } from "../src/sim/drafts.ts"
 import type { BugSeed } from "../src/sim/drafts.ts"
 import { contentTiers, isUnlocked, tierOf } from "../src/sim/tiers.ts"
 import { hasStatus } from "../src/sim/statuses.ts"
+import type { StatusValue } from "../src/sim/statuses.ts"
 import { Boss, Bug, Game, Pickup, pickupKinds } from "../src/sim/schema.ts"
 import type { ChatValue, FxValue, InputValue, PickupKind, Vec } from "../src/sim/schema.ts"
 
@@ -750,6 +751,34 @@ test("Memory leak: when a poisoned bug dies, the leak passes to the nearest bug"
   assert.ok(!poisoned("LEAK-FAR"), "the far one did not")
   wait(1)
   assert.ok(find("LEAK-NEAR")!.hp < near, "and it hurts")
+})
+
+test("statuses hurt a boss in a reduced form: burn and poison deal half", () => {
+  /** Health a boss loses in one second carrying `status`, nobody firing. */
+  const lost = (status: StatusValue) => {
+    const made = createSimulation({ level: levels[0]!, seed: 4, input: { snapshot: () => idleInput }, presentation: { fx: () => undefined, chat: () => undefined } })
+    if (!made.ok) throw new Error(JSON.stringify(made.error))
+    const sim = made.value
+    const me = sim.view().player!.position
+    const Spawn = Game.System("Test/Spawn", { commands: Game.System.commands(Game.System.spawns(Boss)) }, ({ commands }) => {
+      commands.spawn(makeBoss({ ...levels[0]!.boss, key: "BOSS-1" }, { x: me.x + 400, y: me.y - 300 }))
+    })
+    assert.ok(sim.runtime.tick(Game.Schedule(Spawn, Game.Schedule.applyDeferred())).ok)
+    // Past the boss's boot shield, which shrugs everything off.
+    for (let frame = 0; frame < 2.5 * 60; frame++) assert.ok(sim.step().ok)
+    const Inflict = Game.System("Test/Inflict", { queries: { bosses: Game.Query({ selection: { boss: Game.Query.write(Boss) } }) } }, ({ queries }) => {
+      for (const match of queries.bosses.each()) match.data.boss.update((boss) => ({ ...boss, statuses: [status] }))
+    })
+    assert.ok(sim.runtime.tick(Game.Schedule(Inflict)).ok)
+    const before = sim.view().bosses[0]!.hp
+    for (let frame = 0; frame < 60; frame++) assert.ok(sim.step().ok)
+    return before - sim.view().bosses[0]!.hp
+  }
+  // On a bug: burn 2.5 hp/s, poison 0.4 hp/s per stack.
+  const burn = lost({ kind: "burn", seconds: 3, by: 0, stacks: 1 })
+  assert.ok(Math.abs(burn - 1.25) < 0.05, `burn took ${burn.toFixed(2)} hp in a second`)
+  const poison = lost({ kind: "poison", seconds: 6, by: 0, stacks: 5 })
+  assert.ok(Math.abs(poison - 1) < 0.05, `poison took ${poison.toFixed(2)} hp in a second`)
 })
 
 test("Memory leak arrives with sprint 4 (Foundry) and not before", () => {

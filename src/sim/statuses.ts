@@ -43,6 +43,9 @@ export const statusEffects = {
 
 export type StatusTable = Readonly<Record<StatusKind, StatusEffect>>
 
+/** Statuses reach a boss in a reduced form: this much of the damage they deal to a bug. */
+export const BOSS_STATUS_DAMAGE = 0.5
+
 /** Timed buffs that make every hit of their holder apply a status, whatever the weapon. */
 export const statusBuffs = [{ buff: "codeFreeze", status: "freeze" }, { buff: "memoryLeak", status: "poison" }] as const satisfies ReadonlyArray<{ buff: PickupKind; status: StatusKind }>
 
@@ -69,15 +72,16 @@ export const applyStatus = (
 export const catchStatus = (statuses: ReadonlyArray<StatusValue>, from: StatusValue): Array<StatusValue> =>
   [...statuses.filter((status) => status.kind !== from.kind), { ...from, stacks: 1 }]
 
-/** One step of `dt`: what is left, and the damage each status deals, with who to credit it to. */
+/** One step of `dt`: what is left, and the damage each status deals (reduced on a boss), with who to credit it to. */
 export const tickStatuses = (
   statuses: ReadonlyArray<StatusValue>,
   dt: number,
+  boss: boolean,
   table: StatusTable = statusEffects
 ): { statuses: Array<StatusValue>; damage: Array<{ kind: StatusKind; amount: number; by: number }> } => {
   const damage = statuses
     .filter((status) => table[status.kind].dps > 0)
-    .map((status) => ({ kind: status.kind, amount: table[status.kind].dps * status.stacks * Math.min(dt, status.seconds), by: status.by }))
+    .map((status) => ({ kind: status.kind, amount: table[status.kind].dps * status.stacks * Math.min(dt, status.seconds) * (boss ? BOSS_STATUS_DAMAGE : 1), by: status.by }))
   const left = statuses
     .map((status) => ({ ...status, seconds: status.seconds - dt }))
     .filter((status) => status.seconds > 0)
