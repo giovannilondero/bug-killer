@@ -16,16 +16,16 @@
     "serve:cloudflare": "pnpm build && wrangler dev"
   },
   "dependencies": {
-    "@typeonce/ritmo": "^0.12.0",
-    "@typeonce/ritmo-browser": "^0.12.0",
-    "@typeonce/ritmo-math": "^0.12.0",
+    "@typeonce/ritmo": "^0.14.0",
+    "@typeonce/ritmo-browser": "^0.14.0",
+    "@typeonce/ritmo-math": "^0.14.0",
     "pixi.js": "8.22.0",
     "ws": "^8.22.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261022.1",
-    "@typeonce/oxlint-plugin-ritmo": "0.12.0",
-    "@typeonce/ritmo-devtools": "0.12.0",
+    "@typeonce/oxlint-plugin-ritmo": "0.14.0",
+    "@typeonce/ritmo-devtools": "0.14.0",
     "@types/node": "^26.6.5",
     "@types/ws": "^8.18.2",
     "oxlint": "^1.89.0",

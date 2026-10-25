@@ -1,3 +1,5 @@
+import { Touch } from "@typeonce/ritmo-browser"
+
 import type { Vec } from "../sim/schema.ts"
 import { fullscreenSupported, isFullscreen, onFullscreenChange } from "./fullscreen.ts"
 import { t } from "./language.ts"
@@ -48,59 +50,21 @@ const el = (tag: string, className: string, text = ""): HTMLElement => {
   return node
 }
 
-/** A thumb stick that appears where the finger lands inside its zone. */
-const stick = (zone: HTMLElement) => {
+/** A stick drawn where its thumb landed inside its zone, from the controls' view. */
+const stickNode = (zone: HTMLElement) => {
   const base = el("div", "stick")
   const knob = el("div", "knob")
   base.append(knob)
   zone.append(base)
-  let id: number | null = null
-  let origin: Vec = { x: 0, y: 0 }
-  let value: Vec = { x: 0, y: 0 }
-
-  const show = (at: Vec) => {
-    base.style.left = `${at.x}px`
-    base.style.top = `${at.y}px`
-    base.classList.add("held")
-  }
-  const release = () => {
-    id = null
-    value = { x: 0, y: 0 }
-    knob.style.transform = ""
-    base.classList.remove("held")
-  }
-
-  zone.addEventListener("pointerdown", (event) => {
-    if (id !== null) return
-    event.preventDefault()
-    id = event.pointerId
-    zone.setPointerCapture(event.pointerId)
-    const box = zone.getBoundingClientRect()
-    origin = { x: event.clientX - box.left, y: event.clientY - box.top }
-    value = { x: 0, y: 0 }
-    show(origin)
-  })
-  zone.addEventListener("pointermove", (event) => {
-    if (event.pointerId !== id) return
-    const box = zone.getBoundingClientRect()
-    const dx = event.clientX - box.left - origin.x
-    const dy = event.clientY - box.top - origin.y
-    const length = Math.hypot(dx, dy)
-    const clamped = Math.min(length, STICK_RADIUS)
-    const k = length > 0 ? clamped / length : 0
-    knob.style.transform = `translate(${dx * k}px, ${dy * k}px)`
-    value = { x: (dx * k) / STICK_RADIUS, y: (dy * k) / STICK_RADIUS }
-  })
-  for (const type of ["pointerup", "pointercancel", "lostpointercapture"] as const) {
-    zone.addEventListener(type, (event) => {
-      if (event.pointerId === id) release()
-    })
-  }
-
-  return {
-    held: () => id !== null,
-    value: () => value,
-    release
+  return (stick: Touch.StickView | null, layout: Touch.StickZone | null) => {
+    base.classList.toggle("held", stick !== null)
+    if (stick === null || layout === null) {
+      knob.style.transform = ""
+      return
+    }
+    base.style.left = `${stick.origin.x - layout.region.left}px`
+    base.style.top = `${stick.origin.y - layout.region.top}px`
+    knob.style.transform = `translate(${stick.knob.x - stick.origin.x}px, ${stick.knob.y - stick.origin.y}px)`
   }
 }
 
@@ -150,22 +114,49 @@ export const makeTouchControls = (root: HTMLElement, actions: { pause: () => voi
   }
   root.append(left, right, dashButton, bombButton, bar)
 
-  const move = stick(left)
-  const aim = stick(right)
+  // A zone's rect relative to the overlay: the CSS stays where the sticks live.
+  const regionOf = (zone: HTMLElement): Touch.Rect => {
+    const box = zone.getBoundingClientRect()
+    const origin = root.getBoundingClientRect()
+    return { left: box.left - origin.left, top: box.top - origin.top, width: box.width, height: box.height }
+  }
+  // The raw tilt (dead zone 0): `snapshot` applies `DEADZONE` itself. A hidden overlay has no sticks,
+  // so a thumb held when the game pauses lets go. Any pointer drives them, as the zones always did.
+  const sticks = Touch.actions(
+    root,
+    window,
+    () => ({
+      sticks: {
+        move: root.hidden ? null : { region: regionOf(left), radius: STICK_RADIUS, deadZone: 0 },
+        aim: root.hidden ? null : { region: regionOf(right), radius: STICK_RADIUS, deadZone: 0 }
+      },
+      buttons: {}
+    }),
+    { pointerTypes: ["touch", "pen", "mouse"] }
+  )
+  const drawMove = stickNode(left)
+  const drawAim = stickNode(right)
+  const draw = () => {
+    const view = sticks.view()
+    drawMove(view.sticks.move, view.layout.sticks.move)
+    drawAim(view.sticks.aim, view.layout.sticks.aim)
+  }
   const dash = latch(dashButton)
   const bomb = latch(bombButton)
+  // The bar sits over the right zone: its taps are not the aim stick.
+  bar.addEventListener("pointerdown", (event) => event.stopPropagation())
   pauseButton.addEventListener("click", actions.pause)
   muteButton.addEventListener("click", actions.mute)
 
   return {
     snapshot: (): TouchSnapshot => {
-      const m = move.value()
-      const a = aim.value()
+      const { move: m, aim: a } = sticks.snapshot().vectors
+      draw()
       const magnitude = Math.hypot(a.x, a.y)
       return {
-        move: Math.hypot(m.x, m.y) < DEADZONE ? { x: 0, y: 0 } : m,
+        move: Math.hypot(m.x, m.y) < DEADZONE ? { x: 0, y: 0 } : { x: m.x, y: m.y },
         aim: magnitude < DEADZONE ? null : { x: a.x / magnitude, y: a.y / magnitude },
-        fire: aim.held(),
+        fire: a.active,
         dash: dash(),
         bomb: bomb()
       }
@@ -173,8 +164,9 @@ export const makeTouchControls = (root: HTMLElement, actions: { pause: () => voi
     setVisible: (visible: boolean) => {
       root.hidden = !visible
       if (!visible) {
-        move.release()
-        aim.release()
+        // Read the layout now: the sticks a hidden overlay has none of let go of their thumbs.
+        sticks.snapshot()
+        draw()
       }
       dashButton.textContent = t().touch.dash
       dashButton.setAttribute("aria-label", t().touch.dash)

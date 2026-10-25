@@ -9,14 +9,14 @@ importers:
   .:
     dependencies:
       '@typeonce/ritmo':
-        specifier: ^0.12.0
-        version: 0.12.0(typescript@7.0.2)
+        specifier: ^0.14.0
+        version: 0.14.0(typescript@7.0.2)
       '@typeonce/ritmo-browser':
-        specifier: ^0.12.0
-        version: 0.12.0(typescript@7.0.2)
+        specifier: ^0.14.0
+        version: 0.14.0(typescript@7.0.2)
       '@typeonce/ritmo-math':
-        specifier: ^0.12.0
-        version: 0.12.0(typescript@7.0.2)
+        specifier: ^0.14.0
+        version: 0.14.0(typescript@7.0.2)
       pixi.js:
         specifier: 8.22.0
         version: 8.22.0
@@ -28,11 +28,11 @@ importers:
         specifier: ^5.20261022.1
         version: 5.20261022.1
       '@typeonce/oxlint-plugin-ritmo':
-        specifier: 0.12.0
-        version: 0.12.0(oxlint@1.89.0)
+        specifier: 0.14.0
+        version: 0.14.0(oxlint@1.89.0)
       '@typeonce/ritmo-devtools':
-        specifier: 0.12.0
-        version: 0.12.0(typescript@7.0.2)
+        specifier: 0.14.0
+        version: 0.14.0(typescript@7.0.2)
       '@types/node':
         specifier: ^26.6.5
         version: 26.6.5
@@ -685,27 +685,27 @@ packages:
   '@speed-highlight/core@1.2.24':
     resolution: {integrity: sha512-qeW2e1l78afw8VhRPfPQ1Gjj+KU5XFQ/OFV5ti6eTa9bruO7mJyZtA4vw0ofqmA3tKCkROE9xLk3VZoeRc98nw==}
 
-  '@typeonce/oxlint-plugin-ritmo@0.12.0':
-    resolution: {integrity: sha512-Uxm1ADGmsWV+2TtobwTMtYMWvRvByY5g4qWAl64aYUBGzKc2QeakfZWnPtXDTcK69Mvz8xTPU1AxMYnFSoSDKw==}
+  '@typeonce/oxlint-plugin-ritmo@0.14.0':
+    resolution: {integrity: sha512-UtfLipN7T8meY03NyAeTn2etpl0HCahOWaPCA3YlNgixkNG7/cCmRRXGZoo0o4sVsR9ArQ9SKRLzAnxzzBTGJA==}
     engines: {node: '>=20'}
     peerDependencies:
       oxlint: '>=1.86.0'
 
-  '@typeonce/ritmo-browser@0.12.0':
-    resolution: {integrity: sha512-ReMvchRwpY1qUpqGEz04U5IH5BykzqyDVr54qldvaDr2E2ib641c5/2ZH3xzq2IP5zJswBp/CagtkrFzBALVig==}
+  '@typeonce/ritmo-browser@0.14.0':
+    resolution: {integrity: sha512-0nqPzdE2GGJuL/ykshwRLNHRlU1Rk+MwEKdxszyUw4WDlwQ9K2d9/K7nIfgeQzxmswUsOaTCAhvVNyvKczI0bg==}
     engines: {node: '>=20'}
 
-  '@typeonce/ritmo-devtools@0.12.0':
-    resolution: {integrity: sha512-BIzpR4YBNgQiN7Z7+quQAPPrRdjdIjr7eUib4374yT6oIPQnPWMk+S2iOYMff3X8ALidoXuh4iodg+6R6OUvqw==}
+  '@typeonce/ritmo-devtools@0.14.0':
+    resolution: {integrity: sha512-9TDO7DylwJwEYCS0YgsN2RFI98B49FkxugKaB/+k/lRQSAV6G7Nj+01iOnTozx+RX6dThOwDbbbneoET3fpw6g==}
     engines: {node: '>=22.15'}
     hasBin: true
 
-  '@typeonce/ritmo-math@0.12.0':
-    resolution: {integrity: sha512-ryXaakyxcjVnaBK83CJxjoU4MSbFoamWbVO2YfSfsEyVTsNQ/MtVjtMS6MZWhKhWVHW86B+iiXUobyGPDvpqWA==}
+  '@typeonce/ritmo-math@0.14.0':
+    resolution: {integrity: sha512-zgrhF6ZKyTLd+10HmFEPf8DkqqaPtSJer+6vkXQPi09C3C0g5te/pn7RG4DA4FgWlcDbByEQ1V22AdDdWES9fg==}
     engines: {node: '>=20'}
 
-  '@typeonce/ritmo@0.12.0':
-    resolution: {integrity: sha512-pqp3qX+h+Z6ctWqkF3w7tx672g6gmRT166Ss5oAHhOO6FNfkP3pxJetfQBK/paXrQS88HfqCYCWApAFweRs2IA==}
+  '@typeonce/ritmo@0.14.0':
+    resolution: {integrity: sha512-SHwQwj6cwBk+rXc7GwOSQHJjvjeaOuYODMiaz8cary/Fm8ilbneXRr7hUFV9ysaXEaO5qYE7Hm7hTMSrIlg7Bw==}
     engines: {node: '>=20'}
     peerDependencies:
       typescript: '>=5.9'
@@ -1521,30 +1521,30 @@ snapshots:
 
   '@speed-highlight/core@1.2.24': {}
 
-  '@typeonce/oxlint-plugin-ritmo@0.12.0(oxlint@1.89.0)':
+  '@typeonce/oxlint-plugin-ritmo@0.14.0(oxlint@1.89.0)':
     dependencies:
       '@oxlint/plugins': 1.89.0
       oxlint: 1.89.0
 
-  '@typeonce/ritmo-browser@0.12.0(typescript@7.0.2)':
+  '@typeonce/ritmo-browser@0.14.0(typescript@7.0.2)':
     dependencies:
-      '@typeonce/ritmo': 0.12.0(typescript@7.0.2)
+      '@typeonce/ritmo': 0.14.0(typescript@7.0.2)
     transitivePeerDependencies:
       - typescript
 
-  '@typeonce/ritmo-devtools@0.12.0(typescript@7.0.2)':
+  '@typeonce/ritmo-devtools@0.14.0(typescript@7.0.2)':
     dependencies:
-      '@typeonce/ritmo': 0.12.0(typescript@7.0.2)
+      '@typeonce/ritmo': 0.14.0(typescript@7.0.2)
     transitivePeerDependencies:
       - typescript
 
-  '@typeonce/ritmo-math@0.12.0(typescript@7.0.2)':
+  '@typeonce/ritmo-math@0.14.0(typescript@7.0.2)':
     dependencies:
-      '@typeonce/ritmo': 0.12.0(typescript@7.0.2)
+      '@typeonce/ritmo': 0.14.0(typescript@7.0.2)
     transitivePeerDependencies:
       - typescript
 
-  '@typeonce/ritmo@0.12.0(typescript@7.0.2)':
+  '@typeonce/ritmo@0.14.0(typescript@7.0.2)':
     optionalDependencies:
       typescript: 7.0.2
 

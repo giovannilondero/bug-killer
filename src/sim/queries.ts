@@ -1,3 +1,5 @@
+import type { QueryMatch } from "@typeonce/ritmo/Query"
+
 import { Body, Boss, Bug, Game, HostileShot, Pickup, Player, Position, Shot, Velocity } from "./schema.ts"
 
 export const PlayerWrite = Game.Query({
@@ -18,7 +20,7 @@ export const PlayerRead = Game.Query({
 })
 
 /** Developers still standing, lowest seat first: who bugs chase and where clients drop rewards. */
-export const standing = (team: ReadonlyArray<{ data: { position: { get: () => { readonly x: number; readonly y: number } }; player: { get: () => { readonly hp: number; readonly slot: number } } } }>) =>
+export const standing = (team: ReadonlyArray<QueryMatch<typeof Game.schema, typeof PlayerRead>>) =>
   team
     .filter((match) => match.data.player.get().hp > 0)
     .sort((a, b) => a.data.player.get().slot - b.data.player.get().slot)

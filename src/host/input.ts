@@ -14,29 +14,10 @@ export const keyBindings = {
   fire: [Keyboard.code("KeyJ")]
 } as const
 
-/** Typing a name or a run code is not moving: keys typed into a form field never reach the game. */
+/** Typing a name or a run code is not a shortcut: M, P and Escape typed into a form field stay in the field. (Ritmo's `Keyboard` already leaves form fields alone for movement.) */
 export const typing = (event: Event) => {
   const target = event.target
   return target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement
-}
-
-/** The window as the keyboard sees it, minus the form fields (Ritmo would swallow their W, A, S, D and space). */
-const gameKeys = (host: Window): Keyboard.KeyboardHost => {
-  const filtered = new Map<(event: KeyboardEvent) => void, (event: KeyboardEvent) => void>()
-  return {
-    addEventListener: (type: "keydown" | "keyup" | "blur", listener: (event: KeyboardEvent) => void) => {
-      const wrapped = (event: KeyboardEvent) => {
-        if (type === "blur" || !typing(event)) listener(event)
-      }
-      filtered.set(listener, wrapped)
-      host.addEventListener(type, wrapped as EventListener)
-    },
-    removeEventListener: (type: "keydown" | "keyup" | "blur", listener: (event: KeyboardEvent) => void) => {
-      const wrapped = filtered.get(listener)
-      if (wrapped) host.removeEventListener(type, wrapped as EventListener)
-      filtered.delete(listener)
-    }
-  }
 }
 
 /** Aim assist for thumbs: how far, and how wide a cone around the stick, a target may be. */
@@ -84,7 +65,7 @@ const assist = (me: Vec, direction: Vec | null, targets: ReadonlyArray<Vec>): Ve
  * renderer last used.
  */
 export const makeInput = (canvas: HTMLCanvasElement, camera: Camera, touch: TouchControls, arena: Arena) => {
-  const keys = Keyboard.actions(gameKeys(window), keyBindings)
+  const keys = Keyboard.actions(window, keyBindings)
   const pointer = Pointer.actions(canvas, window, {})
   // A snapshot starts a new press window, so the renderer reads the cursor from the last one.
   let cursor: Vec = { x: canvas.clientWidth / 2, y: canvas.clientHeight / 3 }

@@ -126,7 +126,7 @@ export const Party = Descriptor.Resource<Array<TeammateValue>>()("BugKiller/Part
 export const LevelSpec = Descriptor.Resource<Level>()("BugKiller/Level")
 /** The language clients write in, fixed for the whole level. */
 export const Language = Descriptor.Resource<Locale>()("BugKiller/Language")
-export const Rng = Descriptor.ConstructedResource(Random)("BugKiller/Rng")
+export const Rng = Descriptor.ConstructedResource(Random.codec)("BugKiller/Rng")
 
 export type Phase = "waves" | "boss" | "cleared" | "dead"
 
