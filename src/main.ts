@@ -696,12 +696,12 @@ const stats = (v: View) => html`
   ${team(v)}`
 
 /**
- * The release's version: a sprint's number, ∞ for Endless, and a bonus level
- * as a pre-release of the sprint that unlocks it (`v3.4.12-hotdesk`).
+ * The release's version: a sprint's number, and a bonus level as a pre-release
+ * of the sprint that unlocks it (`v3.4.12-hotdesk`). Endless is never cleared, so it has none.
  */
 const versionOf = (v: View): string => {
   const sprint = levels.findIndex((level) => level.id === v.level.id)
-  const major = v.level.bonus ? v.level.bonus.after : sprint >= 0 ? sprint + 1 : "∞"
+  const major = v.level.bonus ? v.level.bonus.after : sprint + 1
   return `v${major}.${v.run.wave}.${v.run.fixed.length}${v.level.bonus ? `-${v.level.id}` : ""}`
 }
 
