@@ -244,3 +244,38 @@ test("the host can pick a bonus level in the lobby, and everyone plays it", () =
     assert.ok(Math.abs(p.position.x - arenas.small.width / 2) < 200 && Math.abs(p.position.y - arenas.small.height / 2) < 200, JSON.stringify(p.position))
   }
 })
+
+test("the host picks Endless's arena, and the whole team plays in it", () => {
+  const rooms = makeRooms({ random: seeded() })
+  const ada = browser()
+  const bob = browser()
+  send(rooms, ada, { t: "create", name: "Ada", level: "endless", locale: "en", arena: "small" })
+  const code = ada.last("room")!.room.code
+  send(rooms, bob, { t: "join", code, name: "Bob" })
+  assert.equal(bob.last("room")?.room.arena, "small", "teammates see it in the lobby")
+  send(rooms, bob, { t: "start", arena: "normal" })
+  assert.equal(bob.last("error")?.code, "notHost", "a teammate cannot pick it")
+  send(rooms, ada, { t: "start" })
+  for (const who of [ada, bob]) assert.equal(who.last("started")?.arena, "small")
+  rooms.advance(1 / 30)
+  for (const p of bob.last("frame")!.view.players) {
+    assert.ok(Math.abs(p.position.x - arenas.small.width / 2) < 200 && Math.abs(p.position.y - arenas.small.height / 2) < 200, JSON.stringify(p.position))
+  }
+})
+
+test("an arena Endless doesn't offer is refused, and a sprint is always played in its own", () => {
+  const rooms = makeRooms({ random: seeded() })
+  const cara = browser()
+  send(rooms, cara, { t: "create", name: "Cara", level: "endless", locale: "en", arena: "moon" })
+  assert.equal(cara.last("room"), undefined, "an unknown arena is refused")
+  const ada = browser()
+  send(rooms, ada, { t: "create", name: "Ada", level: "glacier", locale: "en" })
+  assert.equal(ada.last("room")?.room.arena, "normal", "the normal arena unless the host says otherwise")
+  send(rooms, ada, { t: "start", arena: 3 })
+  assert.equal(ada.last("started"), undefined, "a malformed arena is refused")
+  send(rooms, ada, { t: "start", arena: "small" })
+  rooms.advance(1 / 30)
+  // Glacier keeps the normal floor: the team starts in its middle.
+  const [p] = ada.last("frame")!.view.players
+  assert.ok(Math.abs(p!.position.x - arenas.normal.width / 2) < 200, JSON.stringify(p!.position))
+})
