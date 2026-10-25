@@ -695,7 +695,7 @@ test("Memory leak: a bug the poison finishes off counts as a fix for the develop
 })
 
 test("Memory leak: when a poisoned bug dies, the leak passes to the nearest bug", () => {
-  const { sim, find, wait } = poisonScene([
+  const { find, wait } = poisonScene([
     { bug: leaky("LEAK-1"), dx: 260, dy: 0 },
     { bug: leaky("LEAK-NEAR"), dx: 340, dy: 90, hp: 20 },
     { bug: leaky("LEAK-FAR"), dx: 340, dy: -400, hp: 20 }
