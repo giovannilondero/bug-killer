@@ -146,6 +146,8 @@ export const it: Strings = {
     ai: { label: "AI", hint: "torretta automatica" },
     pairProgramming: { label: "Pair programming", hint: "due colpi alla volta" },
     codeFreeze: { label: "Code freeze", hint: "i colpi congelano" },
+    memoryLeak: { label: "Memory leak", hint: "i colpi avvelenano" },
+    pushForce: { label: "git push --force", hint: "un razzo: boom dove miri" },
     breakpoint: { label: "Breakpoint", hint: "+1 trappola" }
   },
   floorCode: [

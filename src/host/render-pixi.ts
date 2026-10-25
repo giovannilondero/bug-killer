@@ -9,14 +9,14 @@ import type { Arena } from "../content/arenas.ts"
 import { bugKinds } from "../content/bugs.ts"
 import { clients } from "../content/clients.ts"
 import { comboMultiplier } from "../sim/systems/combat.ts"
-import { BREAKPOINT, BUFF_SECONDS, PARTY, PLAYER, TURRET } from "../sim/constants.ts"
+import { BREAKPOINT, BUFF_SECONDS, PARTY, PLAYER, ROCKET, TURRET } from "../sim/constants.ts"
 import { isUnlocked } from "../sim/tiers.ts"
 import { hasStatus } from "../sim/statuses.ts"
 import { WEAPONS } from "../sim/weapons.ts"
 import type { FxValue, PickupKind, Vec } from "../sim/schema.ts"
 import type { View } from "../sim/simulation.ts"
 import { formatNumber, locale, t } from "./language.ts"
-import { floorKey, MONO, paintBreakpoint, paintBug, paintFloor, paintHeart, paintHostile, paintLabel, paintPickup, paintPing, paintPlayer, paintTooltip, pickupIcons, pickupInfo, SANS, shade, tooltipHeight, TOOLTIP_WIDTH, truncate } from "./paint.ts"
+import { floorKey, MONO, paintBreakpoint, paintBug, paintFloor, paintHeart, paintHostile, paintLabel, paintPickup, paintPing, paintPlayer, paintRocket, paintRocketTarget, paintTooltip, pickupIcons, pickupInfo, SANS, shade, tooltipHeight, TOOLTIP_WIDTH, truncate } from "./paint.ts"
 import type { BugLook, TooltipBug } from "./paint.ts"
 import type { Camera, Renderer } from "./render.ts"
 import { touchMode } from "./touch.ts"
@@ -261,6 +261,13 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
     }
   }
 
+  /** A wisp of smoke left behind a rocket each frame. */
+  const puff = (at: Vec, velocity: Vec) => {
+    const len = Math.hypot(velocity.x, velocity.y) || 1
+    const life = 0.35 + Math.random() * 0.25
+    particles.push({ x: at.x - (velocity.x / len) * 26, y: at.y - (velocity.y / len) * 26, vx: (Math.random() - 0.5) * 30, vy: (Math.random() - 0.5) * 30, life, max: life, color: "#9aa4b8", size: 4 })
+  }
+
   const fx = (event: FxValue) => {
     switch (event.type) {
       case "kill":
@@ -348,14 +355,19 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
         burst(event.x, event.y, "#ff4d6d", 10, 120, 2)
         break
       case "breakpoint":
-        // Execution paused: an icy ring, and everything caught in it stops.
-        shake = Math.max(shake, 12)
+        // Execution paused: an icy ring (the blast itself comes as an explosion), and everything caught in it stops.
         for (let i = 0; i < 40; i++) {
           const a = (i / 40) * Math.PI * 2
           particles.push({ x: event.x, y: event.y, vx: Math.cos(a) * 420, vy: Math.sin(a) * 420, life: 0.4, max: 0.4, color: "#9be7ff", size: 3 })
         }
-        burst(event.x, event.y, "#ff4d6d", 16, 200, 3)
         floaters.push({ x: event.x, y: event.y - 30, life: 1.3, max: 1.3, text: t().hud.breakpointHit, sub: "", color: "#9be7ff", big: false })
+        break
+      case "explosion":
+        shake = Math.max(shake, 12)
+        flash = Math.max(flash, 0.25)
+        burst(event.x, event.y, "#ff9440", 40, event.radius * 3, 5)
+        burst(event.x, event.y, "#ffd84a", 24, event.radius * 2, 4)
+        burst(event.x, event.y, "#ffffff", 10, event.radius, 3)
         break
       case "shoot":
         break
@@ -393,7 +405,7 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
     const k = options.frozen ? 0 : Math.floor((((age % period) + period) % period) / period * frames) % frames
     const blur = options.boss ? 30 : 12
     const half = Math.max(r * 1.45 + 4, r + blur * 1.6)
-    const look = `${options.flash > 0 ? "f" : ""}${options.reopened ? "r" : ""}${options.trait === "armored" ? "a" : ""}${options.boss ? "b" : ""}${options.frozen ? "i" : ""}`
+    const look = `${options.flash > 0 ? "f" : ""}${options.reopened ? "r" : ""}${options.trait === "armored" ? "a" : ""}${options.boss ? "b" : ""}${options.frozen ? "i" : ""}${options.poisoned ? "p" : ""}`
     return bakery.bake(`bug|${color}|${r}|${look}|${k}`, wres, around(half), (g) => paintBug(g, r, color, (k * period) / frames, options))
   }
 
@@ -536,7 +548,7 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
     if (boss.pattern === "crash" && Math.sin(time * 30) > 0.7) {
       drawBug(x + Math.random() * 10 - 5, y, boss.radius, boss.radius, "#ff00ff", heading, boss.age, { flash: 0, trait: "plain", reopened: false, boss: true }, 0.4)
     }
-    drawBug(x, y, boss.radius, boss.radius, boss.color, heading, boss.age, { flash: boss.hitFlash, trait: "plain", reopened: true, boss: true, frozen: hasStatus(boss.statuses, "freeze") }, 1)
+    drawBug(x, y, boss.radius, boss.radius, boss.color, heading, boss.age, { flash: boss.hitFlash, trait: "plain", reopened: true, boss: true, frozen: hasStatus(boss.statuses, "freeze"), poisoned: hasStatus(boss.statuses, "poison") }, 1)
     if (boss.shield > 0) {
       const r = boss.radius * 1.35
       W.sprite(bakery.bake(`shield|${r}`, wres, around(r + 34), (g) => {
@@ -692,7 +704,7 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
         }), x, y, { rotation: -time * 3, alpha: appear })
       }
       const color = bug.resurrectedBy ? "#9dff6b" : bugKinds[bug.priority].color
-      drawBug(x, y, bug.radius * (0.4 + appear * 0.6), bug.radius, color, heading, bug.age, { flash: bug.hitFlash, trait: bug.trait, reopened: bug.reopened || bug.resurrectedBy !== null, frozen: hasStatus(bug.statuses, "freeze") }, appear)
+      drawBug(x, y, bug.radius * (0.4 + appear * 0.6), bug.radius, color, heading, bug.age, { flash: bug.hitFlash, trait: bug.trait, reopened: bug.reopened || bug.resurrectedBy !== null, frozen: hasStatus(bug.statuses, "freeze"), poisoned: hasStatus(bug.statuses, "poison") }, appear)
       const isTarget = mission?.kind === "killTarget" && mission.target === bug.key
       if (isTarget) {
         const pulse = bug.radius * 1.6 + Math.sin(time * 8) * 4
@@ -731,6 +743,15 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
         g.lineWidth = 5
         g.beginPath(); g.moveTo(-16, 0); g.lineTo(0, 0); g.stroke()
       }), x, y, { rotation: Math.atan2(shot.velocity.y, shot.velocity.x) })
+    }
+
+    // Rockets: where each will go off, then the rocket with its smoke.
+    for (const rocket of view.rockets) {
+      W.sprite(bakery.bake("rocketTarget", wres, around(ROCKET.blastRadius + 2), (g) => paintRocketTarget(g, ROCKET.blastRadius)), rocket.target.x, rocket.target.y)
+      W.sprite(bakery.bake("rocket", wres, { left: -64, top: -14, right: 10, bottom: 14 }, (g) => paintRocket(g)), rocket.position.x, rocket.position.y, {
+        rotation: Math.atan2(rocket.velocity.y, rocket.velocity.x)
+      })
+      puff(rocket.position, rocket.velocity)
     }
 
     for (const shot of view.hostile) {
@@ -935,7 +956,7 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
         text(S, res, `${t().pickups[weapon.kind].label.toUpperCase()}  ${Math.ceil(weapon.seconds)}s`, `bold 11px ${MONO}`, "#ffd84a", 152, y + 2, "left")
         row++
       }
-      for (const kind of ["tools", "hotfix", "refactor", "coffee", "unitTest", "codeFreeze"] as const) {
+      for (const kind of ["tools", "hotfix", "refactor", "coffee", "unitTest", "codeFreeze", "memoryLeak"] as const) {
         const left = player.buffs[kind]
         if (left <= 0) continue
         const y = 142 + row * 22

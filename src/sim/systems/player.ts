@@ -1,10 +1,10 @@
 import { arenaOf } from "../../content/arenas.ts"
 import { breakpointSpot } from "../breakpoints.ts"
-import { DT, PARTY, PLAYER } from "../constants.ts"
-import { makeBreakpoint, makeShot } from "../drafts.ts"
-import { distanceSquared, length, normalize } from "../math.ts"
+import { DT, PARTY, PLAYER, ROCKET } from "../constants.ts"
+import { makeBreakpoint, makeRocket, makeShot } from "../drafts.ts"
+import { clampToArena, distanceSquared, length, normalize } from "../math.ts"
 import { PlayerWrite } from "../queries.ts"
-import { BombBlast, Breakpoint, Fx, Game, Input, LevelSpec, Run, Shot, pickupKinds } from "../schema.ts"
+import { BombBlast, Breakpoint, Fx, Game, Input, LevelSpec, Rocket, Run, Shot, pickupKinds } from "../schema.ts"
 import type { InputValue, Vec } from "../schema.ts"
 import { HOTFIX_COOLDOWN, WEAPONS, basicGun } from "../weapons.ts"
 import type { WeaponKind } from "../weapons.ts"
@@ -53,13 +53,13 @@ export const PlayerControlSystem = Game.System(
       fx: Game.System.writeEvent(Fx),
       bomb: Game.System.writeEvent(BombBlast)
     },
-    commands: Game.System.commands(Game.System.spawns(Shot, Breakpoint))
+    commands: Game.System.commands(Game.System.spawns(Shot, Rocket, Breakpoint))
   },
   ({ queries, resources, events, commands }) => {
     const phase = resources.run.get().phase
-    const arena = arenaOf(resources.level.get())
     const inputs = resources.input.get()
     const team = queries.player.each()
+    const arena = arenaOf(resources.level.get())
     const up = team.filter((match) => match.data.player.get().hp > 0).map((match) => match.data.position.get())
 
     /** Bullets from `lanes` barrels side by side (pixels off the aim line), fanned out by Refactor. */
@@ -77,7 +77,9 @@ export const PlayerControlSystem = Game.System(
     /** What each weapon does with one pull of the trigger. */
     const fire: Record<WeaponKind, (trigger: Trigger) => void> = {
       gun: (trigger) => bullets(trigger, [0]),
-      pairProgramming: (trigger) => bullets(trigger, [-8, 8])
+      pairProgramming: (trigger) => bullets(trigger, [-8, 8]),
+      // One rocket to the crosshair, kept on the floor so the far explosion happens where it can be seen.
+      pushForce: (trigger) => commands.spawn(makeRocket(trigger.muzzle, clampToArena(trigger.target, ROCKET.radius, arena), trigger.owner))
     }
 
     for (const { data } of team) {

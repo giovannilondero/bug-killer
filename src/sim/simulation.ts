@@ -16,7 +16,7 @@ import type { Level } from "../content/levels.ts"
 import { BREAKPOINT, CALLS, FIRST_CLIENT_DELAY, TOBIA, PARTY, RESURRECT, WAVE_INTERVAL } from "./constants.ts"
 import { makePlayer } from "./drafts.ts"
 import { BossRead, BugRead, HostileShotRead, PickupRead, PlayerRead, ShotRead } from "./queries.ts"
-import { Calls, Chat, Fx, Game, Input, InputSource, Interruptions, Language, LevelSpec, Missions, Party, Player, Position, Presentation, Run, Tiers, Turret, Breakpoint } from "./schema.ts"
+import { Breakpoint, Calls, Chat, Fx, Game, Input, InputSource, Interruptions, Language, LevelSpec, Missions, Party, Player, Position, Presentation, Rocket, Run, Tiers, Turret, Velocity } from "./schema.ts"
 import { contentTiers, isUnlocked, tierOf } from "./tiers.ts"
 import type { TierTable } from "./tiers.ts"
 import type { CallsValue, ChatValue, FxValue, InputValue, InputsValue, InterruptionsValue, MissionsValue, RunValue, TeammateValue } from "./schema.ts"
@@ -101,6 +101,7 @@ export const ViewInspector = Game.Inspector(
       hostile: HostileShotRead,
       pickups: PickupRead,
       turrets: Game.Query({ selection: { position: Game.Query.read(Position), turret: Game.Query.read(Turret) } }),
+      rockets: Game.Query({ selection: { position: Game.Query.read(Position), velocity: Game.Query.read(Velocity), rocket: Game.Query.read(Rocket) } }),
       breakpoints: Game.Query({ selection: { position: Game.Query.read(Position), breakpoint: Game.Query.read(Breakpoint) } })
     },
     resources: {
@@ -126,6 +127,7 @@ export const ViewInspector = Game.Inspector(
       hostile: queries.hostile.each().map((m) => ({ id: m.entity.id, position: m.data.position.get(), text: m.data.shot.get().text })),
       turrets: queries.turrets.each().map((m) => ({ id: m.entity.id, position: m.data.position.get(), ...m.data.turret.get() })),
       pickups: queries.pickups.each().map((m) => ({ id: m.entity.id, position: m.data.position.get(), ...m.data.pickup.get() })),
+      rockets: queries.rockets.each().map((m) => ({ id: m.entity.id, position: m.data.position.get(), velocity: m.data.velocity.get(), ...m.data.rocket.get() })),
       breakpoints: queries.breakpoints.each().map((m) => ({ id: m.entity.id, position: m.data.position.get(), ...m.data.breakpoint.get() })),
       run: resources.run.get(),
       /** The highest content tier on offer right now. */

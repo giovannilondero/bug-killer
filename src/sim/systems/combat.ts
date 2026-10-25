@@ -3,12 +3,13 @@ import * as Random from "@typeonce/ritmo-math/Random"
 import { arenaOf } from "../../content/arenas.ts"
 import { bugKinds } from "../../content/bugs.ts"
 import { text } from "../../content/i18n.ts"
-import { BOMB_RADIUS, BREAKPOINT, BUFF_SECONDS, COMBO_WINDOW, DT, PLAYER } from "../constants.ts"
+import { BOMB_RADIUS, BREAKPOINT, BUFF_SECONDS, COMBO_WINDOW, DT, PLAYER, ROCKET } from "../constants.ts"
 import { makeBug, makePickup, makeTurret } from "../drafts.ts"
 import { clampToArena, distanceSquared, overlaps } from "../math.ts"
 import { BossWrite, BugWrite, HostileShotWrite, PickupWrite, PlayerWrite, ShotWrite } from "../queries.ts"
 import {
   BombBlast,
+  Body,
   Boss,
   Breakpoint,
   Bug,
@@ -22,10 +23,12 @@ import {
   PlayerHurt,
   Position,
   Rng,
+  Rocket,
   Run,
   Shot,
   Tiers,
   Turret,
+  Velocity,
   pickupKinds
 } from "../schema.ts"
 import type { BugValue, PickupKind, PlayerValue, RunValue, Vec } from "../schema.ts"
@@ -43,7 +46,7 @@ export const comboMultiplier = (combo: number): number => Math.min(4, 1 + Math.f
 const dropChance = { Lowest: 0.05, Low: 0.07, Medium: 0.09, High: 0.2, Highest: 1 } as const satisfies Record<BugValue["priority"], number>
 
 /** Pickups that drop from bugs; reverts and pizza are rarer, the AI turret rarest, and only Tobia hands out the _strumenti_. */
-const dropWeights = { hotfix: 3, refactor: 3, coffee: 2, unitTest: 2, revert: 1, pizza: 1.5, tools: 0, ai: 0.5, pairProgramming: 1, codeFreeze: 2, breakpoint: 1 } as const satisfies Record<PickupKind, number>
+const dropWeights = { hotfix: 3, refactor: 3, coffee: 2, unitTest: 2, revert: 1, pizza: 1.5, tools: 0, ai: 0.5, pairProgramming: 1, codeFreeze: 2, memoryLeak: 2, pushForce: 0.4, breakpoint: 1 } as const satisfies Record<PickupKind, number>
 
 /**
  * How a hit lands: the statuses it applies (Code freeze from the hitter's
@@ -73,6 +76,9 @@ export const CombatSystem = Game.System(
       shots: ShotWrite,
       hostile: HostileShotWrite,
       pickups: PickupWrite,
+      rockets: Game.Query({
+        selection: { position: Game.Query.read(Position), velocity: Game.Query.read(Velocity), body: Game.Query.read(Body), rocket: Game.Query.read(Rocket) }
+      }),
       breakpoints: Game.Query({ selection: { position: Game.Query.read(Position), breakpoint: Game.Query.read(Breakpoint) } })
     },
     resources: {
@@ -90,7 +96,7 @@ export const CombatSystem = Game.System(
     },
     commands: Game.System.commands(
       Game.System.spawns(Bug, Pickup, Turret),
-      Game.System.despawns(Bug, Boss, Shot, HostileShot, Pickup, Breakpoint)
+      Game.System.despawns(Bug, Boss, Shot, HostileShot, Pickup, Rocket, Breakpoint)
     )
   },
   ({ queries, resources, events, commands }) => {
@@ -122,6 +128,19 @@ export const CombatSystem = Game.System(
       run.comboTimer = COMBO_WINDOW
       run.lastProgressAt = run.time
       credit(by, points, 0)
+
+      // Memory leak: the poison moves on to the nearest bug, still owned by whoever applied it.
+      const leak = bug.statuses.find((status) => status.kind === "poison")
+      if (leak) {
+        const heir = bugs
+          .filter((other) => !gone.has(other.entity.id))
+          .reduce<(typeof bugs)[number] | null>((best, other) =>
+            !best || distanceSquared(other.data.position.get(), at) < distanceSquared(best.data.position.get(), at) ? other : best, null)
+        if (heir) {
+          const value = heir.data.bug.get()
+          heir.data.bug.set({ ...value, statuses: applyStatus(value.statuses, "poison", leak.by) })
+        }
+      }
 
       if (bug.trait === "reopens" && !bug.reopened && random.next() < REOPEN_CHANCE) {
         // QA says no: the ticket comes straight back.
@@ -228,6 +247,25 @@ export const CombatSystem = Game.System(
       }
     }
 
+    /**
+     * Area damage: every bug and boss the blast reaches takes `damage`,
+     * credited to `by` and landing as `hit`. Developers are never caught in
+     * it, whoever's it is.
+     */
+    const explode = (at: Vec, radius: number, damage: number, by: number, hit: Hit = {}): void => {
+      events.fx.emit({ type: "explosion", x: at.x, y: at.y, radius })
+      for (const match of bugs) {
+        if (!gone.has(match.entity.id) && overlaps(at, radius, match.data.position.get(), match.data.body.get().radius)) {
+          damageBug(match, damage, by, hit)
+        }
+      }
+      for (const match of bosses) {
+        if (!gone.has(match.entity.id) && overlaps(at, radius, match.data.position.get(), match.data.body.get().radius)) {
+          damageBoss(match, damage, by, hit)
+        }
+      }
+    }
+
     // git reset --hard
     for (const blast of events.bombs.all()) {
       for (const match of bugs) {
@@ -246,29 +284,32 @@ export const CombatSystem = Game.System(
       }
     }
 
-    /** Hurts every bug and boss within `radius` of `at`, for `by`, landing `hit` on each. */
-    const blast = (at: Vec, radius: number, damage: number, by: number, hit: Hit): void => {
-      for (const match of bugs) {
-        if (!gone.has(match.entity.id) && distanceSquared(match.data.position.get(), at) < (radius + match.data.body.get().radius) ** 2) {
-          damageBug(match, damage, by, hit)
-        }
-      }
-      for (const match of bosses) {
-        if (!gone.has(match.entity.id) && distanceSquared(match.data.position.get(), at) < (radius + match.data.body.get().radius) ** 2) {
-          damageBoss(match, damage, by, hit)
-        }
-      }
+    // git push --force: a rocket goes off on the first bug or boss it touches, or where it was aimed.
+    for (const rocket of queries.rockets.each()) {
+      const at = rocket.data.position.get()
+      const radius = rocket.data.body.get().radius
+      const velocity = rocket.data.velocity.get()
+      const { target, owner } = rocket.data.rocket.get()
+      const touches = (match: (typeof bugs)[number] | (typeof bosses)[number]) =>
+        !gone.has(match.entity.id) && overlaps(at, radius, match.data.position.get(), match.data.body.get().radius)
+      const hit = bugs.some(touches) || bosses.some(touches)
+      // Past the aimed point once the way left to go points backward.
+      const arrived = (target.x - at.x) * velocity.x + (target.y - at.y) * velocity.y <= 0
+      if (!hit && !arrived) continue
+      gone.add(rocket.entity.id)
+      commands.despawn(rocket.entity)
+      explode(hit ? at : target, ROCKET.blastRadius, ROCKET.damage, owner, hitBy(owner))
     }
 
-    // A Breakpoint goes off when a bug or a boss comes close, for whoever set it. Developers walk over it safely.
+    // A Breakpoint goes off when a bug or a boss comes close, for whoever set it, and freezes what it does not fix.
     for (const trap of queries.breakpoints.each()) {
       const at = trap.data.position.get()
       const near = (match: (typeof bugs)[number] | (typeof bosses)[number]) =>
-        !gone.has(match.entity.id) && distanceSquared(match.data.position.get(), at) < (BREAKPOINT.trigger + match.data.body.get().radius) ** 2
+        !gone.has(match.entity.id) && overlaps(at, BREAKPOINT.trigger, match.data.position.get(), match.data.body.get().radius)
       if (!bugs.some(near) && !bosses.some(near)) continue
       commands.despawn(trap.entity)
       events.fx.emit({ type: "breakpoint", x: at.x, y: at.y })
-      blast(at, BREAKPOINT.blast, BREAKPOINT.damage, trap.data.breakpoint.get().owner, { inflict: ["freeze"] })
+      explode(at, BREAKPOINT.blast, BREAKPOINT.damage, trap.data.breakpoint.get().owner, { inflict: ["freeze"] })
     }
 
     // Shots against bugs and bosses.

@@ -117,6 +117,7 @@ const playFx = (event: FxValue) => {
     case "turret": audio.turret(); break
     case "hallucination": audio.hallucination(); break
     case "bomb": audio.bomb(); break
+    case "explosion": audio.explosion(); break
     case "dash": audio.dash(); break
     case "breakpointSet": audio.breakpointSet(); break
     case "breakpoint": audio.breakpoint(); break

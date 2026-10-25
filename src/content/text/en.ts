@@ -146,6 +146,8 @@ export const en: Strings = {
     ai: { label: "AI", hint: "auto turret" },
     pairProgramming: { label: "Pair programming", hint: "two shots at once" },
     codeFreeze: { label: "Code freeze", hint: "hits freeze" },
+    memoryLeak: { label: "Memory leak", hint: "hits poison" },
+    pushForce: { label: "git push --force", hint: "a rocket: boom where you aim" },
     breakpoint: { label: "Breakpoint", hint: "+1 trap" }
   },
   floorCode: [
