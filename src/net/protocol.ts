@@ -65,7 +65,8 @@ export type ClientMessage =
 export type ServerMessage =
   | { readonly t: "room"; readonly room: RoomInfo; readonly you: number }
   | { readonly t: "started"; readonly level: LevelId; readonly arena: ArenaId; readonly locale: Locale; readonly you: number }
-  | { readonly t: "frame"; readonly view: NetView; readonly fx: ReadonlyArray<FxValue>; readonly chat: ReadonlyArray<ChatValue> }
+  /** `step`: the server steps the run had taken, its clock; the browser places the frame on it, not on when it arrived. */
+  | { readonly t: "frame"; readonly step: number; readonly view: NetView; readonly fx: ReadonlyArray<FxValue>; readonly chat: ReadonlyArray<ChatValue> }
   | { readonly t: "error"; readonly code: ErrorCode }
 
 /** Trims and squeezes a chosen name; null when nothing printable is left. */

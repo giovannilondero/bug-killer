@@ -201,7 +201,7 @@ export const makeRooms = (options: RoomsOptions = {}) => {
     const chat = room.chat
     room.fx = []
     room.chat = []
-    broadcast(room, () => ({ t: "frame", view, fx, chat }))
+    broadcast(room, () => ({ t: "frame", step: room.steps, view, fx, chat }))
   }
 
   const receive = (peer: Peer, raw: string) => {
