@@ -1,7 +1,9 @@
+import type { Arena } from "./arenas.ts"
 import { backlog } from "./backlog.ts"
 import { projectOf } from "./bugs.ts"
 import type { BacklogBug } from "./bugs.ts"
 import type { ClientId } from "./clients.ts"
+import type { Tier } from "../sim/tiers.ts"
 
 /** How a boss fights; each pattern is one branch of the boss system. */
 export const bossPatterns = ["dispenser", "crash", "twoFactor", "undefined"] as const
@@ -32,10 +34,14 @@ export interface Level {
   readonly clientEvery: number
   /** Bugs released per wave. */
   readonly waveSize: number
+  /** The highest content tier this level offers (see `src/sim/tiers.ts`); Endless climbs to it. */
+  readonly tier: Tier
   readonly boss: Boss
   readonly bugs: ReadonlyArray<BacklogBug>
   /** Endless mode: waves never run out, and every `every` waves the next boss steps in. */
   readonly endless?: { readonly bosses: ReadonlyArray<Boss>; readonly every: number }
+  /** The floor it is played on; the normal arena when left out. */
+  readonly arena?: Arena
 }
 
 const bugsOf = (projects: ReadonlyArray<string>, bossKey: string): ReadonlyArray<BacklogBug> =>
@@ -53,6 +59,7 @@ export const levels: ReadonlyArray<Level> = [
     clients: ["ornella", "gualtiero"],
     clientEvery: 16,
     waveSize: 4,
+    tier: 0,
     boss: {
       key: "GLC-37",
       title: "[Dispenser] Pouring only stops when the request times out",
@@ -72,6 +79,7 @@ export const levels: ReadonlyArray<Level> = [
     clients: ["kevin", "samanta", "gualtiero"],
     clientEvery: 14,
     waveSize: 5,
+    tier: 1,
     boss: {
       key: "QUIZ-276",
       title: "App crashes on launch on iOS 17",
@@ -91,6 +99,7 @@ export const levels: ReadonlyArray<Level> = [
     clients: ["samanta", "ornella", "ugo"],
     clientEvery: 12,
     waveSize: 6,
+    tier: 2,
     boss: {
       key: "KEY-3242",
       title: "API access skips two-factor authentication",
@@ -110,6 +119,7 @@ export const levels: ReadonlyArray<Level> = [
     clients: ["ugo", "ugo", "kevin", "ornella"],
     clientEvery: 10,
     waveSize: 7,
+    tier: 3,
     boss: {
       key: "FND-2245",
       title: "TypeError: Cannot read properties of undefined (reading 'id')",
@@ -135,6 +145,8 @@ export const endlessLevel: Level = {
   clients: ["ugo", "ornella", "kevin", "samanta", "gualtiero"],
   clientEvery: 13,
   waveSize: 4,
+  // Every tier, up to S6: Endless climbs there a step at a time.
+  tier: 5,
   boss: levels[0]!.boss,
   bugs: backlog.filter((bug) => !levels.some((l) => l.boss.key === bug.key)),
   endless: { bosses: levels.map((l) => l.boss), every: 6 }

@@ -18,6 +18,8 @@ import { createRenderer } from "./host/renderer.ts"
 import { makeTouchControls, onTouchMode, touchMode } from "./host/touch.ts"
 import { codePattern, NAME_MAX } from "./net/protocol.ts"
 import type { ErrorCode, RoomInfo, ServerMessage } from "./net/protocol.ts"
+import { bestScore, clearSprint, endEndless, loadProgress, saveProgress, sprintsCleared, sprintUnlocked, unlockEverySprint } from "./progress.ts"
+import type { Progress } from "./progress.ts"
 import { PARTY, STEP } from "./sim/constants.ts"
 import { makePickup } from "./sim/drafts.ts"
 import { Game, Pickup } from "./sim/schema.ts"
@@ -28,20 +30,8 @@ import "./style.css"
 
 type Simulation = Extract<ReturnType<typeof createSimulation>, { ok: true }>["value"]
 
-interface Progress {
-  unlocked: number
-  best: Record<string, number>
-}
-
-const loadProgress = (): Progress => {
-  try {
-    const raw = JSON.parse(localStorage.getItem("bugkiller:progress") ?? "null") as Partial<Progress> | null
-    return { unlocked: raw?.unlocked ?? 1, best: raw?.best ?? {} }
-  } catch {
-    return { unlocked: 1, best: {} }
-  }
-}
-const saveProgress = (p: Progress) => localStorage.setItem("bugkiller:progress", JSON.stringify(p))
+const readProgress = () => loadProgress(localStorage.getItem("bugkiller:progress"))
+const writeProgress = (p: Progress) => localStorage.setItem("bugkiller:progress", saveProgress(p))
 
 const overlay = document.querySelector<HTMLElement>("#overlay")!
 const chatRoot = document.querySelector<HTMLElement>("#chat")!
@@ -66,7 +56,7 @@ const input = makeInput(canvas, renderer, touch, {
   player: () => view?.player?.position ?? null,
   targets: () => (view ? [...view.bugs, ...view.bosses].map((target) => target.position) : [])
 })
-let progress = loadProgress()
+let progress = readProgress()
 
 /** The four sprints, then endless: menu buttons and restarts index into this. */
 const playable = [...levels, endlessLevel]
@@ -172,8 +162,8 @@ const showTitle = () => {
   setMode("menu")
   chatRoot.hidden = true
   const cards = levels.map((level, i) => {
-    const locked = i >= progress.unlocked
-    const best = progress.best[level.id]
+    const locked = !sprintUnlocked(progress, i)
+    const best = bestScore(progress, level.id)
     // No project names or ticket keys here: the menu is what ends up in screenshots.
     return html`
       <button class="level ${locked ? "locked" : ""}" data-level="${i}" ${locked ? "disabled" : ""} style="--accent:${level.theme.accent}">
@@ -184,7 +174,7 @@ const showTitle = () => {
         <span class="level-best">${locked ? t().menu.locked : best ? t().menu.best(formatNumber(best)) : t().menu.fresh}</span>
       </button>`
   }).join("")
-  const endlessBest = progress.best[endlessLevel.id]
+  const endlessBest = bestScore(progress, endlessLevel.id)
   const endlessCard = html`
     <button class="level endless" data-level="${levels.length}" style="--accent:${endlessLevel.theme.accent}">
       <span class="level-name">∞ ${endlessLevel.name}</span>
@@ -201,7 +191,7 @@ const showTitle = () => {
       <span class="level-clients">${PARTY.colors.map((color) => html`<span class="avatar" style="background:${color}"></span>`).join("")}</span>
     </button>`
   // Saved progress, not the `?tutti` shortcut: how far this browser really got.
-  const cleared = Math.min(levels.length, loadProgress().unlocked - 1)
+  const cleared = sprintsCleared(readProgress())
   show(html`
     <div class="title">
       <div class="logo" data-text="BUG KILLER">BUG KILLER</div>
@@ -252,7 +242,7 @@ const saveName = (name: string) => localStorage.setItem("bugkiller:name", name)
 /** The sprints this browser has unlocked, and endless: what a host may pick. */
 const levelOptions = (selected: LevelId) =>
   playable
-    .filter((level, i) => level.endless !== undefined || i < progress.unlocked)
+    .filter((level, i) => level.endless !== undefined || sprintUnlocked(progress, i))
     .map((level) => html`<option value="${level.id}" ${level.id === selected ? "selected" : ""}>${level.endless ? "∞" : escape(level.sprint)} · ${escape(level.name)}</option>`)
     .join("")
 
@@ -610,13 +600,8 @@ const markdownNotes = (v: View) =>
 const showCleared = (v: View) => {
   setMode("over")
   // A sprint cleared together unlocks the next one here too; best scores stay solo.
-  progress = remote
-    ? { ...progress, unlocked: Math.max(progress.unlocked, levelIndex + 2) }
-    : {
-      unlocked: Math.max(progress.unlocked, levelIndex + 2),
-      best: { ...progress.best, [v.level.id]: Math.max(progress.best[v.level.id] ?? 0, v.run.score) }
-    }
-  saveProgress(progress)
+  progress = clearSprint(progress, levelIndex, { score: v.run.score, solo: !remote })
+  writeProgress(progress)
   const last = levelIndex === levels.length - 1
   show(html`
     <div class="panel wide">
@@ -643,10 +628,11 @@ const showCleared = (v: View) => {
 const showDead = (v: View) => {
   setMode("over")
   // Endless only ends here, so this is where its best score is kept.
-  const record = !remote && v.level.endless !== undefined && v.run.score > (progress.best[v.level.id] ?? 0)
-  if (record) {
-    progress = { ...progress, best: { ...progress.best, [v.level.id]: v.run.score } }
-    saveProgress(progress)
+  const ended = v.level.endless !== undefined ? endEndless(progress, { score: v.run.score, solo: !remote }) : undefined
+  const record = ended?.record ?? false
+  if (ended && record) {
+    progress = ended.progress
+    writeProgress(progress)
   }
   const summary = v.level.endless
     ? html`${escape(t().dead.endless(v.run.wave, v.run.loop))}${record ? html` <b>${t().dead.record}</b>` : ""}`
@@ -811,7 +797,7 @@ if (!loop.ok) console.error(loop.error)
 
 // `?tutti` unlocks every sprint for this session, for demos and playtests.
 if (new URLSearchParams(location.search).has("tutti")) {
-  progress = { ...progress, unlocked: levels.length }
+  progress = unlockEverySprint(progress)
 }
 
 if (import.meta.env.DEV) {

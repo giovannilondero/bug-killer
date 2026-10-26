@@ -2,9 +2,10 @@ import * as Random from "@typeonce/ritmo-math/Random"
 import { Ops } from "@typeonce/ritmo-math"
 
 import { text } from "../../content/i18n.ts"
-import { ARENA, DT, TOBIA, RESURRECT } from "../constants.ts"
+import { arenaOf } from "../../content/arenas.ts"
+import { DT, TOBIA, RESURRECT } from "../constants.ts"
 import { makeBug, makePickup } from "../drafts.ts"
-import { clamp } from "../math.ts"
+import { centreOf, clamp } from "../math.ts"
 import { BossRead, BugRead, PlayerRead, standing } from "../queries.ts"
 import { Bug, Chat, Fx, Game, Interruptions, Language, LevelSpec, Pickup, Rng, Run } from "../schema.ts"
 
@@ -40,6 +41,7 @@ export const ResurrectionSystem = Game.System(
     }
 
     const level = resources.level.get()
+    const arena = arenaOf(level)
     const random = Random.draw(resources.rng)
     // Only the level's own tickets come back: no regressions, scope creep, or bosses.
     const candidates = run.fixed.filter((fixed) => level.bugs.some((bug) => bug.key === fixed.key))
@@ -54,11 +56,11 @@ export const ResurrectionSystem = Game.System(
     }
 
     // It rises in plain sight, close enough to see but not on top of you.
-    const me = standing(queries.player.each())[0] ?? { x: ARENA.width / 2, y: ARENA.height / 2 }
+    const me = standing(queries.player.each())[0] ?? centreOf(arena)
     const angle = random.range(0, Math.PI * 2)
     const at = {
-      x: clamp(me.x + Ops.cos(angle) * RESURRECT.distance, 60, ARENA.width - 60),
-      y: clamp(me.y + Ops.sin(angle) * RESURRECT.distance, 60, ARENA.height - 60)
+      x: clamp(me.x + Ops.cos(angle) * RESURRECT.distance, 60, arena.width - 60),
+      y: clamp(me.y + Ops.sin(angle) * RESURRECT.distance, 60, arena.height - 60)
     }
     commands.spawn(makeBug(seed, at, { resurrectedBy: client }))
     const index = run.fixed.findIndex((fixed) => fixed.key === victim.key)
@@ -110,12 +112,13 @@ export const TobiaSystem = Game.System(
 
     if (state.tobiaIn === 0 && (idle || pileUp) && me) {
       const random = Random.draw(resources.rng)
+      const arena = arenaOf(resources.level.get())
       const lines = text[resources.language.get()].tobiaLines
       events.chat.emit({ type: "nudge", client: "tobia", text: lines[state.tobiaLine % lines.length] ?? "" })
       const angle = random.range(0, Math.PI * 2)
       commands.spawn(makePickup("tools", {
-        x: clamp(me.x + Ops.cos(angle) * 110, 40, ARENA.width - 40),
-        y: clamp(me.y + Ops.sin(angle) * 110, 40, ARENA.height - 40)
+        x: clamp(me.x + Ops.cos(angle) * 110, 40, arena.width - 40),
+        y: clamp(me.y + Ops.sin(angle) * 110, 40, arena.height - 40)
       }))
       state.tobiaLine += 1
       state.tobiaIn = TOBIA.cooldown

@@ -3,8 +3,6 @@ import { Clock } from "@typeonce/ritmo"
 export const STEP = Clock.hz(60)
 export const DT = STEP.dt
 
-export const ARENA = { width: 1800, height: 1200 } as const
-
 export const PLAYER = {
   radius: 16,
   speed: 270,
