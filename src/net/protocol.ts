@@ -16,6 +16,8 @@ export const SOCKET_PATH = "/runs"
 export const NAME_MAX = 16
 /** The longest message a browser may send; an input is well under it. */
 export const MESSAGE_MAX = 4096
+/** The most steps of input one message may carry: a browser sends every other step, or sooner. */
+export const INPUTS_MAX = 8
 /**
  * How often a browser says it is still there. A run server that cannot ping
  * (the Durable Object in `src/server/worker.ts`) drops whoever goes quiet.
@@ -58,15 +60,30 @@ export type ClientMessage =
   | { readonly t: "start"; readonly level?: LevelId; readonly hardcore?: boolean; readonly arena?: ArenaId }
   /** The host changing the level, hardcore or Endless's arena in the lobby: every teammate sees it before the run. */
   | { readonly t: "settings"; readonly level?: LevelId; readonly hardcore?: boolean; readonly arena?: ArenaId }
-  | { readonly t: "input"; readonly input: InputValue }
+  /**
+   * One input per step, oldest first; `seq` numbers the last, the ones before
+   * it count down. A page loaded before steps were numbered sends one `input`
+   * and no `seq`.
+   */
+  | { readonly t: "input"; readonly inputs: ReadonlyArray<InputValue>; readonly seq?: number }
   | { readonly t: "leave" }
   | { readonly t: "ping" }
 
 export type ServerMessage =
   | { readonly t: "room"; readonly room: RoomInfo; readonly you: number }
   | { readonly t: "started"; readonly level: LevelId; readonly arena: ArenaId; readonly locale: Locale; readonly you: number }
-  /** `step`: the server steps the run had taken, its clock; the browser places the frame on it, not on when it arrived. */
-  | { readonly t: "frame"; readonly step: number; readonly view: NetView; readonly fx: ReadonlyArray<FxValue>; readonly chat: ReadonlyArray<ChatValue> }
+  /**
+   * `step`: the server steps the run had taken, its clock; the browser places the frame on it, not on when it arrived.
+   * `ack`: the `seq` of this browser's last input the server has stepped, -1 before any.
+   */
+  | {
+      readonly t: "frame"
+      readonly step: number
+      readonly ack: number
+      readonly view: NetView
+      readonly fx: ReadonlyArray<FxValue>
+      readonly chat: ReadonlyArray<ChatValue>
+    }
   | { readonly t: "error"; readonly code: ErrorCode }
 
 /** Trims and squeezes a chosen name; null when nothing printable is left. */
@@ -144,8 +161,20 @@ export const readClientMessage = (raw: string, isLevel: (id: unknown) => id is L
         ...(data.arena === undefined ? {} : { arena: data.arena })
       }
     case "input": {
-      const input = readInput(data.input)
-      return input && { t: "input", input }
+      if (data.inputs === undefined) {
+        const input = readInput(data.input)
+        return input && { t: "input", inputs: [input] }
+      }
+      if (!Array.isArray(data.inputs) || data.inputs.length === 0 || data.inputs.length > INPUTS_MAX) return null
+      const seq = data.seq
+      if (typeof seq !== "number" || !Number.isSafeInteger(seq) || seq < data.inputs.length - 1) return null
+      const inputs: Array<InputValue> = []
+      for (const raw of data.inputs) {
+        const input = readInput(raw)
+        if (!input) return null
+        inputs.push(input)
+      }
+      return { t: "input", inputs, seq }
     }
     case "leave":
       return { t: "leave" }

@@ -337,3 +337,33 @@ test("the host's level, hardcore and Endless arena reach the teammates' lobby as
   send(rooms, ada, { t: "start" })
   assert.equal(bob.last("started")?.arena, "small")
 })
+
+test("each step uses one waiting input, and every frame says which was the last", () => {
+  const rooms = makeRooms({ random: seeded() })
+  const ada = browser()
+  send(rooms, ada, { t: "create", name: "Ada", level: "glacier", locale: "en" })
+  send(rooms, ada, { t: "start" })
+  assert.equal(ada.last("frame")?.ack, -1, "nothing stepped yet")
+  const right = { move: { x: 1, y: 0 }, aim: { x: 0, y: 0 }, fire: false, dash: false, bomb: false, breakpoint: false }
+  const start = ada.last("frame")!.view.players[0]!.position
+  send(rooms, ada, { t: "input", inputs: [right, right], seq: 1 })
+  rooms.advance(1 / 60)
+  rooms.advance(1 / 60)
+  const frame = ada.last("frame")!
+  assert.equal(frame.ack, 1)
+  assert.equal(frame.view.players[0]!.position.x, start.x + 270 * (2 / 60), "two steps, one input each")
+})
+
+test("past a few waiting inputs the oldest go, but not what they pressed", () => {
+  const rooms = makeRooms({ random: seeded() })
+  const ada = browser()
+  send(rooms, ada, { t: "create", name: "Ada", level: "glacier", locale: "en" })
+  send(rooms, ada, { t: "start" })
+  const still = { move: { x: 0, y: 0 }, aim: { x: 0, y: 0 }, fire: false, dash: false, bomb: false, breakpoint: false }
+  send(rooms, ada, { t: "input", inputs: [{ ...still, dash: true }, still, still, still, still, still], seq: 5 })
+  rooms.advance(1 / 60)
+  rooms.advance(1 / 60)
+  const frame = ada.last("frame")!
+  assert.equal(frame.ack, 4, "six came, three over the limit went, and two of the rest were stepped")
+  assert.ok(frame.view.players[0]!.dashCooldown > 0, "the dash in a dropped input still happened")
+})

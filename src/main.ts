@@ -14,6 +14,7 @@ import { enterFullscreen, fullscreenSupported, standalone, toggleFullscreen } fr
 import { makeInput, typing } from "./host/input.ts"
 import { formatNumber, locale, setLocale, t } from "./host/language.ts"
 import { connect, makeFrames } from "./host/net.ts"
+import { makePrediction } from "./host/predict.ts"
 import type { Connection } from "./host/net.ts"
 import { createRenderer } from "./host/renderer.ts"
 import { makeTouchControls, onTouchMode, touchMode } from "./host/touch.ts"
@@ -113,6 +114,8 @@ let levelIndex = 0
 interface Remote {
   readonly connection: Connection
   readonly frames: ReturnType<typeof makeFrames>
+  /** This browser's developer, drawn ahead of the frames: where its input has already taken them. */
+  readonly prediction: ReturnType<typeof makePrediction>
   room: RoomInfo | null
   you: number
   level: Level
@@ -120,19 +123,25 @@ interface Remote {
 }
 let remote: Remote | null = null
 /**
- * Input goes to the run server every other step, 30 times a second: half the
- * messages (the Durable Object counts them), same feel for the aim. What the
+ * Every step's input goes to the run server, numbered, two steps to a
+ * message: half the messages (the Durable Object counts them). What the
  * developer does (a press, a trigger, a turn) goes out on the step it happens.
  */
 const INPUT_EVERY = 2
-let inputSteps = 0
-/** Snapshots taken since the last message: a dash, bomb or Breakpoint pressed in between rides along with the next one. */
-let unsent: InputValue | null = null
+/** Steps taken since the last message, oldest first; `unsentSeq` numbers the last. */
+let unsent: Array<InputValue> = []
+let unsentSeq = -1
 let sent: InputValue = idleInput
-const sendInput = (connection: Connection, value: InputValue) => {
-  connection.send({ t: "input", input: value })
-  sent = value
-  inputSteps = 0
+/** Numbers one step of input and has the prediction apply it; it goes out with the next message. */
+const record = (r: Remote, value: InputValue) => {
+  unsent.push(value)
+  unsentSeq = r.prediction.record(value)
+}
+const flushInput = (r: Remote) => {
+  if (unsent.length === 0) return
+  r.connection.send({ t: "input", inputs: unsent, seq: unsentSeq })
+  sent = unsent[unsent.length - 1]!
+  unsent = []
 }
 /** A move this much off the last one sent is a turn, not a stick's drift. */
 const TURN = 0.5
@@ -385,8 +394,10 @@ const onServer = (message: ServerMessage) => {
       r.level = level.endless ? endlessIn(message.arena) : level
       r.running = true
       r.frames.reset()
+      r.prediction.reset(r.level)
       // The server starts every seat standing still.
       sent = idleInput
+      unsent = []
       levelIndex = playable.indexOf(level)
       view = null
       lastPhase = "waves"
@@ -400,6 +411,11 @@ const onServer = (message: ServerMessage) => {
     }
     case "frame":
       r.frames.push(message.view, message.step)
+      r.prediction.confirm(
+        message.view.players.find((p) => p.slot === r.you),
+        message.view.run.phase,
+        message.ack
+      )
       for (const event of message.fx) playFx(event)
       for (const event of message.chat) chat.push(event)
       break
@@ -433,6 +449,7 @@ const openRemote = (): Remote => {
       }
     }),
     frames: makeFrames(),
+    prediction: makePrediction(),
     room: null,
     you: 0,
     level: playable[0] ?? endlessLevel,
@@ -678,7 +695,8 @@ const showPause = () => {
   setMode("paused")
   if (remote) {
     // The run goes on: stand still rather than keep running into the bugs.
-    sendInput(remote.connection, { ...idleInput, aim: view?.player?.aim ?? idleInput.aim })
+    record(remote, { ...idleInput, aim: view?.player?.aim ?? idleInput.aim })
+    flushInput(remote)
     show(html`
       <div class="panel">
         <h2>${t().pause.title}</h2>
@@ -893,16 +911,9 @@ const loop = FixedLoop.start({
     if (remote) {
       // Multiplayer: the server steps the world; this browser only says what its developer does.
       if (remote.running && mode === "playing") {
-        // Every step still snapshots, so the cursor keeps following the mouse at 60 Hz.
         const latest = input.snapshot()
-        unsent = unsent
-          ? { ...latest, dash: unsent.dash || latest.dash, bomb: unsent.bomb || latest.bomb, breakpoint: unsent.breakpoint || latest.breakpoint }
-          : latest
-        inputSteps += 1
-        if (inputSteps >= INPUT_EVERY || urgent(unsent)) {
-          sendInput(remote.connection, unsent)
-          unsent = null
-        }
+        record(remote, latest)
+        if (unsent.length >= INPUT_EVERY || urgent(latest)) flushInput(remote)
       }
       return Result.success(undefined)
     }
@@ -913,6 +924,12 @@ const loop = FixedLoop.start({
     if (remote) {
       if (!remote.running) return
       view = remote.frames.sample(remote.level, remote.you) ?? view
+      const own = remote.prediction.draw()
+      if (view?.player && own) {
+        const player = { ...view.player, position: own.position, aim: own.aim }
+        const you = remote.you
+        view = { ...view, player, players: view.players.map((p) => (p.slot === you ? player : p)) }
+      }
     } else if (sim) {
       view = sim.view()
     } else {

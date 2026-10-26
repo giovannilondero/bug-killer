@@ -21,6 +21,12 @@ const STEPS_PER_FRAME = 2
 /** A running room nobody is connected to waits this long for someone to come back. */
 const EMPTY_GRACE_SECONDS = 60
 const MAX_STEPS_PER_ADVANCE = 5
+/**
+ * Steps of input a seat may have waiting. Each step uses one, so a browser's
+ * inputs move its developer exactly as it predicted; past a few, the wait
+ * only adds delay for everyone else, and the oldest go.
+ */
+const QUEUE_MAX = 3
 /** Every run steps in one thread: past a handful, they would all lag together. */
 export const MAX_ROOMS = 10
 /** So that one address cannot hold every run, while an office still fits two teams. */
@@ -45,6 +51,10 @@ interface Seat {
   slot: number
   name: string
   peer: Peer | null
+  /** Inputs not stepped yet, oldest first, with their browser's numbers (none from a page that does not number them). */
+  queue: Array<{ readonly input: InputValue; readonly seq?: number }>
+  /** The number of the last input stepped: every frame tells the browser, so it knows what is left to predict. */
+  ack: number
 }
 
 interface Room {
@@ -107,6 +117,14 @@ export const makeRooms = (options: RoomsOptions = {}) => {
     broadcast(room, (seat) => ({ t: "room", room: shared, you: seat.slot }))
   }
 
+  /** `input`, also pressing whatever `earlier` pressed. */
+  const withPresses = (input: InputValue, earlier: InputValue): InputValue => ({
+    ...input,
+    dash: earlier.dash || input.dash,
+    bomb: earlier.bomb || input.bomb,
+    breakpoint: earlier.breakpoint || input.breakpoint
+  })
+
   const fail = (peer: Peer, code: ErrorCode) => peer.send({ t: "error", code })
 
   const newCode = (): string => {
@@ -134,6 +152,9 @@ export const makeRooms = (options: RoomsOptions = {}) => {
 
   const seatPeer = (room: Room, seat: Seat, peer: Peer) => {
     seat.peer = peer
+    // A new connection numbers its inputs from scratch.
+    seat.queue = []
+    seat.ack = -1
     where.set(peer, { room, slot: seat.slot })
   }
 
@@ -147,6 +168,7 @@ export const makeRooms = (options: RoomsOptions = {}) => {
     if (room.sim && !over(room)) {
       // Mid-run the seat stays: the developer stands still until they come back.
       seat.peer = null
+      seat.queue = []
       room.inputs[seat.slot] = { ...idleInput, aim: room.inputs[seat.slot]?.aim ?? idleInput.aim }
     } else {
       room.seats = room.seats.filter((s) => s !== seat)
@@ -170,7 +192,10 @@ export const makeRooms = (options: RoomsOptions = {}) => {
     room.arena = arena
     const party = room.seats.map((seat) => ({ slot: seat.slot, name: seat.name, color: colorOf(seat.slot) }))
     room.inputs = []
-    for (const seat of room.seats) room.inputs[seat.slot] = idleInput
+    for (const seat of room.seats) {
+      room.inputs[seat.slot] = idleInput
+      seat.queue = []
+    }
     room.fx = []
     room.chat = []
     const made = createSimulation({
@@ -201,7 +226,7 @@ export const makeRooms = (options: RoomsOptions = {}) => {
     const chat = room.chat
     room.fx = []
     room.chat = []
-    broadcast(room, () => ({ t: "frame", step: room.steps, view, fx, chat }))
+    broadcast(room, (seat) => ({ t: "frame", step: room.steps, ack: seat.ack, view, fx, chat }))
   }
 
   const receive = (peer: Peer, raw: string) => {
@@ -232,7 +257,7 @@ export const makeRooms = (options: RoomsOptions = {}) => {
           emptyFor: 0
         }
         rooms.set(room.code, room)
-        const seat: Seat = { slot: 0, name, peer: null }
+        const seat: Seat = { slot: 0, name, peer: null, queue: [], ack: -1 }
         room.seats.push(seat)
         seatPeer(room, seat, peer)
         announce(room)
@@ -261,7 +286,7 @@ export const makeRooms = (options: RoomsOptions = {}) => {
         const slot = freeSlot(room)
         if (slot === null) return fail(peer, "full")
         if (at) leave(peer)
-        const seat: Seat = { slot, name, peer: null }
+        const seat: Seat = { slot, name, peer: null, queue: [], ack: -1 }
         room.seats.push(seat)
         room.seats.sort((a, b) => a.slot - b.slot)
         seatPeer(room, seat, peer)
@@ -287,12 +312,15 @@ export const makeRooms = (options: RoomsOptions = {}) => {
       }
       case "input": {
         if (!at || !at.room.sim) return
-        const previous = at.room.inputs[at.slot] ?? idleInput
-        at.room.inputs[at.slot] = {
-          ...message.input,
-          dash: previous.dash || message.input.dash,
-          bomb: previous.bomb || message.input.bomb,
-          breakpoint: previous.breakpoint || message.input.breakpoint
+        const seat = at.room.seats.find((s) => s.slot === at.slot)
+        if (!seat) return
+        const { inputs, seq } = message
+        inputs.forEach((input, i) => seat.queue.push(seq === undefined ? { input } : { input, seq: seq - (inputs.length - 1 - i) }))
+        while (seat.queue.length > QUEUE_MAX) {
+          // The oldest goes, but a press in it still happens, on the next step.
+          const oldest = seat.queue.shift()!
+          const next = seat.queue[0]!
+          seat.queue[0] = { ...next, input: withPresses(next.input, oldest.input) }
         }
         return
       }
@@ -319,6 +347,13 @@ export const makeRooms = (options: RoomsOptions = {}) => {
       room.pending = Math.min(room.pending + seconds, DT * MAX_STEPS_PER_ADVANCE)
       while (room.pending >= DT) {
         room.pending -= DT
+        // One waiting input per seat a step; with none, the developer keeps doing what they did.
+        for (const seat of room.seats) {
+          const next = seat.queue.shift()
+          if (!next) continue
+          room.inputs[seat.slot] = next.input
+          if (next.seq !== undefined) seat.ack = next.seq
+        }
         const stepped = room.sim.step()
         if (!stepped.ok) {
           console.error(`run ${room.code} failed`, stepped.error)

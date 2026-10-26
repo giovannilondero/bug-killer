@@ -2,7 +2,8 @@ import { arenaOf } from "../../content/arenas.ts"
 import { breakpointSpot } from "../breakpoints.ts"
 import { DT, PARTY, PLAYER, ROCKET } from "../constants.ts"
 import { makeBreakpoint, makeRocket, makeShot } from "../drafts.ts"
-import { clampToArena, distanceSquared, length, normalize } from "../math.ts"
+import { clampToArena, distanceSquared, normalize } from "../math.ts"
+import { steer } from "../motion.ts"
 import { PlayerWrite } from "../queries.ts"
 import { BombBlast, Breakpoint, FlameBurst, Fx, Game, Input, LevelSpec, Rocket, Run, Shot, pickupKinds } from "../schema.ts"
 import type { InputValue, Vec } from "../schema.ts"
@@ -126,27 +127,18 @@ export const PlayerControlSystem = Game.System(
       const left = state.weapon.seconds - DT
       const weapon = state.weapon.kind === "gun" || left > 0 ? { ...state.weapon, seconds: Math.max(0, left) } : basicGun
 
-      let { fireCooldown, dashCooldown, dashTime, dashDirection, invulnerable, bombs, breakpoints } = state
+      let { fireCooldown, invulnerable, bombs, breakpoints } = state
       fireCooldown = Math.max(0, fireCooldown - DT)
-      dashCooldown = Math.max(0, dashCooldown - DT)
-      dashTime = Math.max(0, dashTime - DT)
       invulnerable = Math.max(0, invulnerable - DT)
 
-      const move = length(input.move) > 1 ? normalize(input.move) : input.move
-      if (input.dash && dashCooldown === 0) {
-        dashDirection = length(move) > 0 ? normalize(move) : normalize({ x: input.aim.x - position.x, y: input.aim.y - position.y })
-        dashTime = PLAYER.dashTime
-        dashCooldown = PLAYER.dashCooldown
+      // The browser predicting this developer replays the same `steer`.
+      const steered = steer(state, position, input, buffs.coffee > 0)
+      const { dashCooldown, dashTime, dashDirection } = steered.motion
+      if (steered.dashed) {
         invulnerable = Math.max(invulnerable, PLAYER.dashTime + 0.08)
         events.fx.emit({ type: "dash", x: position.x, y: position.y })
       }
-
-      const speed = PLAYER.speed * (buffs.coffee > 0 ? 1.45 : 1)
-      data.velocity.set(
-        dashTime > 0
-          ? { x: dashDirection.x * PLAYER.dashSpeed, y: dashDirection.y * PLAYER.dashSpeed }
-          : { x: move.x * speed, y: move.y * speed }
-      )
+      data.velocity.set(steered.velocity)
 
       const aim = normalize({ x: input.aim.x - position.x, y: input.aim.y - position.y })
       if (input.fire && fireCooldown === 0 && (aim.x !== 0 || aim.y !== 0)) {
