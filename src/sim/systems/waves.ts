@@ -1,11 +1,12 @@
 import * as Random from "@typeonce/ritmo-math/Random"
 
 import { arenaOf } from "../../content/arenas.ts"
-import { DT, ENDLESS, PARTY, WAVE_INTERVAL } from "../constants.ts"
+import { BREAKPOINT, DT, ENDLESS, PARTY, WAVE_INTERVAL } from "../constants.ts"
 import { makeBoss, makeBug } from "../drafts.ts"
 import { edgePoint } from "../math.ts"
-import { BossRead, BugRead, PlayerRead, standing } from "../queries.ts"
-import { Boss, Bug, Fx, Game, LevelSpec, Rng, Run } from "../schema.ts"
+import { BossRead, BugRead, PlayerWrite, standing } from "../queries.ts"
+import { Boss, Bug, Fx, Game, LevelSpec, Rng, Run, Tiers } from "../schema.ts"
+import { isUnlocked, tierOf } from "../tiers.ts"
 
 /**
  * The sprint's pacing: releases the level's backlog in waves, brings in the
@@ -13,15 +14,18 @@ import { Boss, Bug, Fx, Game, LevelSpec, Rng, Run } from "../schema.ts"
  * lost. In endless mode the backlog never empties: bugs are drawn at random,
  * a boss steps in every few waves, and each one beaten makes the next round
  * tougher. A bigger team gets bigger waves and a tougher boss; the run is
- * lost when every developer is down. Also runs the combo timer and the clocks.
+ * lost when every developer is down. When Endless reaches the tier that brings
+ * Breakpoints in, every developer gets the sprint's starting charges. Also runs
+ * the combo timer and the clocks.
  */
 export const WavesSystem = Game.System(
   "BugKiller/Waves",
   {
-    queries: { player: PlayerRead, bugs: BugRead, bosses: BossRead },
+    queries: { player: PlayerWrite, bugs: BugRead, bosses: BossRead },
     resources: {
       level: Game.System.readResource(LevelSpec),
       run: Game.System.writeResource(Run),
+      tiers: Game.System.readResource(Tiers),
       rng: Game.System.writeResource(Rng)
     },
     events: { fx: Game.System.writeEvent(Fx) },
@@ -76,6 +80,11 @@ export const WavesSystem = Game.System(
           events.fx.emit({ type: "spawn", x: at.x, y: at.y })
         }
         run.nextBug += count
+        const unlocks = (wave: number) => isUnlocked("breakpoint", tierOf(level, wave), resources.tiers.get())
+        if (!unlocks(run.wave) && unlocks(run.wave + 1)) {
+          // Breakpoints arrive mid-run: everyone gets what a sprint starts with.
+          for (const match of team) match.data.player.update((p) => ({ ...p, breakpoints: Math.max(p.breakpoints, BREAKPOINT.charges) }))
+        }
         run.wave += 1
         run.waveTimer = endless ? Math.max(ENDLESS.minWaveInterval, WAVE_INTERVAL - run.wave * 0.4) : WAVE_INTERVAL
       }

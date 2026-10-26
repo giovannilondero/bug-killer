@@ -12,7 +12,7 @@ export const defaultLocale: Locale = "en"
 
 export const isLocale = (value: unknown): value is Locale => (locales as ReadonlyArray<unknown>).includes(value)
 
-type Pickups = "hotfix" | "refactor" | "coffee" | "unitTest" | "revert" | "pizza" | "tools" | "ai"
+type Pickups = "hotfix" | "refactor" | "coffee" | "unitTest" | "revert" | "pizza" | "tools" | "ai" | "pairProgramming" | "codeFreeze" | "memoryLeak" | "pushForce" | "flameWar" | "breakpoint"
 
 /** Every word the game shows, in one language. */
 export interface Strings {
@@ -64,6 +64,10 @@ export interface Strings {
     readonly backlog: (open: number, wave: number) => string
     readonly hints: ReadonlyArray<string>
     readonly touchHints: ReadonlyArray<string>
+    /** Label over the Breakpoint count, next to the git reset one. */
+    readonly breakpoints: string
+    /** Floats where a Breakpoint goes off. */
+    readonly breakpointHit: string
     readonly bossFixed: string
     readonly movedToDone: (key: string) => string
     readonly reopenedSub: (key: string) => string
@@ -110,7 +114,7 @@ export interface Strings {
     readonly extras: string
   }
   readonly intro: { readonly clientsOnline: string; readonly start: string; readonly startTouch: string }
-  readonly touch: { readonly dash: string; readonly rotate: string; readonly fullscreen: string; readonly homeScreen: string }
+  readonly touch: { readonly dash: string; readonly breakpoint: string; readonly rotate: string; readonly fullscreen: string; readonly homeScreen: string }
   readonly pause: { readonly title: string; readonly body: string; readonly resume: string; readonly restart: string; readonly menu: string }
   readonly stats: { readonly points: string; readonly closed: string; readonly bestCombo: string; readonly missions: string; readonly breakdowns: string; readonly calls: string }
   readonly notes: {

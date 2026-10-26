@@ -78,7 +78,7 @@ let remote: Remote | null = null
 /** Input goes to the run server every other step, 30 times a second: half the messages, same feel. */
 const INPUT_EVERY = 2
 let inputSteps = 0
-/** Snapshots taken since the last message: a dash or bomb pressed in between rides along with the next one. */
+/** Snapshots taken since the last message: a dash, bomb or Breakpoint pressed in between rides along with the next one. */
 let unsent: InputValue | null = null
 const levelById = (id: LevelId): Level => playable.find((level) => level.id === id) ?? endlessLevel
 
@@ -106,8 +106,8 @@ const syncMusic = () => {
 const playFx = (event: FxValue) => {
   renderer.fx(event)
   switch (event.type) {
-    case "shoot": audio.shoot(); break
-    case "hit": audio.hit(); break
+    case "shoot": audio.shoot(event.weapon); break
+    case "hit": if (!event.quiet) audio.hit(); break
     case "kill":
       if (event.boss) audio.bossDown()
       else audio.kill(view?.run.combo ?? 0)
@@ -117,7 +117,10 @@ const playFx = (event: FxValue) => {
     case "turret": audio.turret(); break
     case "hallucination": audio.hallucination(); break
     case "bomb": audio.bomb(); break
+    case "explosion": audio.explosion(); break
     case "dash": audio.dash(); break
+    case "breakpointSet": audio.breakpointSet(); break
+    case "breakpoint": audio.breakpoint(); break
     case "reopen": audio.reopen(); break
     case "teleport": audio.teleport(); break
     case "resurrect": break
@@ -742,7 +745,9 @@ const loop = FixedLoop.start({
       if (remote.running && mode === "playing") {
         // Every step still snapshots, so the cursor keeps following the mouse at 60 Hz.
         const latest = input.snapshot()
-        unsent = unsent ? { ...latest, dash: unsent.dash || latest.dash, bomb: unsent.bomb || latest.bomb } : latest
+        unsent = unsent
+          ? { ...latest, dash: unsent.dash || latest.dash, bomb: unsent.bomb || latest.bomb, breakpoint: unsent.breakpoint || latest.breakpoint }
+          : latest
         inputSteps += 1
         if (inputSteps % INPUT_EVERY === 0) {
           remote.connection.send({ t: "input", input: unsent })

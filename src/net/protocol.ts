@@ -84,7 +84,8 @@ export const readInput = (value: unknown): InputValue | null => {
     aim: vec(value.aim, 10000),
     fire: value.fire === true,
     dash: value.dash === true,
-    bomb: value.bomb === true
+    bomb: value.bomb === true,
+    breakpoint: value.breakpoint === true
   }
 }
 

@@ -5,7 +5,8 @@ import type { Arena } from "../../content/arenas.ts"
 import { DT, HOMING } from "../constants.ts"
 import { centreOf, clampToArena, nearest, normalize } from "../math.ts"
 import { BossRead, BugRead, BugWrite, HostileShotWrite, Moving, PickupWrite, PlayerRead, ShotWrite, standing } from "../queries.ts"
-import { Body, Game, HostileShot, LevelSpec, Pickup, Position, Rng, Run, Shot, Velocity } from "../schema.ts"
+import { Body, Game, HostileShot, LevelSpec, Pickup, Position, Rng, Rocket, Run, Shot, Velocity } from "../schema.ts"
+import { speedFactor } from "../statuses.ts"
 import { Ops } from "@typeonce/ritmo-math"
 
 /** Bugs crawl toward the nearest developer still standing; each workflow status moves differently. */
@@ -64,7 +65,9 @@ export const BugBrainSystem = Game.System(
 
       const direction = normalize({ x: vx, y: vy })
       const spawnIn = Math.min(1, age / 0.6)
-      match.data.velocity.set({ x: direction.x * bug.speed * spawnIn, y: direction.y * bug.speed * spawnIn })
+      // Code freeze and friends: a frozen bug does not move at all.
+      const speed = bug.speed * spawnIn * speedFactor(bug.statuses, false)
+      match.data.velocity.set({ x: direction.x * speed, y: direction.y * speed })
       match.data.bug.set({ ...bug, age, hitFlash: Math.max(0, bug.hitFlash - DT) })
     })
   }
@@ -78,7 +81,7 @@ export const IntegrateSystem = Game.System(
       moving: Moving,
       contained: Game.Query({
         selection: { position: Game.Query.write(Position), body: Game.Query.read(Body) },
-        without: [Shot, HostileShot, Pickup]
+        without: [Shot, HostileShot, Pickup, Rocket]
       })
     },
     resources: { level: Game.System.readResource(LevelSpec) }

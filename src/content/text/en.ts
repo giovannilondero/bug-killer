@@ -143,7 +143,13 @@ export const en: Strings = {
     revert: { label: "git reset", hint: "+1 bomb" },
     pizza: { label: "Pizza", hint: "+2 sanity" },
     tools: { label: "Tools", hint: "homing shots" },
-    ai: { label: "AI", hint: "auto turret" }
+    ai: { label: "AI", hint: "auto turret" },
+    pairProgramming: { label: "Pair programming", hint: "two shots at once" },
+    codeFreeze: { label: "Code freeze", hint: "hits freeze" },
+    memoryLeak: { label: "Memory leak", hint: "hits poison" },
+    pushForce: { label: "git push --force", hint: "a rocket: boom where you aim" },
+    flameWar: { label: "Flame war", hint: "a cone of fire: this is fine 🔥" },
+    breakpoint: { label: "Breakpoint", hint: "+1 trap" }
   },
   floorCode: [
     "console.log('does it get here?')",
@@ -159,8 +165,11 @@ export const en: Strings = {
       "Mouse          aim and shoot (hold)",
       "Space          dash",
       "Q / right btn  git reset --hard",
+      "F / middle btn breakpoint",
       "P / Esc        pause    ·    M  audio"
     ],
+    breakpoints: "BREAKPOINTS  [F]",
+    breakpointHit: "BREAKPOINT HIT",
     touchHints: ["left thumb    move", "right thumb   aim and shoot", "hold it still shoots the nearest bug"],
     bossFixed: "BOSS FIXED",
     movedToDone: (key) => `${key} moved to Done`,
@@ -204,8 +213,8 @@ export const en: Strings = {
     locked: "🔒 close the previous sprint",
     best: (score) => `best ${score} SP`,
     fresh: "new",
-    controls: "WASD move · mouse aim and shoot · Space dash · Q <code>git reset --hard</code> · P pause · M audio",
-    touchControls: "Left thumb move · right thumb aim and shoot (held still: hits the nearest bug) · DASH · ⏪ <code>git reset --hard</code>",
+    controls: "WASD move · mouse aim and shoot · Space dash · Q <code>git reset --hard</code> · F breakpoint · P pause · M audio",
+    touchControls: "Left thumb move · right thumb aim and shoot (held still: hits the nearest bug) · DASH · ⏪ <code>git reset --hard</code> · 🔴 breakpoint",
     disclaimer: "Any resemblance to real clients is entirely intentional.",
     language: "Language",
     endless: (every) => `∞ every open bug · a boss every ${every} waves`,
@@ -216,6 +225,7 @@ export const en: Strings = {
   intro: { clientsOnline: "clients online", start: "Click or press any key to start", startTouch: "Tap to start" },
   touch: {
     dash: "DASH",
+    breakpoint: "Breakpoint",
     rotate: "Turn your phone sideways: the backlog is wide.",
     fullscreen: "Fullscreen",
     homeScreen: "To play fullscreen: Share → Add to Home Screen."

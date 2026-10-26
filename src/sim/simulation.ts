@@ -13,11 +13,11 @@ import { defaultLocale } from "../content/i18n.ts"
 import type { Locale } from "../content/i18n.ts"
 import { arenaOf, arenas } from "../content/arenas.ts"
 import type { Level } from "../content/levels.ts"
-import { CALLS, FIRST_CLIENT_DELAY, TOBIA, PARTY, RESURRECT, WAVE_INTERVAL } from "./constants.ts"
+import { BREAKPOINT, CALLS, FIRST_CLIENT_DELAY, TOBIA, PARTY, RESURRECT, WAVE_INTERVAL } from "./constants.ts"
 import { makePlayer } from "./drafts.ts"
 import { BossRead, BugRead, HostileShotRead, PickupRead, PlayerRead, ShotRead } from "./queries.ts"
-import { Calls, Chat, Fx, Game, Input, InputSource, Interruptions, Language, LevelSpec, Missions, Party, Player, Position, Presentation, Run, Turret } from "./schema.ts"
-import { contentTiers, tierOf } from "./tiers.ts"
+import { Breakpoint, Calls, Chat, Fx, Game, Input, InputSource, Interruptions, Language, LevelSpec, Missions, Party, Player, Position, Presentation, Rocket, Run, Tiers, Turret, Velocity } from "./schema.ts"
+import { contentTiers, isUnlocked, tierOf } from "./tiers.ts"
 import type { TierTable } from "./tiers.ts"
 import type { CallsValue, ChatValue, FxValue, InputValue, InputsValue, InterruptionsValue, MissionsValue, RunValue, TeammateValue } from "./schema.ts"
 import { BossBrainSystem } from "./systems/boss.ts"
@@ -40,14 +40,17 @@ const CaptureInputSystem = InputCapture.system(Game, {
 const SetupSystem = Game.System(
   "BugKiller/Setup",
   {
-    resources: { party: Game.System.readResource(Party), level: Game.System.readResource(LevelSpec) },
+    resources: { party: Game.System.readResource(Party), level: Game.System.readResource(LevelSpec), tiers: Game.System.readResource(Tiers) },
     commands: Game.System.commands(Game.System.spawns(Player))
   },
   ({ resources, commands }) => {
     const party = resources.party.get()
-    const arena = arenaOf(resources.level.get())
+    const level = resources.level.get()
+    const arena = arenaOf(level)
+    // Every sprint starts with a couple of Breakpoints, once their tier is in.
+    const breakpoints = isUnlocked("breakpoint", tierOf(level, 0), resources.tiers.get()) ? BREAKPOINT.charges : 0
     party.forEach((teammate, i) => {
-      commands.spawn(makePlayer({ x: arena.width / 2 + (i - (party.length - 1) / 2) * 90, y: arena.height / 2 + 150 }, { ...teammate }))
+      commands.spawn(makePlayer({ x: arena.width / 2 + (i - (party.length - 1) / 2) * 90, y: arena.height / 2 + 150 }, { ...teammate }, breakpoints))
     })
   }
 )
@@ -97,7 +100,9 @@ export const ViewInspector = Game.Inspector(
       shots: ShotRead,
       hostile: HostileShotRead,
       pickups: PickupRead,
-      turrets: Game.Query({ selection: { position: Game.Query.read(Position), turret: Game.Query.read(Turret) } })
+      turrets: Game.Query({ selection: { position: Game.Query.read(Position), turret: Game.Query.read(Turret) } }),
+      rockets: Game.Query({ selection: { position: Game.Query.read(Position), velocity: Game.Query.read(Velocity), rocket: Game.Query.read(Rocket) } }),
+      breakpoints: Game.Query({ selection: { position: Game.Query.read(Position), breakpoint: Game.Query.read(Breakpoint) } })
     },
     resources: {
       run: Game.System.readResource(Run),
@@ -122,6 +127,8 @@ export const ViewInspector = Game.Inspector(
       hostile: queries.hostile.each().map((m) => ({ id: m.entity.id, position: m.data.position.get(), text: m.data.shot.get().text })),
       turrets: queries.turrets.each().map((m) => ({ id: m.entity.id, position: m.data.position.get(), ...m.data.turret.get() })),
       pickups: queries.pickups.each().map((m) => ({ id: m.entity.id, position: m.data.position.get(), ...m.data.pickup.get() })),
+      rockets: queries.rockets.each().map((m) => ({ id: m.entity.id, position: m.data.position.get(), velocity: m.data.velocity.get(), ...m.data.rocket.get() })),
+      breakpoints: queries.breakpoints.each().map((m) => ({ id: m.entity.id, position: m.data.position.get(), ...m.data.breakpoint.get() })),
       run: resources.run.get(),
       /** The highest content tier on offer right now. */
       tier: tierOf(resources.level.get(), resources.run.get().wave),
@@ -141,7 +148,7 @@ export interface PresentationSink {
   readonly chat: (event: ChatValue) => void
 }
 
-export const idleInput: InputValue = { move: { x: 0, y: 0 }, aim: { x: arenas.normal.width / 2, y: 0 }, fire: false, dash: false, bomb: false }
+export const idleInput: InputValue = { move: { x: 0, y: 0 }, aim: { x: arenas.normal.width / 2, y: 0 }, fire: false, dash: false, bomb: false, breakpoint: false }
 
 /** Playing alone: one seat, no name over the head. */
 export const soloParty: Array<TeammateValue> = [{ slot: 0, name: "", color: PARTY.colors[0] }]

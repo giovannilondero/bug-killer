@@ -49,7 +49,7 @@ interface Room {
   host: number
   seats: Array<Seat>
   sim: Simulation | null
-  /** Each seat's latest input; a dash or bomb is kept until a step uses it. */
+  /** Each seat's latest input; a dash, bomb or Breakpoint is kept until a step uses it. */
   inputs: Array<InputValue>
   fx: Array<FxValue>
   chat: Array<ChatValue>
@@ -264,7 +264,12 @@ export const makeRooms = (options: RoomsOptions = {}) => {
       case "input": {
         if (!at || !at.room.sim) return
         const previous = at.room.inputs[at.slot] ?? idleInput
-        at.room.inputs[at.slot] = { ...message.input, dash: previous.dash || message.input.dash, bomb: previous.bomb || message.input.bomb }
+        at.room.inputs[at.slot] = {
+          ...message.input,
+          dash: previous.dash || message.input.dash,
+          bomb: previous.bomb || message.input.bomb,
+          breakpoint: previous.breakpoint || message.input.breakpoint
+        }
         return
       }
       case "leave":
@@ -297,8 +302,8 @@ export const makeRooms = (options: RoomsOptions = {}) => {
           announce(room)
           break
         }
-        // A dash or a bomb is one press: used by this step, gone for the next.
-        room.inputs = room.inputs.map((input) => input && { ...input, dash: false, bomb: false })
+        // A dash, a bomb or a Breakpoint is one press: used by this step, gone for the next.
+        room.inputs = room.inputs.map((input) => input && { ...input, dash: false, bomb: false, breakpoint: false })
         room.steps += 1
         if (room.steps % STEPS_PER_FRAME === 0 || over(room)) sendFrame(room)
         if (over(room)) {

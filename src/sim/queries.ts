@@ -19,8 +19,8 @@ export const PlayerRead = Game.Query({
   }
 })
 
-/** Developers still standing, lowest seat first: who bugs chase and where clients drop rewards. */
-export const standing = (team: ReadonlyArray<QueryMatch<typeof Game.schema, typeof PlayerRead>>) =>
+/** Developers still standing, lowest seat first: who bugs chase and where clients drop rewards. Takes reading or writing matches alike. */
+export const standing = (team: ReadonlyArray<Pick<QueryMatch<typeof Game.schema, typeof PlayerRead>, "data">>) =>
   team
     .filter((match) => match.data.player.get().hp > 0)
     .sort((a, b) => a.data.player.get().slot - b.data.player.get().slot)

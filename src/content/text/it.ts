@@ -143,7 +143,13 @@ export const it: Strings = {
     revert: { label: "git reset", hint: "+1 bomba" },
     pizza: { label: "Pizza", hint: "+2 sanità" },
     tools: { label: "Strumenti", hint: "colpi a ricerca" },
-    ai: { label: "AI", hint: "torretta automatica" }
+    ai: { label: "AI", hint: "torretta automatica" },
+    pairProgramming: { label: "Pair programming", hint: "due colpi alla volta" },
+    codeFreeze: { label: "Code freeze", hint: "i colpi congelano" },
+    memoryLeak: { label: "Memory leak", hint: "i colpi avvelenano" },
+    pushForce: { label: "git push --force", hint: "un razzo: boom dove miri" },
+    flameWar: { label: "Flame war", hint: "un cono di fuoco: this is fine 🔥" },
+    breakpoint: { label: "Breakpoint", hint: "+1 trappola" }
   },
   floorCode: [
     "console.log('qui ci arriva?')",
@@ -159,8 +165,11 @@ export const it: Strings = {
       "Mouse          mira e spara (tieni premuto)",
       "Spazio         dash",
       "Q / tasto dx   git reset --hard",
+      "F / rotellina  breakpoint",
       "P / Esc        pausa    ·    M  audio"
     ],
+    breakpoints: "BREAKPOINT  [F]",
+    breakpointHit: "BREAKPOINT RAGGIUNTO",
     touchHints: ["pollice sinistro   muoviti", "pollice destro     mira e spara", "tienilo fermo      spara al bug più vicino"],
     bossFixed: "BOSS FIXATO",
     movedToDone: (key) => `${key} spostato in Done`,
@@ -204,8 +213,8 @@ export const it: Strings = {
     locked: "🔒 chiudi lo sprint precedente",
     best: (score) => `record ${score} SP`,
     fresh: "nuovo",
-    controls: "WASD muoviti · mouse mira e spara · Spazio dash · Q <code>git reset --hard</code> · P pausa · M audio",
-    touchControls: "Pollice sinistro muoviti · pollice destro mira e spara (fermo: colpisce il bug più vicino) · DASH · ⏪ <code>git reset --hard</code>",
+    controls: "WASD muoviti · mouse mira e spara · Spazio dash · Q <code>git reset --hard</code> · F breakpoint · P pausa · M audio",
+    touchControls: "Pollice sinistro muoviti · pollice destro mira e spara (fermo: colpisce il bug più vicino) · DASH · ⏪ <code>git reset --hard</code> · 🔴 breakpoint",
     disclaimer: "Ogni somiglianza con clienti reali è puramente intenzionale.",
     language: "Lingua",
     endless: (every) => `∞ tutti i bug aperti · un boss ogni ${every} ondate`,
@@ -216,6 +225,7 @@ export const it: Strings = {
   intro: { clientsOnline: "clienti online", start: "Clicca o premi un tasto per iniziare", startTouch: "Tocca per iniziare" },
   touch: {
     dash: "DASH",
+    breakpoint: "Breakpoint",
     rotate: "Gira il telefono in orizzontale: il backlog è largo.",
     fullscreen: "Schermo intero",
     homeScreen: "Per giocare a schermo intero: Condividi → Aggiungi alla schermata Home."
