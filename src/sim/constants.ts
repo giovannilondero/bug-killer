@@ -1,5 +1,7 @@
 import { Clock } from "@typeonce/ritmo"
 
+import type { TicketType } from "../content/bugs.ts"
+
 export const STEP = Clock.hz(60)
 export const DT = STEP.dt
 
@@ -51,6 +53,31 @@ export const RESURRECT = { first: 28, min: 24, max: 40, hpFactor: 1.5, speedFact
 export const TOBIA = { idle: 11, pileUp: 2, cooldown: 30, firstCooldown: 12 } as const
 
 export const HOMING = { range: 520, turnRate: 9 } as const
+
+/** A Deploying bug lights its fuse this close to a developer (gap between bodies), then goes off over this radius. */
+export const DEPLOY = { reach: 50, fuse: 1, chainFuse: 0.12, radius: 130, damage: 4 } as const
+
+/** An Epic's nest: every few seconds it releases a sub-task of one of these priorities, while fewer than `brood` are alive. */
+export const EPIC = { every: 3, brood: 6, priorities: ["Lowest", "Low"], ring: 14 } as const
+
+/** How a ticket's type scales its priority's stats. */
+export interface TicketScale {
+  readonly hp: number
+  readonly speed: number
+  readonly radius: number
+  readonly points: number
+}
+
+export const ticketScales = {
+  bug: { hp: 1, speed: 1, radius: 1, points: 1 },
+  story: { hp: 1.5, speed: 0.9, radius: 1.2, points: 1.5 },
+  subtask: { hp: 0.5, speed: 1.4, radius: 0.7, points: 0.5 },
+  // An Epic never moves: a big nest that has to be dug out.
+  epic: { hp: 8, speed: 0, radius: 2, points: 4 }
+} as const satisfies Record<TicketType, TicketScale>
+
+/** How many sub-tasks a closed Story splits into. */
+export const STORY_SUBTASKS = 2
 
 /** Seconds each timed power-up lasts. Weapons time themselves (`weapons.ts`). */
 export const BUFF_SECONDS = { hotfix: 8, refactor: 10, coffee: 8, unitTest: 6, revert: 0, pizza: 0, tools: 10, ai: 0, pairProgramming: 0, codeFreeze: 8, memoryLeak: 8, pushForce: 0, flameWar: 0, breakpoint: 0 } as const

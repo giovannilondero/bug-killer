@@ -84,6 +84,7 @@ export const en: Strings = {
     "Data is missing (which data?)"
   ],
   regression: (key) => `Regression introduced by the fix for ${key}`,
+  subtask: (summary) => `Sub-task: ${summary}`,
   minions: { crash: "Crash report without a stack trace", null: "Cannot read properties of null" },
   calls: {
     meetTitles: [
@@ -126,7 +127,14 @@ export const en: Strings = {
     armored: "BLOCKED: takes half damage",
     reopens: "IN QA: may reopen",
     jittery: "IN DEVELOPMENT: moves erratically",
+    deploying: "DEPLOYING: stops next to you and blows up",
     plain: ""
+  },
+  ticketTypes: {
+    bug: { label: "Bug", hint: "" },
+    story: { label: "Story", hint: "STORY: splits into 2 sub-tasks" },
+    subtask: { label: "Sub-task", hint: "SUB-TASK: small and fast" },
+    epic: { label: "Epic", hint: "EPIC: a nest of sub-tasks, the wave waits until it is closed" }
   },
   taglines: {
     glacier: "A cold start: everything is Ready for QA, nothing is really done.",
@@ -174,6 +182,8 @@ export const en: Strings = {
     bossFixed: "BOSS FIXED",
     movedToDone: (key) => `${key} moved to Done`,
     reopenedSub: (key) => `${key} failed QA`,
+    deployed: "DEPLOYED",
+    deployedSub: "straight to production",
     resurrected: (key) => `🧟 ${key} RESURRECTED`,
     resurrectedSub: (name) => `${name} says it's not fixed`,
     testsPassing: "✓ tests passing",
@@ -248,6 +258,7 @@ export const en: Strings = {
   notes: {
     title: "📦 Release notes",
     scopeCreep: (n) => `+ ${n} extra client ${n === 1 ? "request" : "requests"} handled "on the fly"`,
+    subtasks: (n) => `+ ${n} ${n === 1 ? "sub-task" : "sub-tasks"}`,
     resurrections: (n) => `🧟 ${n} ${n === 1 ? "bug" : "bugs"} "not fixed yet" according to the clients (and fixed again)`
   },
   cleared: {

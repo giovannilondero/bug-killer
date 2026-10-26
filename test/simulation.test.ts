@@ -683,6 +683,99 @@ test("Code freeze arrives with sprint 3 (Keystone) and not before", () => {
   assert.equal(isUnlocked("codeFreeze", levels[2]!.tier), true)
 })
 
+// --- Ticket types ----------------------------------------------------------
+
+/** A level with no backlog of its own: only the tickets a test drops in, 200 px above the autopilot. */
+const dropIn = (tickets: ReadonlyArray<BugSeed>, level: Level = levels[1]!) => {
+  let current: View | null = null
+  let frame = 0
+  const made = createSimulation({ level: { ...level, bugs: [] }, seed: 4, locale: "en", input: autopilot(() => current, () => frame), presentation: { fx: () => undefined, chat: () => undefined } })
+  if (!made.ok) throw new Error(JSON.stringify(made.error))
+  const sim = made.value
+  const me = sim.view().player!.position
+  const Place = Game.System("Test/Place", { commands: Game.System.commands(Game.System.spawns(Bug)) }, ({ commands }) => {
+    tickets.forEach((ticket, i) => commands.spawn(makeBug(ticket, { x: me.x + (i - (tickets.length - 1) / 2) * 120, y: me.y - 200 })))
+  })
+  assert.ok(sim.runtime.tick(Game.Schedule(Place, Game.Schedule.applyDeferred())).ok)
+  current = sim.view()
+  return {
+    view: () => current!,
+    /** Steps until `done` holds (or the seconds run out), handing every view to `see`. */
+    until: (done: (view: View) => boolean, seconds = 30, see: (view: View) => void = () => undefined) => {
+      for (const end = frame + seconds * 60; frame < end && !done(current!); frame++) {
+        assert.ok(sim.step().ok)
+        current = sim.view()
+        see(current)
+      }
+      return current!
+    }
+  }
+}
+
+test("a closed Story splits into 2 smaller, faster sub-tasks keyed after it; the notes only count them", () => {
+  const story: BugSeed = { key: "MEOW-900", summary: "As a cat I want a bigger box", priority: "Medium", status: "To Do", type: "story" }
+  const shooting = dropIn([story])
+  const before = shooting.view().bugs[0]!
+  assert.equal(before.type, "story")
+
+  const split = shooting.until((v) => !v.bugs.some((bug) => bug.key === story.key))
+  const children = split.bugs.filter((bug) => bug.key.startsWith(`${story.key}-`))
+  assert.deepEqual(children.map((bug) => bug.key).sort(), ["MEOW-900-1", "MEOW-900-2"])
+  for (const child of children) {
+    assert.equal(child.type, "subtask")
+    assert.ok(child.radius < before.radius, `sub-task radius ${child.radius} vs ${before.radius}`)
+    assert.ok(child.speed > before.speed, `sub-task speed ${child.speed} vs ${before.speed}`)
+  }
+
+  const done = shooting.until((v) => v.bugs.length === 0)
+  assert.deepEqual(done.run.fixed.map((f) => [f.key, f.type]), [["MEOW-900", "story"]])
+  assert.equal(done.run.subtasks, 2)
+})
+
+test("a Highest bug still leaves its 3 regressions, a Story its 2 sub-tasks", () => {
+  const shooting = dropIn([
+    { key: "QUIZ-901", summary: "Leaderboard shows negative scores", priority: "Highest", status: "To Do" },
+    { key: "QUIZ-902", summary: "As a host I want timed rounds", priority: "High", status: "To Do", type: "story" }
+  ])
+  const keys = new Set<string>()
+  const done = shooting.until((v) => v.bugs.length === 0, 60, (v) => v.bugs.forEach((bug) => keys.add(bug.key)))
+  assert.equal(done.run.phase, "waves", "closed by the developer, not lost")
+  assert.deepEqual([...keys].sort(), ["QUIZ-901", "QUIZ-901-REG1", "QUIZ-901-REG2", "QUIZ-901-REG3", "QUIZ-902", "QUIZ-902-1", "QUIZ-902-2"])
+  assert.deepEqual(done.run.fixed.map((f) => f.key).sort(), ["QUIZ-901", "QUIZ-902"])
+  assert.equal(done.run.subtasks, 2)
+})
+
+test("a Highest Story leaves both its 2 sub-tasks and the 3 regressions, and its sub-tasks leave none", () => {
+  const shooting = dropIn([{ key: "QUIZ-911", summary: "As a host I want live scores", priority: "Highest", status: "To Do", type: "story" }])
+  const keys = new Set<string>()
+  const done = shooting.until((v) => v.bugs.length === 0, 60, (v) => v.bugs.forEach((bug) => keys.add(bug.key)))
+  assert.equal(done.run.phase, "waves", "closed by the developer, not lost")
+  assert.deepEqual([...keys].sort(), ["QUIZ-911", "QUIZ-911-1", "QUIZ-911-2", "QUIZ-911-REG1", "QUIZ-911-REG2", "QUIZ-911-REG3"])
+  assert.equal(done.run.subtasks, 2)
+})
+
+test("Stories come with Side Quests: none in Glacier, none before their tier, in Endless from its second tier", () => {
+  assert.ok(levels[0]!.bugs.every((bug) => (bug.type ?? "bug") === "bug"), "Glacier's backlog has no Stories")
+  assert.ok(levels[1]!.bugs.some((bug) => bug.type === "story"), "Side Quests' backlog has some")
+
+  /** The tier the run was at when each Story first showed up. */
+  const stories = (options: Omit<Parameters<typeof createSimulation>[0], "presentation" | "input">, seconds: number) => {
+    const seen = new Map<number, number>()
+    watch(options, seconds, (v) => {
+      for (const bug of v.bugs) if (bug.type === "story" && !seen.has(bug.id)) seen.set(bug.id, v.tier)
+    })
+    return [...seen.values()]
+  }
+
+  assert.ok(stories({ level: levels[1]!, seed: 5 }, 150).length > 0, "Side Quests releases Stories")
+  assert.deepEqual(stories({ level: { ...levels[1]!, tier: 0 }, seed: 5 }, 150), [], "held at tier 0 its Stories are plain bugs")
+
+  const quick = { ...endlessLevel, waveSize: 2, endless: { ...endlessLevel.endless!, every: 100 } }
+  const endless = stories({ level: quick, seed: 5 }, 200)
+  assert.ok(endless.length > 0, "Endless releases Stories once it gets there")
+  assert.ok(endless.every((tier) => tier >= contentTiers.story), `tiers at first sight: ${endless.join(", ")}`)
+})
+
 // --- Statuses: Memory leak (poison) ------------------------------------------
 
 /**

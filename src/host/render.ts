@@ -3,14 +3,14 @@ import type { Arena } from "../content/arenas.ts"
 import { bugKinds } from "../content/bugs.ts"
 import { clients } from "../content/clients.ts"
 import { comboMultiplier } from "../sim/systems/combat.ts"
-import { BREAKPOINT, BUFF_SECONDS, PARTY, PLAYER, ROCKET, TURRET } from "../sim/constants.ts"
+import { BREAKPOINT, BUFF_SECONDS, DEPLOY, PARTY, PLAYER, ROCKET, TURRET } from "../sim/constants.ts"
 import { isUnlocked } from "../sim/tiers.ts"
 import { hasStatus } from "../sim/statuses.ts"
 import { WEAPONS } from "../sim/weapons.ts"
 import type { FxValue, Vec } from "../sim/schema.ts"
 import type { View } from "../sim/simulation.ts"
 import { formatNumber, t } from "./language.ts"
-import { floorKey, MONO, paintBreakpoint, paintBug, paintFloor, paintHeart, paintHostile, paintLabel, paintPickup, paintPing, paintPlayer, paintRocket, paintRocketTarget, paintTooltip, pickupIcons, pickupInfo, roundRect, SANS, shade, tooltipHeight, TOOLTIP_WIDTH, truncate } from "./paint.ts"
+import { floorKey, fuseBlink, fuseProgress, MONO, paintBreakpoint, paintBug, paintFloor, paintFuseRing, paintHeart, paintHostile, paintLabel, paintNest, paintPickup, paintPing, paintPlayer, paintRocket, paintRocketTarget, paintTooltip, pickupIcons, pickupInfo, roundRect, SANS, shade, tooltipHeight, TOOLTIP_WIDTH, truncate } from "./paint.ts"
 import type { BugLook } from "./paint.ts"
 import { touchMode } from "./touch.ts"
 
@@ -121,6 +121,16 @@ export const makeRenderer = (canvas: HTMLCanvasElement) => {
         burst(event.x, event.y, "#9dffb0", 16, 200, 3)
         break
       }
+      case "fuse":
+        burst(event.x, event.y, "#ff5a3c", 10, 140, 2)
+        break
+      case "deploy":
+        shake = Math.max(shake, 14)
+        flash = Math.max(flash, 0.35)
+        burst(event.x, event.y, "#ffb347", 46, DEPLOY.radius * 3.2, 4)
+        burst(event.x, event.y, "#ff5a3c", 24, DEPLOY.radius * 2, 3)
+        floaters.push({ x: event.x, y: event.y - 30, life: 1.4, max: 1.4, text: t().hud.deployed, sub: t().hud.deployedSub, color: "#ffb347", big: false })
+        break
       case "reopen":
         floaters.push({ x: event.x, y: event.y - 24, life: 1.6, max: 1.6, text: "REOPENED", sub: t().hud.reopenedSub(event.key), color: "#ff4d6d", big: false })
         burst(event.x, event.y, "#ff4d6d", 14, 180, 3)
@@ -206,7 +216,20 @@ export const makeRenderer = (canvas: HTMLCanvasElement) => {
 
   // --- Drawing helpers ----------------------------------------------------
 
-  const drawBug = (x: number, y: number, r: number, color: string, heading: number, t: number, options: BugLook) => {
+  const drawBug = (x: number, y: number, r: number, color: string, heading: number, t: number, look: BugLook) => {
+    const lit = fuseProgress(look.fuse)
+    const options = lit !== null && fuseBlink(lit, t) ? { ...look, flash: 1 } : look
+    if (lit !== null) {
+      // The blast radius, and a ring closing in on the bug as the fuse burns down.
+      ctx.save()
+      ctx.translate(x, y)
+      ctx.globalAlpha = 0.45 + lit * 0.5
+      paintFuseRing(ctx, DEPLOY.radius)
+      ctx.globalAlpha = 0.8
+      ctx.scale(1 - lit, 1 - lit)
+      paintFuseRing(ctx, DEPLOY.radius)
+      ctx.restore()
+    }
     ctx.save()
     ctx.translate(x, y)
     if (options.trait === "jittery" && Math.sin(t * 40) > 0.6) {
@@ -237,6 +260,11 @@ export const makeRenderer = (canvas: HTMLCanvasElement) => {
       ctx.setLineDash([3, 5])
       ctx.beginPath(); ctx.arc(x, y, r * 1.35, t * 2, t * 2 + Math.PI * 1.6); ctx.stroke()
       ctx.setLineDash([])
+    }
+    if (options.trait === "deploying") {
+      ctx.font = `${Math.round(r * 0.7)}px ${SANS}`
+      ctx.textAlign = "center"
+      ctx.fillText("🚀", x, y + r * 0.25)
     }
   }
 
@@ -526,6 +554,13 @@ export const makeRenderer = (canvas: HTMLCanvasElement) => {
       const heading = view.player ? Math.atan2(view.player.position.y - y, view.player.position.x - x) : 0
       const appear = Math.min(1, bug.age / 0.4)
       ctx.globalAlpha = appear
+      if (bug.type === "epic") {
+        // An Epic sits in its nest.
+        ctx.save()
+        ctx.translate(x, y)
+        paintNest(ctx, bug.radius)
+        ctx.restore()
+      }
       if (bug.resurrectedBy) {
         // A zombie ticket: a sickly green aura and the client's colour around it.
         const glow = ctx.createRadialGradient(x, y, bug.radius * 0.5, x, y, bug.radius * 2)
@@ -539,7 +574,7 @@ export const makeRenderer = (canvas: HTMLCanvasElement) => {
         ctx.beginPath(); ctx.arc(x, y, bug.radius * 1.45, -time * 3, -time * 3 + Math.PI * 2); ctx.stroke()
         ctx.setLineDash([])
       }
-      drawBug(x, y, bug.radius * (0.4 + appear * 0.6), bug.resurrectedBy ? "#9dff6b" : bugKinds[bug.priority].color, heading, bug.age, { flash: bug.hitFlash, trait: bug.trait, reopened: bug.reopened || bug.resurrectedBy !== null, frozen: hasStatus(bug.statuses, "freeze"), poisoned: hasStatus(bug.statuses, "poison"), burning: hasStatus(bug.statuses, "burn") })
+      drawBug(x, y, bug.radius * (0.4 + appear * 0.6), bug.resurrectedBy ? "#9dff6b" : bugKinds[bug.priority].color, heading, bug.age, { flash: bug.hitFlash, trait: bug.trait, reopened: bug.reopened || bug.resurrectedBy !== null, frozen: hasStatus(bug.statuses, "freeze"), poisoned: hasStatus(bug.statuses, "poison"), burning: hasStatus(bug.statuses, "burn"), type: bug.type, fuse: bug.fuse })
       ctx.globalAlpha = 1
       const isTarget = mission?.kind === "killTarget" && mission.target === bug.key
       if (isTarget) {
@@ -555,7 +590,7 @@ export const makeRenderer = (canvas: HTMLCanvasElement) => {
       const name = bug.resurrectedBy ? `🧟 ${bug.key}` : bug.reopened ? `${bug.key} ↺` : bug.key
       if (bug === chip) {
         const trait = t().traits[bug.trait].split(":")[0]
-        label([name, bug.priority, trait].filter(Boolean).join(" · "), x, y - bug.radius - 10, bugKinds[bug.priority].color, 16, bugKinds[bug.priority].color)
+        label([name, bug.type === "bug" ? "" : t().ticketTypes[bug.type].label, bug.priority, trait].filter(Boolean).join(" · "), x, y - bug.radius - 10, bugKinds[bug.priority].color, 16, bugKinds[bug.priority].color)
       } else {
         label(name, x, y - bug.radius - 10, isTarget ? "#ff6b81" : bug.resurrectedBy ? "#9dff6b" : bug.reopened ? "#ff6b81" : "#e8ecf4")
       }
