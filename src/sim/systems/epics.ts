@@ -4,7 +4,7 @@ import { Ops } from "@typeonce/ritmo-math"
 import { arenaOf } from "../../content/arenas.ts"
 import { text } from "../../content/i18n.ts"
 import { DT, EPIC } from "../constants.ts"
-import { makeBug, subtaskOf } from "../drafts.ts"
+import { bugRadius, makeBug, subtaskOf } from "../drafts.ts"
 import { clampToArena } from "../math.ts"
 import { BugWrite } from "../queries.ts"
 import { Bug, Fx, Game, Language, LevelSpec, Rng, Run } from "../schema.ts"
@@ -60,9 +60,10 @@ export const EpicSystem = Game.System(
           const angle = released * GOLDEN_ANGLE
           const distance = match.data.body.get().radius + EPIC.ring
           const centre = match.data.position.get()
-          const at = clampToArena({ x: centre.x + Ops.cos(angle) * distance, y: centre.y + Ops.sin(angle) * distance }, EPIC.ring, arena)
           const priority = random.pick(EPIC.priorities) ?? "Lowest"
-          commands.spawn(makeBug(subtaskOf(epic, released, priority, strings), at, { parent: epic.key }))
+          const seed = subtaskOf(epic, released, priority, strings)
+          const at = clampToArena({ x: centre.x + Ops.cos(angle) * distance, y: centre.y + Ops.sin(angle) * distance }, Math.max(EPIC.ring, bugRadius(seed)), arena)
+          commands.spawn(makeBug(seed, at, { parent: epic.key }))
           events.fx.emit({ type: "spawn", x: at.x, y: at.y })
           released += 1
         }

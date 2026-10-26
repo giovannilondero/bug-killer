@@ -1,9 +1,10 @@
 import * as Random from "@typeonce/ritmo-math/Random"
 
 import { arenaOf } from "../../content/arenas.ts"
+import { ticketsOf } from "../../content/levels.ts"
 import { BREAKPOINT, DT, ENDLESS, PARTY, SPAWN_SAFE_DISTANCE, WAVE_INTERVAL } from "../constants.ts"
 import { makeBoss, makeBug } from "../drafts.ts"
-import { centreOf, edgePoint, openPoint } from "../math.ts"
+import { centreOf, clampToArena, edgePoint, openPoint } from "../math.ts"
 import { BossRead, BugRead, PlayerWrite, standing } from "../queries.ts"
 import { Boss, Bug, Fx, Game, LevelSpec, Rng, Run, Tiers } from "../schema.ts"
 import { isUnlocked, ticketTypeAt, tierOf } from "../tiers.ts"
@@ -13,10 +14,12 @@ import { isUnlocked, ticketTypeAt, tierOf } from "../tiers.ts"
  * boss when the backlog is empty, and decides when the level is cleared or
  * lost. In endless mode the backlog never empties: bugs are drawn at random,
  * a boss steps in every few waves, and each one beaten makes the next round
- * tougher. A bigger team gets bigger waves and a tougher boss; the run is
- * lost when every developer is down. When Endless reaches the tier that brings
- * Breakpoints in, every developer gets the sprint's starting charges. Also runs
- * the combo timer and the clocks.
+ * tougher. A bonus level draws a fixed number of tickets at random from
+ * the whole backlog, each at most once, then calls its boss. A bigger team
+ * gets bigger waves and a tougher boss; the run is lost when every developer
+ * is down. When Endless reaches the tier that brings Breakpoints in, every
+ * developer gets the sprint's starting charges. Also runs the combo timer and
+ * the clocks.
  */
 export const WavesSystem = Game.System(
   "BugKiller/Waves",
@@ -62,7 +65,7 @@ export const WavesSystem = Game.System(
     if (run.phase === "waves") {
       run.waveTimer -= DT
       // Endless: the backlog is bottomless until the wave that calls the next boss.
-      const backlogLeft = endless ? (run.wave < run.nextBossAt ? Infinity : 0) : level.bugs.length - run.nextBug
+      const backlogLeft = endless ? (run.wave < run.nextBossAt ? Infinity : 0) : ticketsOf(level) - run.nextBug
       const solo = endless ? Math.min(ENDLESS.maxWaveSize, level.waveSize + Math.floor(run.wave / 3)) : level.waveSize
       const waveSize = Math.round(solo * (1 + extra * PARTY.waveSizePerPlayer))
       const quiet = aliveBugs <= Math.floor(waveSize / 2)
@@ -72,13 +75,20 @@ export const WavesSystem = Game.System(
         // This wave plays at the tier it releases into: a ticket type it hasn't unlocked comes as a plain bug.
         const tier = tierOf(level, run.wave + 1)
         const deploys = isUnlocked("deploying", tier, resources.tiers.get())
+        // A bonus level never draws a ticket that is open or already closed this run.
+        const drawn = new Set([...run.fixed.map((f) => f.key), ...queries.bugs.each().map((b) => b.data.bug.get().key)])
         for (let i = 0; i < count; i++) {
-          const seed = endless ? random.pick(level.bugs) : level.bugs[run.nextBug + i]
+          const seed = endless
+            ? random.pick(level.bugs)
+            : level.bonus
+              ? random.pick(level.bugs.filter((bug) => !drawn.has(bug.key)))
+              : level.bugs[run.nextBug + i]
           if (!seed) {
             continue
           }
           const type = ticketTypeAt(seed.type, tier, resources.tiers.get())
           // Away from one developer per bug, in turn, so nobody gets them all.
+          drawn.add(seed.key)
           const avoid = up[i % Math.max(1, up.length)] ?? null
           // An Epic never moves, so it nests out in the open instead of on the edge.
           const at = type === "epic" ? openPoint(random, avoid ?? centreOf(arena), SPAWN_SAFE_DISTANCE, arena) : edgePoint(random, avoid, arena)
@@ -96,8 +106,8 @@ export const WavesSystem = Game.System(
       }
       if (backlogLeft === 0 && aliveBugs === 0) {
         setPhase("boss")
-        const at = { x: arena.width / 2, y: Math.min(360, arena.height * 0.3) }
         const boss = endless ? (endless.bosses[run.loop % endless.bosses.length] ?? level.boss) : level.boss
+        const at = clampToArena({ x: arena.width / 2, y: Math.min(360, arena.height * 0.3) }, boss.radius, arena)
         commands.spawn(makeBoss(boss, at, (endless ? 1 + run.loop * ENDLESS.bossHpPerLoop : 1) * (1 + extra * PARTY.bossHpPerPlayer)))
         events.fx.emit({ type: "spawn", x: at.x, y: at.y })
       }

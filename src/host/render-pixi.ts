@@ -5,6 +5,7 @@
 import { Application, CanvasSource, Container, Graphics, Sprite, Texture } from "pixi.js"
 
 import { arenaOf } from "../content/arenas.ts"
+import { ticketsOf } from "../content/levels.ts"
 import type { Arena } from "../content/arenas.ts"
 import { bugKinds } from "../content/bugs.ts"
 import { clients } from "../content/clients.ts"
@@ -18,7 +19,7 @@ import { WEAPONS } from "../sim/weapons.ts"
 import type { FxValue, PickupKind, Vec } from "../sim/schema.ts"
 import type { View } from "../sim/simulation.ts"
 import { formatNumber, locale, t } from "./language.ts"
-import { bossHealth, conflictMarkerColors, conflictMarkers, floorKey, fuseBlink, fuseProgress, MONO, paintBreakpoint, paintBug, paintFloor, paintFuseRing, paintHeart, paintHostile, paintLabel, paintNest, paintPickup, paintPing, paintPlayer, paintCircuit, paintRestartGhost, paintRocket, paintRocketTarget, paintStack, paintTooltip, pickupIcons, pickupInfo, SANS, shade, shieldLabel, tooltipHeight, TOOLTIP_WIDTH, truncate } from "./paint.ts"
+import { bossHealth, conflictMarkerColors, conflictMarkers, flameColor, floorKey, fuseBlink, fuseProgress, MONO, paintBreakpoint, paintBug, paintFlame, paintFloor, paintFuseRing, paintHeart, paintHostile, paintLabel, paintNest, paintPickup, paintPing, paintPlayer, paintCircuit, paintRestartGhost, paintRocket, paintRocketTarget, paintMinimapWalls, paintStack, paintTooltip, pickupIcons, pickupInfo, SANS, shade, shieldLabel, tooltipHeight, TOOLTIP_WIDTH, truncate } from "./paint.ts"
 import type { BugLook, TooltipBug } from "./paint.ts"
 import type { Camera, Renderer } from "./render.ts"
 import { touchMode } from "./touch.ts"
@@ -61,6 +62,9 @@ interface Box {
   readonly right: number
   readonly bottom: number
 }
+
+/** The radius Flame war's puffs are baked at, scaled to size when drawn. */
+const FLAME_PUFF = 32
 
 const around = (half: number, halfY = half): Box => ({ left: -half, top: -halfY, right: half, bottom: halfY })
 
@@ -133,6 +137,8 @@ interface Place {
   sy?: number
   alpha?: number
   tint?: string | number
+  /** `add` sums the colour onto what is below, so overlapping light burns brighter. */
+  blend?: "add"
 }
 
 /**
@@ -164,6 +170,7 @@ const makeLayer = (parent: Container) => {
     s.scale.set(place.sx ?? place.scale ?? 1, place.sy ?? place.scale ?? 1)
     s.alpha = place.alpha ?? 1
     s.tint = place.tint ?? 0xffffff
+    s.blendMode = place.blend ?? "normal"
     return s
   }
 
@@ -243,6 +250,8 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
 
   const camera: Camera = { x: 0, y: 0, scale: 1 }
   const particles: Array<Particle> = []
+  /** Flame war's puffs: a particle whose colour comes from its age. */
+  const flames: Array<Omit<Particle, "color">> = []
   const floaters: Array<Floater> = []
   let shake = 0
   let flash = 0
@@ -377,14 +386,13 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
         floaters.push({ x: event.x, y: event.y - 30, life: 1.3, max: 1.3, text: t().hud.breakpointHit, sub: "", color: "#9be7ff", big: false })
         break
       case "flame":
-        // A puff of fire fanning out along the cone, yellow at the core, red at the edges.
-        for (let i = 0; i < 8; i++) {
+        // A gust of fire filling the cone: each puff leaves the nozzle small and white-hot, then swells and cools to red.
+        for (let i = 0; i < 14; i++) {
           const a = event.angle + (Math.random() * 2 - 1) * event.spread
-          // Particles slow down by 8% a frame, so they travel about a fifth of their speed.
-          const s = (event.range / 0.21) * (0.35 + Math.random() * 0.65)
-          const life = 0.25 + Math.random() * 0.15
-          const color = ["#fff3a0", "#ffd84a", "#ff9440", "#ff4d2d"][Math.floor(Math.random() * 4)]!
-          particles.push({ x: event.x, y: event.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life, max: life, color, size: 5 + Math.random() * 5 })
+          // Puffs slow down by 8% a frame, so they travel about a fifth of their speed.
+          const s = (event.range / 0.21) * (0.3 + Math.random() * 0.7)
+          const life = 0.3 + Math.random() * 0.2
+          flames.push({ x: event.x, y: event.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life, max: life, size: 5 + Math.random() * 4 })
         }
         break
       case "explosion":
@@ -885,6 +893,23 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
       p.vy *= 0.92
       W.rect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size, p.color, p.life / p.max)
     }
+    // Flame war's fire, added onto the floor so the thick of the cone burns brightest.
+    for (let i = flames.length - 1; i >= 0; i--) {
+      const f = flames[i]!
+      f.life -= dt
+      if (f.life <= 0) {
+        flames.splice(i, 1)
+        continue
+      }
+      f.x += f.vx * dt
+      f.y += f.vy * dt
+      f.vx *= 0.92
+      f.vy *= 0.92
+      const k = 1 - f.life / f.max
+      const color = flameColor(k)
+      const puff = bakery.bake(`flame|${color}`, wres, around(FLAME_PUFF), (g) => paintFlame(g, FLAME_PUFF, color))
+      W.sprite(puff, f.x, f.y, { scale: (f.size * (1 + k * 2.5)) / FLAME_PUFF, alpha: 0.85 * (1 - k * k), blend: "add" })
+    }
     for (let i = trail.length - 1; i >= 0; i--) {
       trail[i]!.life -= dt
       if (trail[i]!.life <= 0) trail.splice(i, 1)
@@ -1043,6 +1068,8 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
         const color = i < player.hp ? "#ff4d6d" : "rgba(255,255,255,0.15)"
         S.sprite(bakery.bake(`heart|${color}`, res, { left: -6, top: -4, right: 24, bottom: 19 }, (g) => paintHeart(g, 0, 0, color)), 20 + i * 24, 58)
       }
+      // Hardcore: said right of the single heart, in its colour.
+      if (view.hardcore) text(S, res, `☠ ${t().hardcore.hud}`, `bold 11px ${MONO}`, "#ff4d6d", 26 + player.maxHp * 24, 71, "left")
       text(S, res, "GIT RESET --HARD  [Q]", `11px ${MONO}`, "#9aa4b8", 20, 100, "left")
       for (let i = 0; i < player.bombs; i++) text(S, res, "⏪", `16px ${SANS}`, "#9aa4b8", 20 + i * 24, 122, "left")
       if (isUnlocked("breakpoint", view.tier)) {
@@ -1106,7 +1133,7 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
       text(S, res, t().hud.endless(run.wave, bossIn), `bold 12px ${MONO}`, "#e8ecf4", width / 2, 28)
       bar(width / 2 - w / 2, 38, w, 8, 4, Math.min(1, (every - bossIn) / every), accent)
     } else if (run.phase === "waves") {
-      const total = view.level.bugs.length
+      const total = ticketsOf(view.level)
       const released = Math.min(total, run.nextBug)
       const open = total - released + view.bugs.length
       const w = Math.min(360, width - 460)
@@ -1141,13 +1168,15 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
       disc(S, res, m.x, m.y, r, color, alpha)
     }
 
-    S.sprite(bakery.bake(`minimap|${w}|${h}`, res, { left: -1, top: -1, right: w + 1, bottom: h + 1 }, (g) => {
+    // The walls are part of the map's background: a floor's walls never move.
+    S.sprite(bakery.bake(`minimap|${w}|${h}|${arena.width}x${arena.height}|${arena.walls?.length ?? 0}`, res, { left: -1, top: -1, right: w + 1, bottom: h + 1 }, (g) => {
       g.globalAlpha = 0.9
       g.fillStyle = "rgba(10,12,20,0.78)"
       g.strokeStyle = "rgba(255,255,255,0.18)"
       g.lineWidth = 1
       g.beginPath(); g.roundRect(0, 0, w, h, 6)
       g.fill(); g.stroke()
+      paintMinimapWalls(g, arena, k)
     }), x, y)
 
     // What is on screen right now, clipped to the map: only the edges that fall inside it.

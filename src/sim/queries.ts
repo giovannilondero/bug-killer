@@ -73,6 +73,7 @@ export const Moving = Game.Query({
 export const ShotWrite = Game.Query({
   selection: {
     position: Game.Query.read(Position),
+    velocity: Game.Query.read(Velocity),
     body: Game.Query.read(Body),
     shot: Game.Query.write(Shot)
   }
@@ -89,6 +90,7 @@ export const ShotRead = Game.Query({
 export const HostileShotWrite = Game.Query({
   selection: {
     position: Game.Query.read(Position),
+    velocity: Game.Query.read(Velocity),
     body: Game.Query.read(Body),
     shot: Game.Query.write(HostileShot)
   }

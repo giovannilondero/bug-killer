@@ -3,9 +3,9 @@ import { Ops } from "@typeonce/ritmo-math"
 
 import { text } from "../../content/i18n.ts"
 import { arenaOf } from "../../content/arenas.ts"
-import { DT, TOBIA, RESURRECT } from "../constants.ts"
+import { DT, TOBIA, RESURRECT, WALL_MARGIN } from "../constants.ts"
 import { makeBug, makePickup } from "../drafts.ts"
-import { centreOf, clamp } from "../math.ts"
+import { centreOf, clampToArena } from "../math.ts"
 import { BossRead, BugRead, PlayerRead, standing } from "../queries.ts"
 import { Bug, Chat, Fx, Game, Interruptions, Language, LevelSpec, Pickup, Rng, Run } from "../schema.ts"
 
@@ -58,10 +58,7 @@ export const ResurrectionSystem = Game.System(
     // It rises in plain sight, close enough to see but not on top of you.
     const me = standing(queries.player.each())[0] ?? centreOf(arena)
     const angle = random.range(0, Math.PI * 2)
-    const at = {
-      x: clamp(me.x + Ops.cos(angle) * RESURRECT.distance, 60, arena.width - 60),
-      y: clamp(me.y + Ops.sin(angle) * RESURRECT.distance, 60, arena.height - 60)
-    }
+    const at = clampToArena({ x: me.x + Ops.cos(angle) * RESURRECT.distance, y: me.y + Ops.sin(angle) * RESURRECT.distance }, 60, arena)
     // As it was closed: a Story that played as a plain bug comes back as one.
     commands.spawn(makeBug({ ...seed, type: victim.type }, at, { resurrectedBy: client }))
     const index = run.fixed.findIndex((fixed) => fixed.key === victim.key)
@@ -117,10 +114,7 @@ export const TobiaSystem = Game.System(
       const lines = text[resources.language.get()].tobiaLines
       events.chat.emit({ type: "nudge", client: "tobia", text: lines[state.tobiaLine % lines.length] ?? "" })
       const angle = random.range(0, Math.PI * 2)
-      commands.spawn(makePickup("tools", {
-        x: clamp(me.x + Ops.cos(angle) * 110, 40, arena.width - 40),
-        y: clamp(me.y + Ops.sin(angle) * 110, 40, arena.height - 40)
-      }))
+      commands.spawn(makePickup("tools", clampToArena({ x: me.x + Ops.cos(angle) * 110, y: me.y + Ops.sin(angle) * 110 }, WALL_MARGIN, arena)))
       state.tobiaLine += 1
       state.tobiaIn = TOBIA.cooldown
     }

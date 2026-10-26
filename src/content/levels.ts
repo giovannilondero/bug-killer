@@ -1,4 +1,5 @@
-import type { Arena } from "./arenas.ts"
+import { arenaOf, arenas } from "./arenas.ts"
+import type { Arena, ArenaId } from "./arenas.ts"
 import { backlog } from "./backlog.ts"
 import { projectOf } from "./bugs.ts"
 import type { BacklogBug } from "./bugs.ts"
@@ -28,7 +29,7 @@ export interface Boss {
   readonly shotText: string
 }
 
-export const levelIds = ["glacier", "sidequests", "keystone", "foundry", "monorepo", "microservices", "legacy", "production", "endless"] as const
+export const levelIds = ["glacier", "sidequests", "keystone", "foundry", "monorepo", "microservices", "legacy", "production", "endless", "hotdesk", "cubicles"] as const
 export type LevelId = (typeof levelIds)[number]
 
 export interface Level {
@@ -53,7 +54,15 @@ export interface Level {
   readonly endless?: { readonly bosses: ReadonlyArray<Boss>; readonly every: number }
   /** The floor it is played on; the normal arena when left out. */
   readonly arena?: Arena
+  /**
+   * A bonus level, outside the campaign: playable once `after` sprints are
+   * cleared, it draws `tickets` at random from the whole backlog, then its boss.
+   */
+  readonly bonus?: { readonly after: number; readonly tickets: number }
 }
+
+/** How many tickets a level releases before its boss: its backlog, or a bonus level's draw. */
+export const ticketsOf = (level: Level): number => level.bonus?.tickets ?? level.bugs.length
 
 const bugsOf = (projects: ReadonlyArray<string>, bossKey: string): ReadonlyArray<BacklogBug> =>
   backlog.filter((bug) => projects.includes(projectOf(bug.key)) && bug.key !== bossKey)
@@ -246,3 +255,65 @@ export const endlessLevel: Level = {
   bugs: backlog.filter((bug) => !levels.some((l) => l.boss.key === bug.key)),
   endless: { bosses: levels.map((l) => l.boss), every: 6 }
 }
+
+/**
+ * A bonus level draws from what Endless does, every open ticket of every
+ * project, and offers the content of the sprint that unlocks it.
+ */
+const bonus = (spec: Omit<Level, "bugs" | "projects" | "tier" | "bonus"> & { readonly bonus: NonNullable<Level["bonus"]> }): Level => ({
+  ...spec,
+  projects: endlessLevel.projects,
+  bugs: endlessLevel.bugs,
+  tier: levels[spec.bonus.after - 1]?.tier ?? 0
+})
+
+const sprintBoss = (id: LevelId): Boss => levels.find((l) => l.id === id)!.boss
+
+/**
+ * Bonus levels: optional, in arenas of their own, each unlocked by clearing
+ * a sprint and ending with one of the campaign's bosses. One entry each.
+ */
+export const bonusLevels: ReadonlyArray<Level> = [
+  bonus({
+    id: "hotdesk",
+    sprint: "Bonus",
+    name: "Hotdesk",
+    theme: { background: "#14110a", grid: "#2b2412", accent: "#ffb347" },
+    clients: ["samanta", "kevin", "ornella"],
+    clientEvery: 12,
+    waveSize: 5,
+    boss: sprintBoss("keystone"),
+    arena: arenas.small,
+    bonus: { after: 3, tickets: 30 }
+  }),
+  bonus({
+    id: "cubicles",
+    sprint: "Bonus",
+    name: "Cubicles",
+    theme: { background: "#0d1012", grid: "#1d252b", accent: "#9ad1d4" },
+    clients: ["gualtiero", "ugo", "debora"],
+    clientEvery: 12,
+    waveSize: 6,
+    boss: sprintBoss("sidequests"),
+    arena: arenas.walls,
+    bonus: { after: 5, tickets: 30 }
+  })
+]
+
+/**
+ * The arenas Endless can be played in, in the picker's order. Each one past
+ * the normal opens with the bonus level played in it. One entry each.
+ */
+export const endlessArenas: ReadonlyArray<{ readonly id: ArenaId; readonly unlockedBy?: LevelId }> = [
+  { id: "normal" },
+  { id: "small", unlockedBy: "hotdesk" },
+  { id: "walls", unlockedBy: "cubicles" }
+]
+
+export const isEndlessArena = (id: unknown): id is ArenaId => endlessArenas.some((arena) => arena.id === id)
+
+/** Endless, played in the chosen arena. */
+export const endlessIn = (arena: ArenaId): Level => ({ ...endlessLevel, arena: arenas[arena] })
+
+/** Which of Endless's arenas a level is played in; the normal one for anything else. */
+export const endlessArenaOf = (level: Level): ArenaId => endlessArenas.find((entry) => arenas[entry.id] === arenaOf(level))?.id ?? "normal"

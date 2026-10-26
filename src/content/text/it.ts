@@ -161,7 +161,19 @@ export const it: Strings = {
     microservices: "Quaranta servizi, un bug in ognuno. Debora lo vuole più pop entro venerdì.",
     legacy: "Schermo verde, COBOL e un loop che nessuno osa toccare. Più dura che mai.",
     production: "È in produzione, è venerdì e lo stack trabocca. L'ultimo sprint, il più duro.",
-    endless: "Tutti i bug di tutti i progetti, per sempre. Quanto resisti?"
+    endless: "Tutti i bug di tutti i progetti, per sempre. Quanto resisti?",
+    hotdesk: "Niente scrivania fissa, niente spazio per i gomiti. Il boss del 2FA ha prenotato la sala riunioni.",
+    cubicles: "Un open space diviso in cubicoli: i muri fermano i tuoi colpi e i loro. Il boss del crash si riavvia dietro ognuno."
+  },
+  bossConcepts: {
+    dispenser: "Timeout",
+    crash: "Crash all'avvio",
+    twoFactor: "Bypass del 2FA",
+    undefined: "undefined",
+    mergeConflict: "Merge conflict",
+    raceCondition: "Race condition",
+    infiniteLoop: "Loop infinito",
+    stackOverflow: "Stack overflow"
   },
   pickups: {
     hotfix: { label: "Hotfix", hint: "fuoco rapido" },
@@ -256,7 +268,11 @@ export const it: Strings = {
     endless: (every) => `∞ tutti i bug aperti · un boss ogni ${every} ondate`,
     campaign: "Campagna",
     campaignProgress: (cleared, total) => `${cleared}/${total} sprint chiusi`,
-    extras: "Altre modalità"
+    extras: "Altre modalità",
+    bonus: "Livelli bonus",
+    bonusTag: "BONUS",
+    bonusMeta: (tickets) => `${tickets} ticket da tutti i progetti · un boss`,
+    bonusLocked: (sprint) => `🔒 chiudi lo sprint ${sprint}`
   },
   intro: { clientsOnline: "clienti online", start: "Clicca o premi un tasto per iniziare", startTouch: "Tocca per iniziare" },
   touch: {
@@ -351,5 +367,19 @@ export const it: Strings = {
       notHost: "Solo l'host può iniziare.",
       busy: "Troppe run aperte in questo momento: riprova tra poco, o gioca da solo."
     }
+  },
+  hardcore: {
+    name: "Hardcore",
+    rules: "1 di sanità · niente Pizza · si torna in piedi con 1",
+    on: "attivo",
+    off: "spento",
+    hud: "HARDCORE",
+    badge: "Completato in hardcore",
+    run: "☠ Partita hardcore"
+  },
+  arena: {
+    label: "Arena",
+    names: { normal: "Normale", small: "Piccola", walls: "Muri" },
+    locked: (bonus) => `🔒 si apre con ${bonus}`
   }
 }

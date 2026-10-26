@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
+import { arenas } from "../src/content/arenas.ts"
 import type { ServerMessage } from "../src/net/protocol.ts"
 import { makeRooms } from "../src/server/rooms.ts"
 import type { Peer } from "../src/server/rooms.ts"
@@ -211,4 +212,128 @@ test("a Breakpoint press reaches the server and is placed for whoever sent it; m
   assert.deepEqual(view.breakpoints.map((b) => b.owner), [1], "Bob's Breakpoint, seen by Ada too")
   assert.equal(view.players.find((p) => p.slot === 1)!.breakpoints, 1)
   assert.equal(view.players.find((p) => p.slot === 0)!.breakpoints, 2, "Ada keeps hers")
+})
+
+test("the host sets hardcore in the lobby, and it reaches every teammate's run", () => {
+  const rooms = makeRooms({ random: seeded() })
+  const ada = browser()
+  const bob = browser()
+  send(rooms, ada, { t: "create", name: "Ada", level: "glacier", locale: "en", hardcore: true })
+  const code = ada.last("room")!.room.code
+  send(rooms, bob, { t: "join", code, name: "Bob" })
+  assert.equal(bob.last("room")?.room.hardcore, true, "teammates see it in the lobby")
+  send(rooms, ada, { t: "start" })
+  for (const who of [ada, bob]) {
+    const view = who.last("frame")!.view
+    assert.equal(view.hardcore, true)
+    assert.deepEqual(view.players.map((p) => p.maxHp), [1, 1])
+  }
+
+  // Back in the lobby the host may turn it off for the next run; a teammate cannot.
+  for (let i = 0; i < 60 * 120 && ada.last("frame")!.view.run.phase !== "dead"; i++) rooms.advance(1 / 60)
+  assert.equal(ada.last("room")?.room.state, "lobby")
+  send(rooms, bob, { t: "start", hardcore: false })
+  assert.equal(bob.last("error")?.code, "notHost")
+  send(rooms, ada, { t: "start", hardcore: false })
+  assert.equal(bob.last("room")?.room.hardcore, false)
+  assert.equal(bob.last("frame")!.view.hardcore, false)
+  assert.deepEqual(bob.last("frame")!.view.players.map((p) => p.maxHp), [6, 6])
+})
+
+test("a run is not hardcore unless the host says so, and only a real true counts", () => {
+  const rooms = makeRooms({ random: seeded() })
+  const ada = browser()
+  send(rooms, ada, { t: "create", name: "Ada", level: "glacier", locale: "en" })
+  assert.equal(ada.last("room")?.room.hardcore, false)
+  const cara = browser()
+  send(rooms, cara, { t: "create", name: "Cara", level: "glacier", locale: "en", hardcore: "yes" })
+  assert.equal(cara.last("room"), undefined, "a malformed flag is refused")
+  send(rooms, ada, { t: "start", hardcore: 1 })
+  assert.equal(ada.last("started"), undefined, "a malformed flag is refused")
+})
+
+test("the host can pick a bonus level in the lobby, and everyone plays it", () => {
+  const rooms = makeRooms({ random: seeded() })
+  const ada = browser()
+  const bob = browser()
+  send(rooms, ada, { t: "create", name: "Ada", level: "glacier", locale: "en" })
+  send(rooms, bob, { t: "join", code: ada.last("room")!.room.code, name: "Bob" })
+  send(rooms, ada, { t: "start", level: "hotdesk" })
+  assert.equal(ada.last("started")?.level, "hotdesk")
+  assert.equal(bob.last("started")?.level, "hotdesk")
+  assert.equal(bob.last("room")?.room.level, "hotdesk")
+  rooms.advance(1 / 30)
+  const players = bob.last("frame")!.view.players
+  assert.equal(players.length, 2)
+  // The team starts near the middle of the small arena, not of the normal one.
+  for (const p of players) {
+    assert.ok(Math.abs(p.position.x - arenas.small.width / 2) < 200 && Math.abs(p.position.y - arenas.small.height / 2) < 200, JSON.stringify(p.position))
+  }
+})
+
+test("the host picks Endless's arena, and the whole team plays in it", () => {
+  const rooms = makeRooms({ random: seeded() })
+  const ada = browser()
+  const bob = browser()
+  send(rooms, ada, { t: "create", name: "Ada", level: "endless", locale: "en", arena: "small" })
+  const code = ada.last("room")!.room.code
+  send(rooms, bob, { t: "join", code, name: "Bob" })
+  assert.equal(bob.last("room")?.room.arena, "small", "teammates see it in the lobby")
+  send(rooms, bob, { t: "start", arena: "normal" })
+  assert.equal(bob.last("error")?.code, "notHost", "a teammate cannot pick it")
+  send(rooms, ada, { t: "start" })
+  for (const who of [ada, bob]) assert.equal(who.last("started")?.arena, "small")
+  rooms.advance(1 / 30)
+  for (const p of bob.last("frame")!.view.players) {
+    assert.ok(Math.abs(p.position.x - arenas.small.width / 2) < 200 && Math.abs(p.position.y - arenas.small.height / 2) < 200, JSON.stringify(p.position))
+  }
+})
+
+test("an arena Endless doesn't offer is refused, and a sprint is always played in its own", () => {
+  const rooms = makeRooms({ random: seeded() })
+  const cara = browser()
+  send(rooms, cara, { t: "create", name: "Cara", level: "endless", locale: "en", arena: "moon" })
+  assert.equal(cara.last("room"), undefined, "an unknown arena is refused")
+  const ada = browser()
+  send(rooms, ada, { t: "create", name: "Ada", level: "glacier", locale: "en" })
+  assert.equal(ada.last("room")?.room.arena, "normal", "the normal arena unless the host says otherwise")
+  send(rooms, ada, { t: "start", arena: 3 })
+  assert.equal(ada.last("started"), undefined, "a malformed arena is refused")
+  send(rooms, ada, { t: "start", arena: "small" })
+  rooms.advance(1 / 30)
+  // Glacier keeps the normal floor: the team starts in its middle.
+  const [p] = ada.last("frame")!.view.players
+  assert.ok(Math.abs(p!.position.x - arenas.normal.width / 2) < 200, JSON.stringify(p!.position))
+})
+
+test("the host's level, hardcore and Endless arena reach the teammates' lobby as soon as they change", () => {
+  const rooms = makeRooms({ random: seeded() })
+  const ada = browser()
+  const bob = browser()
+  send(rooms, ada, { t: "create", name: "Ada", level: "endless", locale: "en" })
+  const code = ada.last("room")!.room.code
+  send(rooms, bob, { t: "join", code, name: "Bob" })
+  send(rooms, ada, { t: "settings", hardcore: true, arena: "small" })
+  assert.equal(bob.last("room")?.room.hardcore, true, "Bob sees hardcore before the run starts")
+  assert.equal(bob.last("room")?.room.arena, "small")
+  assert.equal(bob.last("room")?.room.state, "lobby")
+  send(rooms, ada, { t: "settings", hardcore: false })
+  assert.equal(bob.last("room")?.room.hardcore, false, "each change goes out")
+  assert.equal(bob.last("room")?.room.arena, "small", "what the host didn't touch stays")
+  send(rooms, ada, { t: "settings", level: "glacier" })
+  assert.equal(bob.last("room")?.room.level, "glacier")
+  send(rooms, ada, { t: "settings", level: "endless" })
+
+  // A teammate cannot change them, and a malformed change is refused.
+  send(rooms, bob, { t: "settings", hardcore: true })
+  assert.equal(bob.last("error")?.code, "notHost")
+  const seen = bob.inbox.length
+  for (const bad of [{ t: "settings", hardcore: "yes" }, { t: "settings", arena: "moon" }, { t: "settings", arena: 3 }, { t: "settings", level: "../etc" }]) send(rooms, ada, bad)
+  assert.equal(bob.inbox.length, seen, "nothing went out")
+  assert.equal(rooms.room(code)?.hardcore, false)
+  assert.equal(rooms.room(code)?.arena, "small")
+
+  // And the run the host starts plays by them.
+  send(rooms, ada, { t: "start" })
+  assert.equal(bob.last("started")?.arena, "small")
 })

@@ -7,11 +7,12 @@ import type { Client, ClientId, MissionKind } from "../../content/clients.ts"
 import { text } from "../../content/i18n.ts"
 import type { Strings } from "../../content/i18n.ts"
 import { arenaOf } from "../../content/arenas.ts"
-import { DT } from "../constants.ts"
+import { DT, WALL_MARGIN } from "../constants.ts"
 import { makeBug, makePickup } from "../drafts.ts"
-import { centreOf, clamp, edgePoint } from "../math.ts"
+import { allowedPickups } from "../hardcore.ts"
+import { centreOf, clampToArena, edgePoint } from "../math.ts"
 import { BugRead, PlayerRead, standing } from "../queries.ts"
-import { Bug, BugFixed, Chat, Fx, Game, Language, LevelSpec, Missions, Pickup, PlayerHurt, Rng, Run, Tiers } from "../schema.ts"
+import { Bug, BugFixed, Chat, Fx, Game, Hardcore, Language, LevelSpec, Missions, Pickup, PlayerHurt, Rng, Run, Tiers } from "../schema.ts"
 import type { BugValue, MissionValue, PickupKind } from "../schema.ts"
 import { tierOf, unlocked } from "../tiers.ts"
 import { Ops } from "@typeonce/ritmo-math"
@@ -97,6 +98,7 @@ export const MissionDirectorSystem = Game.System(
       level: Game.System.readResource(LevelSpec),
       language: Game.System.readResource(Language),
       tiers: Game.System.readResource(Tiers),
+      hardcore: Game.System.readResource(Hardcore),
       missions: Game.System.writeResource(Missions),
       run: Game.System.writeResource(Run),
       rng: Game.System.writeResource(Rng)
@@ -200,12 +202,9 @@ export const MissionDirectorSystem = Game.System(
         run.score += MISSION_POINTS
         const line = random.pick(strings.outcomes[mission.client].success) ?? "ok"
         events.chat.emit({ type: "outcome", client: mission.client, text: say(mission.client, line), success: true })
-        const reward = random.pick(unlocked(rewards, tierOf(level, run.wave), resources.tiers.get()))
+        const reward = random.pick(allowedPickups(unlocked(rewards, tierOf(level, run.wave), resources.tiers.get()), resources.hardcore.get()))
         const angle = random.range(0, Math.PI * 2)
-        if (reward) commands.spawn(makePickup(reward, {
-          x: clamp(playerAt.x + Ops.cos(angle) * 90, 40, arena.width - 40),
-          y: clamp(playerAt.y + Ops.sin(angle) * 90, 40, arena.height - 40)
-        }))
+        if (reward) commands.spawn(makePickup(reward, clampToArena({ x: playerAt.x + Ops.cos(angle) * 90, y: playerAt.y + Ops.sin(angle) * 90 }, WALL_MARGIN, arena)))
         state.active = null
         state.nextIn = level.clientEvery
       } else {

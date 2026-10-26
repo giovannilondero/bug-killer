@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { test } from "node:test"
 
 import { locales, text } from "../src/content/i18n.ts"
-import { endlessLevel, levels } from "../src/content/levels.ts"
+import { endlessArenas, endlessIn, endlessLevel, levels } from "../src/content/levels.ts"
 import type { Level } from "../src/content/levels.ts"
 import { idleInput } from "../src/sim/simulation.ts"
 import type { View } from "../src/sim/simulation.ts"
@@ -85,9 +85,10 @@ test("Stack overflow's new strings exist in every language", () => {
   }
 })
 
-test("Endless rotates all 8 bosses, Stack overflow last", () => {
+test("Endless rotates all 8 bosses, Stack overflow last, in every arena", () => {
   assert.equal(endlessLevel.endless!.bosses.length, 8)
   assert.equal(endlessLevel.endless!.bosses[7]!.pattern, "stackOverflow")
+  for (const { id } of endlessArenas) assert.deepEqual(endlessIn(id).endless!.bosses, levels.map((level) => level.boss), id)
   assert.ok(endlessLevel.bugs.some((bug) => bug.key.startsWith("PROD-")))
 })
 

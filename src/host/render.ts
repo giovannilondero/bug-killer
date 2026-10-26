@@ -1,4 +1,5 @@
 import { arenaOf } from "../content/arenas.ts"
+import { ticketsOf } from "../content/levels.ts"
 import type { Arena } from "../content/arenas.ts"
 import { bugKinds } from "../content/bugs.ts"
 import { clients } from "../content/clients.ts"
@@ -12,7 +13,7 @@ import { WEAPONS } from "../sim/weapons.ts"
 import type { FxValue, Vec } from "../sim/schema.ts"
 import type { View } from "../sim/simulation.ts"
 import { formatNumber, t } from "./language.ts"
-import { bossHealth, conflictMarkerColors, conflictMarkers, floorKey, fuseBlink, fuseProgress, MONO, paintBreakpoint, paintBug, paintFloor, paintFuseRing, paintHeart, paintHostile, paintLabel, paintNest, paintPickup, paintPing, paintPlayer, paintCircuit, paintRestartGhost, paintRocket, paintRocketTarget, paintStack, paintTooltip, pickupIcons, pickupInfo, roundRect, SANS, shade, shieldLabel, tooltipHeight, TOOLTIP_WIDTH, truncate } from "./paint.ts"
+import { bossHealth, conflictMarkerColors, conflictMarkers, flameColor, floorKey, fuseBlink, fuseProgress, MONO, paintBreakpoint, paintBug, paintFlame, paintFloor, paintFuseRing, paintHeart, paintHostile, paintLabel, paintNest, paintPickup, paintPing, paintPlayer, paintCircuit, paintRestartGhost, paintRocket, paintRocketTarget, paintMinimapWalls, paintStack, paintTooltip, pickupIcons, pickupInfo, roundRect, SANS, shade, shieldLabel, tooltipHeight, TOOLTIP_WIDTH, truncate } from "./paint.ts"
 import type { BugLook } from "./paint.ts"
 import { touchMode } from "./touch.ts"
 
@@ -51,6 +52,8 @@ export const makeRenderer = (canvas: HTMLCanvasElement) => {
   const ctx = canvas.getContext("2d")!
   const camera: Camera = { x: 0, y: 0, scale: 1 }
   const particles: Array<Particle> = []
+  /** Flame war's puffs: a particle whose colour comes from its age. */
+  const flames: Array<Omit<Particle, "color">> = []
   const floaters: Array<Floater> = []
   let shake = 0
   let flash = 0
@@ -192,14 +195,13 @@ export const makeRenderer = (canvas: HTMLCanvasElement) => {
         floaters.push({ x: event.x, y: event.y - 30, life: 1.3, max: 1.3, text: t().hud.breakpointHit, sub: "", color: "#9be7ff", big: false })
         break
       case "flame":
-        // A puff of fire fanning out along the cone, yellow at the core, red at the edges.
-        for (let i = 0; i < 8; i++) {
+        // A gust of fire filling the cone: each puff leaves the nozzle small and white-hot, then swells and cools to red.
+        for (let i = 0; i < 14; i++) {
           const a = event.angle + (Math.random() * 2 - 1) * event.spread
-          // Particles slow down by 8% a frame, so they travel about a fifth of their speed.
-          const s = (event.range / 0.21) * (0.35 + Math.random() * 0.65)
-          const life = 0.25 + Math.random() * 0.15
-          const color = ["#fff3a0", "#ffd84a", "#ff9440", "#ff4d2d"][Math.floor(Math.random() * 4)]!
-          particles.push({ x: event.x, y: event.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life, max: life, color, size: 5 + Math.random() * 5 })
+          // Puffs slow down by 8% a frame, so they travel about a fifth of their speed.
+          const s = (event.range / 0.21) * (0.3 + Math.random() * 0.7)
+          const life = 0.3 + Math.random() * 0.2
+          flames.push({ x: event.x, y: event.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life, max: life, size: 5 + Math.random() * 4 })
         }
         break
       case "explosion":
@@ -748,6 +750,27 @@ export const makeRenderer = (canvas: HTMLCanvasElement) => {
       ctx.fillStyle = p.color
       ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size)
     }
+    // Flame war's fire, added onto the floor so the thick of the cone burns brightest.
+    ctx.globalCompositeOperation = "lighter"
+    for (let i = flames.length - 1; i >= 0; i--) {
+      const f = flames[i]!
+      f.life -= dt
+      if (f.life <= 0) {
+        flames.splice(i, 1)
+        continue
+      }
+      f.x += f.vx * dt
+      f.y += f.vy * dt
+      f.vx *= 0.92
+      f.vy *= 0.92
+      const k = 1 - f.life / f.max
+      ctx.globalAlpha = 0.85 * (1 - k * k)
+      ctx.save()
+      ctx.translate(f.x, f.y)
+      paintFlame(ctx, f.size * (1 + k * 2.5), flameColor(k))
+      ctx.restore()
+    }
+    ctx.globalCompositeOperation = "source-over"
     ctx.globalAlpha = 1
     for (let i = trail.length - 1; i >= 0; i--) {
       trail[i]!.life -= dt
@@ -906,6 +929,12 @@ export const makeRenderer = (canvas: HTMLCanvasElement) => {
       for (let i = 0; i < player.maxHp; i++) {
         paintHeart(ctx, 20 + i * 24, 58, i < player.hp ? "#ff4d6d" : "rgba(255,255,255,0.15)")
       }
+      if (view.hardcore) {
+        // Hardcore: said right of the single heart, in its colour.
+        ctx.font = `bold 11px ${MONO}`
+        ctx.fillStyle = "#ff4d6d"
+        ctx.fillText(`☠ ${t().hardcore.hud}`, 26 + player.maxHp * 24, 71)
+      }
       ctx.font = `11px ${MONO}`
       ctx.fillStyle = "#9aa4b8"
       ctx.textAlign = "left"
@@ -1000,7 +1029,7 @@ export const makeRenderer = (canvas: HTMLCanvasElement) => {
       ctx.fillStyle = accent
       roundRect(ctx, x, 38, w * Math.min(1, (every - bossIn) / every), 8, 4); ctx.fill()
     } else if (run.phase === "waves") {
-      const total = view.level.bugs.length
+      const total = ticketsOf(view.level)
       const released = Math.min(total, run.nextBug)
       const open = total - released + view.bugs.length
       const w = Math.min(360, width - 460)
@@ -1053,6 +1082,10 @@ export const makeRenderer = (canvas: HTMLCanvasElement) => {
     roundRect(ctx, x, y, w, h, 6)
     ctx.fill(); ctx.stroke()
     ctx.clip()
+    ctx.save()
+    ctx.translate(x, y)
+    paintMinimapWalls(ctx, arena, k)
+    ctx.restore()
 
     // What is on screen right now.
     ctx.strokeStyle = "rgba(255,255,255,0.35)"

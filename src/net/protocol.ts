@@ -5,7 +5,9 @@
  * frames it sends back. Everything here is plain JSON, and everything a
  * browser sends is checked before the server uses it.
  */
+import type { ArenaId } from "../content/arenas.ts"
 import type { Locale } from "../content/i18n.ts"
+import { isEndlessArena } from "../content/levels.ts"
 import type { LevelId } from "../content/levels.ts"
 import type { ChatValue, FxValue, InputValue } from "../sim/schema.ts"
 import type { View } from "../sim/simulation.ts"
@@ -36,6 +38,10 @@ export interface RoomInfo {
   readonly code: string
   readonly state: RoomState
   readonly level: LevelId
+  /** The host's choice for the next run: one sanity and no Pizza, for the whole team. */
+  readonly hardcore: boolean
+  /** Endless's arena, the host's pick: only an Endless run is played in it. */
+  readonly arena: ArenaId
   readonly host: number
   readonly members: ReadonlyArray<Member>
 }
@@ -47,16 +53,18 @@ export type NetView = Omit<View, "level">
 export type ErrorCode = "notFound" | "full" | "started" | "nameTaken" | "badName" | "badLevel" | "notHost" | "busy"
 
 export type ClientMessage =
-  | { readonly t: "create"; readonly name: string; readonly level: LevelId; readonly locale: Locale }
+  | { readonly t: "create"; readonly name: string; readonly level: LevelId; readonly locale: Locale; readonly hardcore?: boolean; readonly arena?: ArenaId }
   | { readonly t: "join"; readonly code: string; readonly name: string }
-  | { readonly t: "start"; readonly level?: LevelId }
+  | { readonly t: "start"; readonly level?: LevelId; readonly hardcore?: boolean; readonly arena?: ArenaId }
+  /** The host changing the level, hardcore or Endless's arena in the lobby: every teammate sees it before the run. */
+  | { readonly t: "settings"; readonly level?: LevelId; readonly hardcore?: boolean; readonly arena?: ArenaId }
   | { readonly t: "input"; readonly input: InputValue }
   | { readonly t: "leave" }
   | { readonly t: "ping" }
 
 export type ServerMessage =
   | { readonly t: "room"; readonly room: RoomInfo; readonly you: number }
-  | { readonly t: "started"; readonly level: LevelId; readonly locale: Locale; readonly you: number }
+  | { readonly t: "started"; readonly level: LevelId; readonly arena: ArenaId; readonly locale: Locale; readonly you: number }
   | { readonly t: "frame"; readonly view: NetView; readonly fx: ReadonlyArray<FxValue>; readonly chat: ReadonlyArray<ChatValue> }
   | { readonly t: "error"; readonly code: ErrorCode }
 
@@ -73,6 +81,12 @@ const isObject = (value: unknown): value is Record<string, unknown> => typeof va
 
 const finite = (value: unknown, limit: number): number =>
   typeof value === "number" && Number.isFinite(value) ? Math.max(-limit, Math.min(limit, value)) : 0
+
+/** An optional flag: absent, or a real boolean. */
+const isFlag = (value: unknown): value is boolean | undefined => value === undefined || typeof value === "boolean"
+
+/** An optional Endless arena: absent, or one Endless offers. */
+const isArena = (value: unknown): value is ArenaId | undefined => value === undefined || isEndlessArena(value)
 
 const vec = (value: unknown, limit: number) => (isObject(value) ? { x: finite(value.x, limit), y: finite(value.y, limit) } : { x: 0, y: 0 })
 
@@ -100,14 +114,34 @@ export const readClientMessage = (raw: string, isLevel: (id: unknown) => id is L
   if (!isObject(data)) return null
   switch (data.t) {
     case "create":
-      if (typeof data.name !== "string" || !isLevel(data.level) || !isLocale(data.locale)) return null
-      return { t: "create", name: data.name, level: data.level, locale: data.locale }
+      if (typeof data.name !== "string" || !isLevel(data.level) || !isLocale(data.locale) || !isFlag(data.hardcore) || !isArena(data.arena)) return null
+      return {
+        t: "create",
+        name: data.name,
+        level: data.level,
+        locale: data.locale,
+        ...(data.hardcore === undefined ? {} : { hardcore: data.hardcore }),
+        ...(data.arena === undefined ? {} : { arena: data.arena })
+      }
     case "join":
       if (typeof data.name !== "string" || typeof data.code !== "string") return null
       return { t: "join", name: data.name, code: data.code.trim().toUpperCase() }
     case "start":
-      if (data.level !== undefined && !isLevel(data.level)) return null
-      return data.level === undefined ? { t: "start" } : { t: "start", level: data.level }
+      if ((data.level !== undefined && !isLevel(data.level)) || !isFlag(data.hardcore) || !isArena(data.arena)) return null
+      return {
+        t: "start",
+        ...(data.level === undefined ? {} : { level: data.level }),
+        ...(data.hardcore === undefined ? {} : { hardcore: data.hardcore }),
+        ...(data.arena === undefined ? {} : { arena: data.arena })
+      }
+    case "settings":
+      if ((data.level !== undefined && !isLevel(data.level)) || !isFlag(data.hardcore) || !isArena(data.arena)) return null
+      return {
+        t: "settings",
+        ...(data.level === undefined ? {} : { level: data.level }),
+        ...(data.hardcore === undefined ? {} : { hardcore: data.hardcore }),
+        ...(data.arena === undefined ? {} : { arena: data.arena })
+      }
     case "input": {
       const input = readInput(data.input)
       return input && { t: "input", input }

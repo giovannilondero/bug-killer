@@ -1,12 +1,14 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { endlessLevel, levels } from "../src/content/levels.ts"
+import { arenas } from "../src/content/arenas.ts"
+import { bonusLevels, endlessArenaOf, endlessArenas, endlessIn, endlessLevel, levels, ticketsOf } from "../src/content/levels.ts"
+import { projectOf } from "../src/content/bugs.ts"
 import type { Locale } from "../src/content/i18n.ts"
 import type { Level } from "../src/content/levels.ts"
 import { createSimulation, idleInput } from "../src/sim/simulation.ts"
 import type { View } from "../src/sim/simulation.ts"
-import { makeBoss, makeBug, makePickup } from "../src/sim/drafts.ts"
+import { makeBoss, makeBug, makePickup, spawnBoss } from "../src/sim/drafts.ts"
 import type { BugSeed } from "../src/sim/drafts.ts"
 import { contentTiers, isUnlocked, tierOf } from "../src/sim/tiers.ts"
 import { hasStatus } from "../src/sim/statuses.ts"
@@ -175,11 +177,39 @@ test("the same seed and input replay the same run", () => {
 })
 
 test("every level can be finished by the autopilot or kills it fairly", () => {
-  for (const level of levels) {
+  for (const level of [...levels, ...bonusLevels]) {
     const { view } = play(level, 420)
     assert.ok(view.run.phase === "cleared" || view.run.phase === "dead" || view.run.phase === "boss", `${level.id} ends in ${view.run.phase} after ${view.run.time.toFixed(0)}s, ${view.run.fixed.length} fixed`)
-    console.log(`${level.id}: ${view.run.phase} at ${view.run.time.toFixed(0)}s, fixed ${view.run.fixed.length}/${level.bugs.length + 1}, missions ${view.run.missionsWon}/${view.run.missionsWon + view.run.missionsLost}, hits ${view.run.hitsTaken}`)
+    console.log(`${level.id}: ${view.run.phase} at ${view.run.time.toFixed(0)}s, fixed ${view.run.fixed.length}/${ticketsOf(level) + 1}, missions ${view.run.missionsWon}/${view.run.missionsWon + view.run.missionsLost}, hits ${view.run.hitsTaken}`)
   }
+})
+
+test("Hotdesk draws tickets from the whole backlog in a small arena, then calls the 2FA boss", () => {
+  const hotdesk = bonusLevels.find((level) => level.id === "hotdesk")!
+  // A short draw: the rules, not the stamina.
+  const quick = { ...hotdesk, bonus: { ...hotdesk.bonus!, tickets: 12 } }
+  let current: View | null = null
+  let frame = 0
+  let widest = { x: 0, y: 0 }
+  const made = createSimulation({ level: quick, seed: 11, locale: "en", input: autopilot(() => current, () => frame), presentation: { fx: () => {}, chat: () => {} } })
+  if (!made.ok) throw new Error(JSON.stringify(made.error))
+  current = made.value.view()
+  for (; frame < 300 * 60 && current.run.phase === "waves"; frame++) {
+    assert.ok(made.value.step().ok)
+    current = made.value.view()
+    for (const thing of [...current.players, ...current.bugs, ...current.bosses]) {
+      widest = { x: Math.max(widest.x, thing.position.x), y: Math.max(widest.y, thing.position.y) }
+    }
+  }
+  const view = current
+  assert.equal(view.run.phase, "boss", `${view.run.phase} at ${view.run.time.toFixed(0)}s`)
+  assert.deepEqual(view.bosses.map((b) => b.key), ["KEY-3242"])
+  assert.ok(widest.x <= arenas.small.width && widest.y <= arenas.small.height, `reached ${JSON.stringify(widest)}`)
+  assert.ok(arenas.small.width < arenas.normal.width && arenas.small.height < arenas.normal.height)
+  const drawn = view.run.fixed.filter((f) => !/-REG|^(ESC|CRASH|NULL)-/.test(f.key))
+  assert.equal(drawn.length, 12, drawn.map((f) => f.key).join(" "))
+  assert.equal(new Set(drawn.map((f) => f.key)).size, drawn.length, "no ticket is drawn twice")
+  assert.ok(new Set(drawn.map((f) => projectOf(f.key))).size > 1, "tickets come from more than one project")
 })
 
 test("a client calls on Meet or Slack, and answering pays a bonus", () => {
@@ -208,6 +238,30 @@ test("endless never runs out: after a boss the next round starts, tougher", () =
   assert.ok(view.run.wave > 1)
 })
 
+
+test("Endless runs in the chosen arena: bugs come in at its edges and nothing leaves it", () => {
+  for (const { id } of endlessArenas) {
+    const arena = arenas[id]
+    let current: View | null = null
+    let frame = 0
+    let widest = { x: 0, y: 0 }
+    const made = createSimulation({ level: endlessIn(id), seed: 5, locale: "en", input: autopilot(() => current, () => frame), presentation: { fx: () => {}, chat: () => {} } })
+    if (!made.ok) throw new Error(JSON.stringify(made.error))
+    current = made.value.view()
+    for (; frame < 90 * 60 && current.run.phase !== "dead"; frame++) {
+      assert.ok(made.value.step().ok)
+      current = made.value.view()
+      for (const thing of [...current.players, ...current.bugs, ...current.bosses]) {
+        widest = { x: Math.max(widest.x, thing.position.x), y: Math.max(widest.y, thing.position.y) }
+      }
+    }
+    assert.equal(endlessArenaOf(current.level), id)
+    assert.ok(current.level.endless, "still Endless")
+    assert.ok(widest.x <= arena.width && widest.y <= arena.height, `${id}: reached ${JSON.stringify(widest)}`)
+    // Spawned at the arena's edges: something got close to its far side.
+    assert.ok(widest.x > arena.width - 120 || widest.y > arena.height - 120, `${id}: only reached ${JSON.stringify(widest)}`)
+  }
+})
 
 // --- Playing together ---------------------------------------------------
 
@@ -872,22 +926,21 @@ test("Memory leak: when a poisoned bug dies, the leak passes to the nearest bug"
 })
 
 test("statuses hurt a boss in a reduced form: burn and poison deal half", () => {
-  /** Health a boss loses in one second carrying `status`, nobody firing. */
+  /** Health a boss loses in one second carrying `status`, nobody firing: it arrives already afflicted, its boot shield down. */
   const lost = (status: StatusValue) => {
     const made = createSimulation({ level: levels[0]!, seed: 4, input: { snapshot: () => idleInput }, presentation: { fx: () => undefined, chat: () => undefined } })
     if (!made.ok) throw new Error(JSON.stringify(made.error))
     const sim = made.value
     const me = sim.view().player!.position
+    const boss = levels[0]!.boss
     const Spawn = Game.System("Test/Spawn", { commands: Game.System.commands(Game.System.spawns(Boss)) }, ({ commands }) => {
-      commands.spawn(makeBoss({ ...levels[0]!.boss, key: "BOSS-1" }, { x: me.x + 400, y: me.y - 300 }))
+      commands.spawn(spawnBoss({
+        key: "BOSS-1", title: boss.title, pattern: boss.pattern, shotText: boss.shotText, color: boss.color,
+        hp: boss.hp, maxHp: boss.hp, phase: 1, shield: 0, timer: 1.5, volley: 0, hitFlash: 0, age: 0,
+        statuses: [status], side: null, thread: null, revive: 0, course: 0, frames: 0
+      }, { x: me.x + 400, y: me.y - 300 }, boss.radius))
     })
     assert.ok(sim.runtime.tick(Game.Schedule(Spawn, Game.Schedule.applyDeferred())).ok)
-    // Past the boss's boot shield, which shrugs everything off.
-    for (let frame = 0; frame < 2.5 * 60; frame++) assert.ok(sim.step().ok)
-    const Inflict = Game.System("Test/Inflict", { queries: { bosses: Game.Query({ selection: { boss: Game.Query.write(Boss) } }) } }, ({ queries }) => {
-      for (const match of queries.bosses.each()) match.data.boss.update((boss) => ({ ...boss, statuses: [status] }))
-    })
-    assert.ok(sim.runtime.tick(Game.Schedule(Inflict)).ok)
     const before = sim.view().bosses[0]!.hp
     for (let frame = 0; frame < 60; frame++) assert.ok(sim.step().ok)
     return before - sim.view().bosses[0]!.hp
@@ -1262,6 +1315,10 @@ test("Breakpoint: two charges from sprint 3 (Keystone) on, none before, and a dr
   assert.ok(sim.runtime.tick(Game.Schedule(Drop, Game.Schedule.applyDeferred())).ok)
   for (let frame = 0; frame < 10; frame++) assert.ok(sim.step().ok)
   assert.equal(sim.view().breakpoints.length, 3, "the dropped charge is picked up and placed too")
+
+  // A bonus level plays at the tier of the sprint that unlocks it: Hotdesk follows Keystone.
+  const hotdesk = bonusLevels.find((level) => level.id === "hotdesk")!
+  assert.equal(pressing(hotdesk).view().player!.breakpoints, 2, "Hotdesk starts with two")
 })
 
 test("Breakpoint: in Endless every developer gets the sprint's two once the tier brings them in", () => {
@@ -1280,4 +1337,88 @@ test("Breakpoint: the autopilot sets them down when bugs close in, and they go o
   const { fx } = play(levels[2]!, 90)
   assert.ok(fx.some((e) => e.type === "breakpointSet"), "it placed one")
   assert.ok(fx.some((e) => e.type === "breakpoint"), "and a bug walked onto it")
+})
+
+// --- Hardcore ----------------------------------------------------------------
+
+/** A hardcore (or not) run where `shielded` seats cannot be hurt, watching every frame. */
+const hardcoreRun = (level: Level, seconds: number, pilots: ReadonlyArray<Pilot>, options: { hardcore: boolean; shielded: ReadonlyArray<number>; seed?: number }, onFrame: (v: View) => void) => {
+  let current: View | null = null
+  let frame = 0
+  const seats = pilots.map((pilot, slot) => pilot(() => seat(current, slot), () => frame))
+  const made = createSimulation({
+    level,
+    seed: options.seed ?? 7,
+    locale: "en",
+    hardcore: options.hardcore,
+    party: crew(pilots.map((_, slot) => `dev${slot}`)),
+    inputs: { snapshot: () => seats.map((s) => s.snapshot()) },
+    presentation: { fx: () => undefined, chat: () => undefined }
+  })
+  if (!made.ok) throw new Error(JSON.stringify(made.error))
+  const sim = made.value
+  // Shielded seats are kept in Green tests: one dropped at their feet whenever the last is about to run out.
+  const shield = () => {
+    const spots = current!.players.filter((p) => options.shielded.includes(p.slot) && p.hp > 0 && p.buffs.unitTest < 1).map((p) => p.position)
+    if (spots.length === 0) return
+    const Drop = Game.System("Test/Drop", { commands: Game.System.commands(Game.System.spawns(Pickup)) }, ({ commands }) => {
+      for (const at of spots) commands.spawn(makePickup("unitTest", at))
+    })
+    assert.ok(sim.runtime.tick(Game.Schedule(Drop, Game.Schedule.applyDeferred())).ok)
+  }
+  current = sim.view()
+  for (; frame < seconds * 60; frame++) {
+    shield()
+    assert.ok(sim.step().ok)
+    current = sim.view()
+    onFrame(current)
+    if (current.run.phase === "cleared" || current.run.phase === "dead") break
+  }
+  return sim.view()
+}
+
+test("in hardcore a developer has one sanity, and one hit ends a solo run", () => {
+  for (const level of [levels[0]!, endlessLevel]) {
+    const view = hardcoreRun(level, 120, [idlePilot], { hardcore: true, shielded: [] }, () => undefined)
+    assert.equal(view.hardcore, true)
+    assert.equal(view.players[0]!.maxHp, 1)
+    assert.equal(view.run.phase, "dead", `${level.id} ends`)
+    assert.equal(view.run.hitsTaken, 1, `${level.id}: one hit is enough`)
+  }
+  const normal = hardcoreRun(levels[0]!, 5, [idlePilot], { hardcore: false, shielded: [] }, () => undefined)
+  assert.equal(normal.hardcore, false)
+  assert.equal(normal.players[0]!.maxHp, 6)
+})
+
+test("Pizza never drops in hardcore, from bugs, missions or calls; the other power-ups still do", () => {
+  const seen = (hardcore: boolean) => {
+    const kinds = new Set<string>()
+    for (const seed of [1, 2, 3]) {
+      hardcoreRun(levels[1]!, 180, [answeringPilot], { hardcore, shielded: [0], seed }, (v) => {
+        for (const pickup of v.pickups) kinds.add(pickup.kind)
+      })
+    }
+    return kinds
+  }
+  const normal = seen(false)
+  assert.ok(normal.has("pizza"), `the same runs drop Pizza without hardcore: ${[...normal].join(", ")}`)
+  const hardcore = seen(true)
+  assert.equal(hardcore.has("pizza"), false)
+  // Green tests are left out: the shield drops those itself.
+  assert.ok([...hardcore].some((kind) => kind !== "unitTest"), `the others still drop: ${[...hardcore].join(", ")}`)
+})
+
+test("in hardcore a revived teammate comes back with 1 sanity", () => {
+  const revivedWith: Array<number> = []
+  let down = false
+  hardcoreRun(levels[0]!, 120, [rescuer(0), idlePilot], { hardcore: true, shielded: [0] }, (v) => {
+    const hp = v.players[1]!.hp
+    if (hp <= 0) down = true
+    else if (down) {
+      revivedWith.push(hp)
+      down = false
+    }
+  })
+  assert.ok(revivedWith.length > 0, "the idle developer goes down and is revived")
+  assert.deepEqual([...new Set(revivedWith)], [1])
 })

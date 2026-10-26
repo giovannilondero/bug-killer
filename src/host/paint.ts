@@ -81,12 +81,34 @@ export const paintFloor = (level: Level): HTMLCanvasElement => {
   }
   g.globalAlpha = 1
   if (level.theme.crt) paintScanlines(g, arena, level.theme.accent)
+  paintWalls(g, arena, level.theme.accent)
   g.strokeStyle = level.theme.accent
   g.lineWidth = 4
   g.shadowColor = level.theme.accent
   g.shadowBlur = 20
   g.strokeRect(2, 2, arena.width - 4, arena.height - 4)
   return c
+}
+
+/** Cubicle partitions: a shadow on the floor, a dark panel, and a lit top edge in the level's accent. */
+const paintWalls = (g: CanvasRenderingContext2D, arena: Arena, accent: string) => {
+  for (const wall of arena.walls ?? []) {
+    g.fillStyle = "rgba(0,0,0,0.45)"
+    g.fillRect(wall.x + 6, wall.y + 8, wall.width, wall.height)
+    g.fillStyle = shade(accent, -0.78)
+    g.fillRect(wall.x, wall.y, wall.width, wall.height)
+    g.strokeStyle = shade(accent, -0.3)
+    g.lineWidth = 2
+    g.strokeRect(wall.x + 1, wall.y + 1, wall.width - 2, wall.height - 2)
+    g.fillStyle = shade(accent, -0.55)
+    g.fillRect(wall.x + 6, wall.y + 6, wall.width - 12, wall.height - 12)
+  }
+}
+
+/** The walls on the minimap, `k` map pixels per world unit, from the map's top-left corner. */
+export const paintMinimapWalls = (g: CanvasRenderingContext2D, arena: Arena, k: number) => {
+  g.fillStyle = "rgba(200,215,230,0.55)"
+  for (const wall of arena.walls ?? []) g.fillRect(wall.x * k, wall.y * k, Math.max(1, wall.width * k), Math.max(1, wall.height * k))
 }
 
 /** An old terminal's screen over the floor: phosphor glowing from the middle, and scanlines. */
@@ -106,7 +128,7 @@ const paintScanlines = (g: CanvasRenderingContext2D, arena: Arena, phosphor: str
 /** Which floor a level has, in its arena and the current language, to know when to repaint it. */
 export const floorKey = (level: Level) => {
   const arena = arenaOf(level)
-  return `${level.id}:${arena.width}x${arena.height}:${locale()}`
+  return `${level.id}:${arena.width}x${arena.height}:${arena.walls?.length ?? 0}:${locale()}`
 }
 
 export interface BugLook {
@@ -142,6 +164,22 @@ export const paintFuseRing = (ctx: CanvasRenderingContext2D, radius: number) => 
   ctx.setLineDash([10, 8])
   ctx.beginPath(); ctx.arc(0, 0, radius, 0, Math.PI * 2); ctx.stroke()
   ctx.setLineDash([])
+}
+
+/** Flame war's fire as a puff burns out: white-hot, yellow, orange, red, then smoke. */
+export const flameColors = ["#fff6c8", "#ffd84a", "#ff9440", "#ff4d2d", "#5a2a20"] as const
+
+/** The colour of a puff of flame `k` of the way through its life, from 0 to 1. */
+export const flameColor = (k: number): string => flameColors[Math.min(flameColors.length - 1, Math.floor(k * flameColors.length))]!
+
+/** A puff of flame centred on the origin: solid at the core, fading to nothing at radius `r`. */
+export const paintFlame = (ctx: CanvasRenderingContext2D, r: number, color: string) => {
+  const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, r)
+  glow.addColorStop(0, color)
+  glow.addColorStop(0.35, color)
+  glow.addColorStop(1, `${color}00`)
+  ctx.fillStyle = glow
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill()
 }
 
 /** A bug facing +x, centred on the origin: legs, antennae, glowing body, spots, eyes, armour. */

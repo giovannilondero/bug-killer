@@ -3,9 +3,10 @@ import * as Random from "@typeonce/ritmo-math/Random"
 import { arenaOf } from "../../content/arenas.ts"
 import { bugKinds } from "../../content/bugs.ts"
 import { text } from "../../content/i18n.ts"
-import { BOMB_RADIUS, BREAKPOINT, BUFF_SECONDS, COMBO_WINDOW, DEPLOY, DT, PLAYER, ROCKET, STORY_SUBTASKS, ticketScales } from "../constants.ts"
+import { BOMB_RADIUS, BREAKPOINT, BUFF_SECONDS, COMBO_WINDOW, DEPLOY, DT, PICKUP_RADIUS, PLAYER, ROCKET, STORY_SUBTASKS, ticketScales } from "../constants.ts"
 import { bossRules } from "../bosses.ts"
-import { makeBug, makePickup, makeTurret, spawnBoss, subtaskOf } from "../drafts.ts"
+import { bugRadius, makeBug, makePickup, makeTurret, spawnBoss, subtaskOf } from "../drafts.ts"
+import { allowedPickups } from "../hardcore.ts"
 import { clampToArena, distanceSquared, nearest, overlaps } from "../math.ts"
 import { BossWrite, BugWrite, HostileShotWrite, PickupWrite, PlayerWrite, ShotWrite } from "../queries.ts"
 import {
@@ -18,6 +19,7 @@ import {
   FlameBurst,
   Fx,
   Game,
+  Hardcore,
   HostileShot,
   Language,
   LevelSpec,
@@ -36,7 +38,9 @@ import {
 import type { BugValue, PickupKind, PlayerValue, RunValue, Vec } from "../schema.ts"
 import { applyStatus, catchStatus, hasStatus, inflictedBy, spreads, statusKinds, tickStatuses } from "../statuses.ts"
 import type { StatusKind, StatusValue } from "../statuses.ts"
+import type { BugSeed } from "../drafts.ts"
 import { isUnlocked, tierOf } from "../tiers.ts"
+import { blocked, inWall } from "../walls.ts"
 import { FLAME, inCone, isWeapon, pickUp } from "../weapons.ts"
 import { Ops } from "@typeonce/ritmo-math"
 
@@ -96,7 +100,8 @@ export const CombatSystem = Game.System(
       rng: Game.System.writeResource(Rng),
       language: Game.System.readResource(Language),
       level: Game.System.readResource(LevelSpec),
-      tiers: Game.System.readResource(Tiers)
+      tiers: Game.System.readResource(Tiers),
+      hardcore: Game.System.readResource(Hardcore)
     },
     events: {
       bombs: Game.System.readEvent(BombBlast),
@@ -115,6 +120,7 @@ export const CombatSystem = Game.System(
     const random = Random.draw(resources.rng)
     const strings = text[resources.language.get()]
     const arena = arenaOf(resources.level.get())
+    const drops = allowedPickups(pickupKinds, resources.hardcore.get())
     const gone = new Set<number>()
     // Where Deploying bugs went off this tick: developers in the radius lose sanity below.
     const blasts: Array<Vec> = []
@@ -157,7 +163,7 @@ export const CombatSystem = Game.System(
 
       if (bug.trait === "reopens" && !bug.reopened && random.next() < REOPEN_CHANCE) {
         // QA says no: the ticket comes straight back.
-        commands.spawn(makeBug({ ...bug, status: "Open" }, at, { reopened: true }))
+        commands.spawn(makeBug({ ...bug, status: "Open" }, clampToArena(at, bugRadius(bug), arena), { reopened: true }))
         events.fx.emit({ type: "reopen", x: at.x, y: at.y, key: bug.key })
         events.fx.emit({ type: "kill", x: at.x, y: at.y, color: kind.color, key: bug.key, summary: "", points, boss: false })
         return
@@ -176,28 +182,26 @@ export const CombatSystem = Game.System(
         // A Story is closed by closing its sub-tasks: smaller, faster pieces of the same work.
         for (let i = 0; i < STORY_SUBTASKS; i++) {
           const angle = (i / STORY_SUBTASKS) * Math.PI * 2
-          commands.spawn(makeBug(subtaskOf(bug, i, bug.priority, strings), { x: at.x + Ops.cos(angle) * 24, y: at.y + Ops.sin(angle) * 24 }))
+          const seed = subtaskOf(bug, i, bug.priority, strings)
+          commands.spawn(makeBug(seed, clampToArena({ x: at.x + Ops.cos(angle) * 24, y: at.y + Ops.sin(angle) * 24 }, bugRadius(seed), arena)))
         }
       }
       // Regressions follow the priority, whatever the type; a sub-task's parent has already left its own.
       if (kind.splits > 0 && !bug.regression && bug.type !== "subtask") {
         for (let i = 0; i < kind.splits; i++) {
           const angle = (i / kind.splits) * Math.PI * 2
-          commands.spawn(makeBug(
-            { key: `${bug.key}-REG${i + 1}`, summary: strings.regression(bug.key), priority: "Low", status: "Open" },
-            { x: at.x + Ops.cos(angle) * 30, y: at.y + Ops.sin(angle) * 30 },
-            { regression: true }
-          ))
+          const seed: BugSeed = { key: `${bug.key}-REG${i + 1}`, summary: strings.regression(bug.key), priority: "Low", status: "Open" }
+          commands.spawn(makeBug(seed, clampToArena({ x: at.x + Ops.cos(angle) * 30, y: at.y + Ops.sin(angle) * 30 }, bugRadius(seed), arena), { regression: true }))
         }
       }
 
       if (bug.trait === "deploying") deploy(at, by)
 
       if (random.next() < dropChance[bug.priority]) {
-        // Only what the level has unlocked so far can drop.
+        // Only what the level has unlocked so far can drop, and no Pizza in hardcore.
         const tier = tierOf(resources.level.get(), run.wave)
-        const kindDropped = random.weighted(pickupKinds, (k) => (isUnlocked(k, tier, resources.tiers.get()) ? dropWeights[k] : 0))
-        if (kindDropped) commands.spawn(makePickup(kindDropped, at))
+        const kindDropped = random.weighted(drops, (k) => (isUnlocked(k, tier, resources.tiers.get()) ? dropWeights[k] : 0))
+        if (kindDropped) commands.spawn(makePickup(kindDropped, clampToArena(at, PICKUP_RADIUS, arena)))
       }
     }
 
@@ -225,7 +229,7 @@ export const CombatSystem = Game.System(
       blasts.push(at)
       events.fx.emit({ type: "deploy", x: at.x, y: at.y })
       for (const other of bugs) {
-        if (gone.has(other.entity.id) || distanceSquared(other.data.position.get(), at) >= DEPLOY.radius ** 2) continue
+        if (gone.has(other.entity.id) || distanceSquared(other.data.position.get(), at) >= DEPLOY.radius ** 2 || blocked(arena, at, other.data.position.get())) continue
         damageBug(other, DEPLOY.damage, by)
         const left = other.data.bug.get()
         if (!gone.has(other.entity.id) && left.trait === "deploying" && (left.fuse === null || left.fuse > DEPLOY.chainFuse)) {
@@ -330,26 +334,26 @@ export const CombatSystem = Game.System(
     const explode = (at: Vec, radius: number, damage: number, by: number, hit: Hit = {}): void => {
       events.fx.emit({ type: "explosion", x: at.x, y: at.y, radius })
       for (const match of bugs) {
-        if (!gone.has(match.entity.id) && overlaps(at, radius, match.data.position.get(), match.data.body.get().radius)) {
+        if (!gone.has(match.entity.id) && overlaps(at, radius, match.data.position.get(), match.data.body.get().radius) && !blocked(arena, at, match.data.position.get())) {
           damageBug(match, damage, by, hit)
         }
       }
       for (const match of bosses) {
-        if (!gone.has(match.entity.id) && overlaps(at, radius, match.data.position.get(), match.data.body.get().radius)) {
+        if (!gone.has(match.entity.id) && overlaps(at, radius, match.data.position.get(), match.data.body.get().radius) && !blocked(arena, at, match.data.position.get())) {
           damageBoss(match, damage, by, hit)
         }
       }
     }
 
-    // git reset --hard: not a weapon, so the hitter's statuses stay out of it.
+    // git reset --hard: not a weapon, so the hitter's statuses stay out of it. Walls shelter what is behind them.
     for (const blast of events.bombs.all()) {
       for (const match of bugs) {
-        if (!gone.has(match.entity.id) && distanceSquared(match.data.position.get(), blast) < BOMB_RADIUS ** 2) {
+        if (!gone.has(match.entity.id) && distanceSquared(match.data.position.get(), blast) < BOMB_RADIUS ** 2 && !blocked(arena, blast, match.data.position.get())) {
           damageBug(match, 99, blast.slot)
         }
       }
       for (const match of bosses) {
-        if (!gone.has(match.entity.id)) damageBoss(match, 18, blast.slot)
+        if (!gone.has(match.entity.id) && !blocked(arena, blast, match.data.position.get())) damageBoss(match, 18, blast.slot)
       }
       for (const shot of queries.hostile.each()) {
         if (!gone.has(shot.entity.id)) {
@@ -359,15 +363,16 @@ export const CombatSystem = Game.System(
       }
     }
 
-    // Flame war: every bug and boss inside the cone gets a little damage and catches fire.
+    // Flame war: every bug and boss inside the cone, and not behind a wall, gets a little damage and catches fire.
     for (const flame of events.flames.all()) {
       // The burner's own sound covers every puff: the bugs flash without a hit sound each.
       const hit: Hit = { inflict: [...(hitBy(flame.owner).inflict ?? []), "burn"], quiet: true }
+      const burns = (at: Vec) => inCone(flame, at) && !blocked(arena, flame.origin, at)
       for (const match of bugs) {
-        if (!gone.has(match.entity.id) && inCone(flame, match.data.position.get())) damageBug(match, FLAME.damage, flame.owner, hit)
+        if (!gone.has(match.entity.id) && burns(match.data.position.get())) damageBug(match, FLAME.damage, flame.owner, hit)
       }
       for (const match of bosses) {
-        if (!gone.has(match.entity.id) && inCone(flame, match.data.position.get())) damageBoss(match, FLAME.damage, flame.owner, hit)
+        if (!gone.has(match.entity.id) && burns(match.data.position.get())) damageBoss(match, FLAME.damage, flame.owner, hit)
       }
     }
 
@@ -382,10 +387,13 @@ export const CombatSystem = Game.System(
       const hit = bugs.some(touches) || bosses.some(touches)
       // Past the aimed point once the way left to go points backward.
       const arrived = (target.x - at.x) * velocity.x + (target.y - at.y) * velocity.y <= 0
-      if (!hit && !arrived) continue
+      // A wall in this tick's flight: it goes off on this side of it.
+      const back = { x: at.x - velocity.x * DT, y: at.y - velocity.y * DT }
+      const wall = inWall(arena, at, radius) || blocked(arena, back, at)
+      if (!hit && !arrived && !wall) continue
       gone.add(rocket.entity.id)
       commands.despawn(rocket.entity)
-      explode(hit ? at : target, ROCKET.blastRadius, ROCKET.damage, owner, hitBy(owner))
+      explode(wall ? back : hit ? at : target, ROCKET.blastRadius, ROCKET.damage, owner, hitBy(owner))
     }
 
     // A Breakpoint goes off when a bug or a boss comes close, for whoever set it, and freezes what it does not fix.
@@ -397,6 +405,15 @@ export const CombatSystem = Game.System(
       commands.despawn(trap.entity)
       events.fx.emit({ type: "breakpoint", x: at.x, y: at.y })
       explode(at, BREAKPOINT.blast, BREAKPOINT.damage, trap.data.breakpoint.get().owner, { inflict: ["freeze"] })
+    }
+
+    /** Whether a projectile at `at` flew into a wall this tick: it stops there, whoever fired it. */
+    const walled = (at: Vec, velocity: Vec): boolean => inWall(arena, at) || blocked(arena, { x: at.x - velocity.x * DT, y: at.y - velocity.y * DT }, at)
+    for (const shot of [...queries.shots.each(), ...queries.hostile.each()]) {
+      if (!gone.has(shot.entity.id) && walled(shot.data.position.get(), shot.data.velocity.get())) {
+        gone.add(shot.entity.id)
+        commands.despawn(shot.entity)
+      }
     }
 
     // Shots against bugs and bosses.
@@ -455,7 +472,7 @@ export const CombatSystem = Game.System(
       }
 
       for (const blast of blasts) {
-        if (overlaps(at, radius, blast, DEPLOY.radius)) hurt(blast)
+        if (overlaps(at, radius, blast, DEPLOY.radius) && !blocked(arena, blast, at)) hurt(blast)
       }
       for (const match of bugs) {
         if (!gone.has(match.entity.id) && overlaps(at, radius * 0.8, match.data.position.get(), match.data.body.get().radius * 0.8)) {

@@ -3,6 +3,7 @@ import type * as Random from "@typeonce/ritmo-math/Random"
 import type { Arena } from "../content/arenas.ts"
 import { SPAWN_SAFE_DISTANCE } from "./constants.ts"
 import type { Vec } from "./schema.ts"
+import { inWall, outOfWalls } from "./walls.ts"
 import { Ops } from "@typeonce/ritmo-math"
 
 export const length = (v: Vec): number => Ops.hypot(v.x, v.y)
@@ -18,10 +19,51 @@ export const overlaps = (a: Vec, ra: number, b: Vec, rb: number): boolean => dis
 
 export const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value))
 
-export const clampToArena = (p: Vec, radius: number, arena: Arena): Vec => ({
+const withinEdges = (p: Vec, radius: number, arena: Arena): Vec => ({
   x: clamp(p.x, radius, arena.width - radius),
   y: clamp(p.y, radius, arena.height - radius)
 })
+
+/** How far apart the spots `freeSpot` tries are, ring after ring. */
+const SEARCH_STEP = 10
+
+/**
+ * The spot nearest `p`, ring by ring outwards, where a body of `radius` fits
+ * inside the edges and clear of every wall; `p` itself when there is none.
+ */
+const freeSpot = (p: Vec, radius: number, arena: Arena): Vec => {
+  const rings = Math.ceil(Math.max(arena.width, arena.height) / SEARCH_STEP)
+  for (let ring = 1; ring <= rings; ring++) {
+    let best: Vec | null = null
+    let bestDistance = Infinity
+    for (let i = -ring; i <= ring; i++) {
+      for (const [dx, dy] of [[i, -ring], [i, ring], [-ring, i], [ring, i]] as const) {
+        const spot = withinEdges({ x: p.x + dx * SEARCH_STEP, y: p.y + dy * SEARCH_STEP }, radius, arena)
+        const d = distanceSquared(spot, p)
+        if (d < bestDistance && !inWall(arena, spot, radius)) {
+          best = spot
+          bestDistance = d
+        }
+      }
+    }
+    if (best) return best
+  }
+  return p
+}
+
+/**
+ * The closest spot to `p` where a body of `radius` fits: inside the arena's
+ * edges and out of its walls. Every placement and every move ends here.
+ */
+export const clampToArena = (p: Vec, radius: number, arena: Arena): Vec => {
+  let at = withinEdges(p, radius, arena)
+  // Pushing out of one wall can land in the next (a cubicle's L is two walls that overlap at its corner),
+  // so a few passes settle almost every body, and a search outwards settles the rest.
+  for (let pass = 0; pass < 3 && inWall(arena, at, radius); pass++) {
+    at = withinEdges(outOfWalls(arena, at, radius), radius, arena)
+  }
+  return inWall(arena, at, radius) ? freeSpot(at, radius, arena) : at
+}
 
 export const angleTo = (from: Vec, to: Vec): number => Ops.atan2(to.y - from.y, to.x - from.x)
 
@@ -39,6 +81,11 @@ export const nearest = (from: Vec, points: ReadonlyArray<Vec>): Vec | null => {
   return best
 }
 
+/** How far from any wall a spawn on the edge stays: room for the biggest bug. */
+const CLEARANCE = 40
+/** How far from any wall an open point stays: room for a boss. */
+const OPEN_CLEARANCE = 90
+
 /** A point on the arena's edge, as far from `avoid` as a few tries allow. */
 export const edgePoint = (random: Random.Random, avoid: Vec | null, arena: Arena): Vec => {
   let best: Vec = { x: 60, y: 60 }
@@ -51,6 +98,7 @@ export const edgePoint = (random: Random.Random, avoid: Vec | null, arena: Arena
       : side === 1 ? { x: arena.width - 50, y: along }
       : side === 2 ? { x: along, y: arena.height - 50 }
       : { x: 50, y: along }
+    if (inWall(arena, point, CLEARANCE)) continue
     const d = avoid === null ? Infinity : distanceSquared(point, avoid)
     if (d > SPAWN_SAFE_DISTANCE ** 2) {
       return point
@@ -60,19 +108,19 @@ export const edgePoint = (random: Random.Random, avoid: Vec | null, arena: Arena
       bestDistance = d
     }
   }
-  return best
+  return clampToArena(best, CLEARANCE, arena)
 }
 
 /** The middle of the arena. */
 export const centreOf = (arena: Arena): Vec => ({ x: arena.width / 2, y: arena.height / 2 })
 
-/** A point inside the arena at least `minDistance` from `avoid`. */
+/** A point inside the arena, clear of its walls by room for a boss, at least `minDistance` from `avoid`. */
 export const openPoint = (random: Random.Random, avoid: Vec, minDistance: number, arena: Arena): Vec => {
   for (let attempt = 0; attempt < 12; attempt++) {
     const point = { x: random.range(140, arena.width - 140), y: random.range(140, arena.height - 140) }
-    if (distanceSquared(point, avoid) > minDistance ** 2) {
+    if (distanceSquared(point, avoid) > minDistance ** 2 && !inWall(arena, point, OPEN_CLEARANCE)) {
       return point
     }
   }
-  return { x: arena.width - avoid.x, y: arena.height - avoid.y }
+  return clampToArena({ x: arena.width - avoid.x, y: arena.height - avoid.y }, OPEN_CLEARANCE, arena)
 }

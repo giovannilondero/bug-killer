@@ -61,8 +61,8 @@ export const flameCone = (origin: Vec, direction: Vec): Cone => ({ origin, direc
 
 /**
  * Whether `point` is inside `cone`: close enough, and within its angle of the
- * aim. Only the centre counts. Walls can clip it later by also checking the
- * segment from `cone.origin` to `point`.
+ * aim. Only the centre counts. Walls are not its business: Combat also
+ * checks that none stands between `cone.origin` and `point`.
  */
 export const inCone = (cone: Cone, point: Vec): boolean => {
   const dx = point.x - cone.origin.x

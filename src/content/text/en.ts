@@ -161,7 +161,19 @@ export const en: Strings = {
     microservices: "Forty services, one bug in each. Debora wants it more pop by Friday.",
     legacy: "A green screen, COBOL and a loop nobody dares to touch. Harder than ever.",
     production: "It's live, it's Friday, and the stack is overflowing. The last sprint, and the hardest.",
-    endless: "Every bug from every project, forever. How long can you last?"
+    endless: "Every bug from every project, forever. How long can you last?",
+    hotdesk: "No assigned desks and no elbow room. The 2FA boss has booked the meeting room.",
+    cubicles: "An open space cut into cubicles: walls stop your shots and theirs. The crash boss reboots behind every one."
+  },
+  bossConcepts: {
+    dispenser: "Timeout",
+    crash: "Crash on launch",
+    twoFactor: "2FA bypass",
+    undefined: "undefined",
+    mergeConflict: "Merge conflict",
+    raceCondition: "Race condition",
+    infiniteLoop: "Infinite loop",
+    stackOverflow: "Stack overflow"
   },
   pickups: {
     hotfix: { label: "Hotfix", hint: "rapid fire" },
@@ -256,7 +268,11 @@ export const en: Strings = {
     endless: (every) => `∞ every open bug · a boss every ${every} waves`,
     campaign: "Campaign",
     campaignProgress: (cleared, total) => `${cleared}/${total} sprints closed`,
-    extras: "More modes"
+    extras: "More modes",
+    bonus: "Bonus levels",
+    bonusTag: "BONUS",
+    bonusMeta: (tickets) => `${tickets} tickets from every project · one boss`,
+    bonusLocked: (sprint) => `🔒 close sprint ${sprint}`
   },
   intro: { clientsOnline: "clients online", start: "Click or press any key to start", startTouch: "Tap to start" },
   touch: {
@@ -351,5 +367,19 @@ export const en: Strings = {
       notHost: "Only the host can start.",
       busy: "Too many runs open right now: try again in a bit, or play solo."
     }
+  },
+  hardcore: {
+    name: "Hardcore",
+    rules: "1 sanity · no Pizza · back on your feet with 1",
+    on: "on",
+    off: "off",
+    hud: "HARDCORE",
+    badge: "Cleared in hardcore",
+    run: "☠ Hardcore run"
+  },
+  arena: {
+    label: "Arena",
+    names: { normal: "Normal", small: "Small", walls: "Walls" },
+    locked: (bonus) => `🔒 opens with ${bonus}`
   }
 }

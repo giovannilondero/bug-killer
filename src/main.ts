@@ -5,7 +5,8 @@ import * as Result from "@typeonce/ritmo/Result"
 import { bugKinds, ticketColors } from "./content/bugs.ts"
 import { clients } from "./content/clients.ts"
 import { locales } from "./content/i18n.ts"
-import { endlessLevel, levels } from "./content/levels.ts"
+import type { ArenaId } from "./content/arenas.ts"
+import { bonusLevels, endlessArenaOf, endlessArenas, endlessIn, endlessLevel, isEndlessArena, levels, ticketsOf } from "./content/levels.ts"
 import type { Level, LevelId } from "./content/levels.ts"
 import { makeAudio } from "./host/audio.ts"
 import { makeChat } from "./host/chat.ts"
@@ -18,7 +19,7 @@ import { createRenderer } from "./host/renderer.ts"
 import { makeTouchControls, onTouchMode, touchMode } from "./host/touch.ts"
 import { codePattern, NAME_MAX } from "./net/protocol.ts"
 import type { ErrorCode, RoomInfo, ServerMessage } from "./net/protocol.ts"
-import { bestScore, clearSprint, endEndless, loadProgress, saveProgress, sprintsCleared, sprintUnlocked, unlockEverySprint } from "./progress.ts"
+import { bestScore, bonusUnlocked, clearBonus, clearSprint, endEndless, endlessArenaUnlocked, endlessBest, hardcoreBadge, loadProgress, saveProgress, sprintsCleared, sprintUnlocked, unlockEverySprint } from "./progress.ts"
 import type { Progress } from "./progress.ts"
 import { minionPrefixes } from "./sim/bosses.ts"
 import { PARTY, STEP } from "./sim/constants.ts"
@@ -58,9 +59,51 @@ const input = makeInput(canvas, renderer, touch, {
   targets: () => (view ? [...view.bugs, ...view.bosses].map((target) => target.position) : [])
 })
 let progress = readProgress()
+/** The menu's hardcore toggle: every solo run, and every run this browser hosts, until it is turned off. */
+let hardcore = localStorage.getItem("bugkiller:hardcore") === "on"
+const setHardcore = (on: boolean) => {
+  hardcore = on
+  localStorage.setItem("bugkiller:hardcore", on ? "on" : "off")
+}
+/** Endless's arena, picked in the menu: every solo Endless, and every room this browser opens. */
+let endlessArena: ArenaId = (() => {
+  const saved = localStorage.getItem("bugkiller:arena")
+  return isEndlessArena(saved) ? saved : "normal"
+})()
+const setEndlessArena = (arena: ArenaId) => {
+  endlessArena = arena
+  localStorage.setItem("bugkiller:arena", arena)
+}
+/** The picked arena while it is unlocked here, the normal one otherwise. */
+const pickedArena = (): ArenaId => (endlessArenaUnlocked(progress, endlessArena) ? endlessArena : "normal")
+/** What a locked arena says: the bonus level that opens it. */
+const arenaLock = (arena: ArenaId) => {
+  const by = endlessArenas.find((entry) => entry.id === arena)?.unlockedBy
+  return t().arena.locked(by ? levelById(by).name : "")
+}
+/** The arenas a host may pick: those unlocked here. Shown only while Endless is the chosen level. */
+const arenaField = (selected: ArenaId, level: LevelId) => html`
+  <label class="field" data-arena-field ${levelById(level).endless ? "" : "hidden"}><span>${t().arena.label}</span><select name="arena">${endlessArenas
+    .filter(({ id }) => endlessArenaUnlocked(progress, id))
+    .map(({ id }) => html`<option value="${id}" ${id === selected ? "selected" : ""}>${t().arena.names[id]}</option>`)
+    .join("")}</select></label>`
+/** Shows the arena field when the level picked next to it is Endless. */
+const wireArenaField = (root: ParentNode) => {
+  const select = root.querySelector<HTMLSelectElement>("[name=level]")
+  const box = root.querySelector<HTMLElement>("[data-arena-field]")
+  select?.addEventListener("change", () => {
+    if (box) box.hidden = playable.find((level) => level.id === select.value)?.endless === undefined
+  })
+}
+const chosenArena = (root: ParentNode, fallback: ArenaId): ArenaId => {
+  const value = root.querySelector<HTMLSelectElement>("[name=arena]")?.value
+  return isEndlessArena(value) ? value : fallback
+}
+/** The toggle's rules, under its name: the menu and the lobby say the same thing. */
+const hardcoreRules = () => html`<span class="hardcore-name">☠ ${t().hardcore.name}</span><span class="hardcore-rules">${escape(t().hardcore.rules)}</span>`
 
-/** The sprints, then endless: menu buttons and restarts index into this. */
-const playable = [...levels, endlessLevel]
+/** The sprints, then endless, then the bonus levels: menu buttons and restarts index into this. */
+const playable = [...levels, endlessLevel, ...bonusLevels]
 
 let sim: Simulation | null = null
 let view: View | null = null
@@ -173,22 +216,46 @@ const showTitle = () => {
     // No project names or ticket keys here: the menu is what ends up in screenshots.
     return html`
       <button class="level ${locked ? "locked" : ""}" data-level="${i}" ${locked ? "disabled" : ""} style="--accent:${level.theme.accent}">
-        <span class="level-name">${level.sprint}</span>
+        <span class="level-name">${level.sprint}${hardcoreBadge(progress, level.id) ? html` <span class="hardcore-badge" title="${t().hardcore.badge}" aria-label="${t().hardcore.badge}">☠</span>` : ""}</span>
         <span class="level-tagline">${escape(t().taglines[level.id])}</span>
+        <span class="level-boss"><b>${level.boss.key}</b> · ${escape(t().bossConcepts[level.boss.pattern])}</span>
         <span class="level-meta">${t().menu.openBugs(level.bugs.length)}</span>
         <span class="level-clients">${avatars(level.clients)}</span>
         <span class="level-best">${locked ? t().menu.locked : best ? t().menu.best(formatNumber(best)) : t().menu.fresh}</span>
       </button>`
   }).join("")
-  const endlessBest = bestScore(progress, endlessLevel.id)
+  // The record of the arena picked and the mode the toggle is on: each combination keeps its own.
+  const endlessRecord = endlessBest(progress, { hardcore, arena: pickedArena() })
   const endlessCard = html`
     <button class="level endless" data-level="${levels.length}" style="--accent:${endlessLevel.theme.accent}">
       <span class="level-name">∞ ${endlessLevel.name}</span>
       <span class="level-tagline">${escape(t().taglines.endless)}</span>
       <span class="level-meta">${t().menu.endless(endlessLevel.endless?.every ?? 0)}</span>
       <span class="level-clients">${avatars(endlessLevel.clients)}</span>
-      <span class="level-best">${endlessBest ? t().menu.best(formatNumber(endlessBest)) : t().menu.fresh}</span>
+      <span class="level-best">${endlessRecord ? t().menu.best(formatNumber(endlessRecord)) : t().menu.fresh}${hardcore ? " ☠" : ""}</span>
     </button>`
+  const arenaPicker = html`
+    <div class="arena-picker" role="group" aria-label="${t().arena.label}">
+      <span class="arena-label">∞ ${t().arena.label}</span>
+      ${endlessArenas.map(({ id }) => {
+        const locked = !endlessArenaUnlocked(progress, id)
+        return html`<button data-arena="${id}" aria-pressed="${id === pickedArena()}" ${locked ? "disabled" : ""}>${t().arena.names[id]}${locked ? html` <span class="arena-locked">${escape(arenaLock(id))}</span>` : ""}</button>`
+      }).join("")}
+    </div>`
+  // Bonus levels: their own group and a tagged, dashed card, so they don't read as one more sprint.
+  const bonusCards = bonusLevels.map((level) => {
+    const locked = !bonusUnlocked(progress, level)
+    const best = bestScore(progress, level.id)
+    return html`
+      <button class="level bonus ${locked ? "locked" : ""}" data-level="${playable.indexOf(level)}" ${locked ? "disabled" : ""} style="--accent:${level.theme.accent}">
+        <span class="level-tag">${t().menu.bonusTag}</span>
+        <span class="level-name">★ ${level.name}${hardcoreBadge(progress, level.id) ? html` <span class="hardcore-badge" title="${t().hardcore.badge}" aria-label="${t().hardcore.badge}">☠</span>` : ""}</span>
+        <span class="level-tagline">${escape(t().taglines[level.id])}</span>
+        <span class="level-meta">${t().menu.bonusMeta(ticketsOf(level))}</span>
+        <span class="level-clients">${avatars(level.clients)}</span>
+        <span class="level-best">${locked ? t().menu.bonusLocked(level.bonus?.after ?? 0) : best ? t().menu.best(formatNumber(best)) : t().menu.fresh}</span>
+      </button>`
+  }).join("")
   const multiCard = html`
     <button class="level together" data-multi style="--accent:#7fdcff">
       <span class="level-name">${t().multi.menuButton}</span>
@@ -202,6 +269,7 @@ const showTitle = () => {
     <div class="title">
       <div class="logo" data-text="BUG KILLER">BUG KILLER</div>
       <p class="subtitle">${t().menu.subtitle}</p>
+      <button class="hardcore-toggle" data-hardcore aria-pressed="${hardcore}">${hardcoreRules()}<span class="hardcore-state">${hardcore ? t().hardcore.on : t().hardcore.off}</span></button>
       <section class="group">
         <h3 class="group-title"><span>${t().menu.campaign}</span><span class="group-progress">${t().menu.campaignProgress(cleared, levels.length)}</span></h3>
         <div class="levels">${cards}</div>
@@ -209,6 +277,11 @@ const showTitle = () => {
       <section class="group">
         <h3 class="group-title"><span>${t().menu.extras}</span></h3>
         <div class="levels extras">${endlessCard}${multiCard}</div>
+        ${arenaPicker}
+      </section>
+      <section class="group">
+        <h3 class="group-title"><span>${t().menu.bonus}</span></h3>
+        <div class="levels bonus">${bonusCards}</div>
       </section>
       <div class="legend">
         ${Object.entries(bugKinds).map(([p, k]) => html`<span><i style="background:${k.color}"></i>${p}</span>`).join("")}
@@ -238,6 +311,20 @@ const showTitle = () => {
     })
   )
   overlay.querySelector<HTMLButtonElement>("[data-multi]")?.addEventListener("click", () => showMulti())
+  overlay.querySelectorAll<HTMLButtonElement>("[data-arena]").forEach((button) =>
+    button.addEventListener("click", () => {
+      const arena = button.dataset.arena
+      if (!isEndlessArena(arena)) return
+      setEndlessArena(arena)
+      showTitle()
+      overlay.querySelector<HTMLButtonElement>(`[data-arena="${arena}"]`)?.focus()
+    })
+  )
+  overlay.querySelector<HTMLButtonElement>("[data-hardcore]")?.addEventListener("click", () => {
+    setHardcore(!hardcore)
+    showTitle()
+    overlay.querySelector<HTMLButtonElement>("[data-hardcore]")?.focus()
+  })
 }
 
 // --- Playing together -----------------------------------------------------
@@ -245,11 +332,11 @@ const showTitle = () => {
 const loadName = () => localStorage.getItem("bugkiller:name") ?? ""
 const saveName = (name: string) => localStorage.setItem("bugkiller:name", name)
 
-/** The sprints this browser has unlocked, and endless: what a host may pick. */
+/** The sprints and bonus levels this browser has unlocked, and endless: what a host may pick. */
 const levelOptions = (selected: LevelId) =>
   playable
-    .filter((level, i) => level.endless !== undefined || sprintUnlocked(progress, i))
-    .map((level) => html`<option value="${level.id}" ${level.id === selected ? "selected" : ""}>${level.endless ? "∞" : escape(level.sprint)} · ${escape(level.name)}</option>`)
+    .filter((level, i) => level.endless !== undefined || (level.bonus ? bonusUnlocked(progress, level) : sprintUnlocked(progress, i)))
+    .map((level) => html`<option value="${level.id}" ${level.id === selected ? "selected" : ""}>${level.endless ? "∞" : level.bonus ? "★" : escape(level.sprint)} · ${escape(level.name)}</option>`)
     .join("")
 
 const shareLink = (code: string) => `${location.origin}${location.pathname}?run=${code}`
@@ -273,12 +360,14 @@ const onServer = (message: ServerMessage) => {
       if (mode === "lobby") showLobby()
       else if (mode === "over") fillOverActions()
       break
-    case "started":
+    case "started": {
       r.you = message.you
-      r.level = levelById(message.level)
+      const level = levelById(message.level)
+      // Endless is played in the arena the host picked.
+      r.level = level.endless ? endlessIn(message.arena) : level
       r.running = true
       r.frames.reset()
-      levelIndex = playable.indexOf(r.level)
+      levelIndex = playable.indexOf(level)
       view = null
       lastPhase = "waves"
       chat.reset()
@@ -288,6 +377,7 @@ const onServer = (message: ServerMessage) => {
       audio.rewindMusic()
       renderer.showBanner(`${r.level.sprint.toUpperCase()}: ${r.level.name.toUpperCase()}`, t().hud.startBanner, r.level.theme.accent, 2.4)
       break
+    }
     case "frame":
       r.frames.push(message.view)
       for (const event of message.fx) playFx(event)
@@ -354,6 +444,7 @@ const showMulti = (error?: ErrorCode, code = new URLSearchParams(location.search
       <div class="multi-choices">
         <div class="multi-box">
           <label class="field"><span>${t().multi.level}</span><select name="level">${levelOptions(playable[Math.min(levelIndex, playable.length - 1)]?.id ?? "glacier")}</select></label>
+          ${arenaField(pickedArena(), playable[Math.min(levelIndex, playable.length - 1)]?.id ?? "glacier")}
           <button type="button" class="primary" data-create>${t().multi.create}</button>
         </div>
         <div class="multi-box">
@@ -366,6 +457,7 @@ const showMulti = (error?: ErrorCode, code = new URLSearchParams(location.search
       <div class="actions"><button type="button" data-back>${t().multi.back}</button></div>
     </form>`, "menu")
   const form = overlay.querySelector<HTMLFormElement>("form")!
+  wireArenaField(form)
   const field = (key: string) => form.querySelector<HTMLInputElement>(`[name=${key}]`)!
   const fail = (code: ErrorCode) => {
     form.querySelector(".multi-error")!.textContent = t().multi.errors[code]
@@ -395,7 +487,7 @@ const showMulti = (error?: ErrorCode, code = new URLSearchParams(location.search
     if (!name) return
     audio.unlock()
     const level = form.querySelector<HTMLSelectElement>("[name=level]")!.value
-    openRemote().connection.send({ t: "create", name, level: playable.find((l) => l.id === level)?.id ?? "glacier", locale: locale() })
+    openRemote().connection.send({ t: "create", name, level: playable.find((l) => l.id === level)?.id ?? "glacier", locale: locale(), hardcore, arena: chosenArena(form, pickedArena()) })
   })
   form.querySelector("[data-join]")!.addEventListener("click", join)
   // Two text fields and no submit button: the browser would not send the form on Enter by itself.
@@ -432,6 +524,8 @@ const showLobby = () => {
   const isHost = room.host === r.you
   const host = room.members.find((m) => m.slot === room.host)?.name ?? ""
   const level = levelById(room.level)
+  // Every change the host makes comes back as a new room: keep the control they were on.
+  const focused = document.activeElement?.getAttribute("name")
   show(html`
     <div class="panel multi lobby" style="--accent:${level.theme.accent}">
       <h2>${t().multi.lobby(room.code)}</h2>
@@ -439,8 +533,11 @@ const showLobby = () => {
       <div class="share"><code>${escape(shareLink(room.code))}</code><button data-copy>${t().multi.copyLink}</button></div>
       <ul class="members">${members(room, r.you)}</ul>
       ${isHost
-        ? html`<label class="field"><span>${t().multi.level}</span><select name="level">${levelOptions(room.level)}</select></label>`
-        : html`<p class="lobby-level"><b>${level.endless ? "∞" : escape(level.sprint)} · ${escape(level.name)}</b> — ${escape(t().taglines[level.id])}</p>
+        ? html`<label class="field"><span>${t().multi.level}</span><select name="level">${levelOptions(room.level)}</select></label>
+          ${arenaField(room.arena, room.level)}
+          <label class="hardcore-check"><input type="checkbox" name="hardcore" ${room.hardcore ? "checked" : ""} />${hardcoreRules()}</label>`
+        : html`<p class="lobby-level"><b>${level.endless ? "∞" : escape(level.sprint)} · ${escape(level.name)}${level.endless ? html` · ${t().arena.label} ${t().arena.names[room.arena]}` : ""}</b> — ${escape(t().taglines[level.id])}</p>
+          ${room.hardcore ? html`<p class="hardcore-check">${hardcoreRules()}</p>` : ""}
           <p class="waiting">${escape(t().multi.waiting(host))}</p>`}
       <p class="multi-error" role="alert"></p>
       <div class="actions">
@@ -448,6 +545,17 @@ const showLobby = () => {
         <button data-leave>${t().multi.leave}</button>
       </div>
     </div>`, "menu")
+  wireArenaField(overlay)
+  if (focused) overlay.querySelector<HTMLElement>(`[name="${focused}"]`)?.focus()
+  // The host's picks go out as they change, so the whole team sees the rules it will play by.
+  const chosen = () => ({
+    level: playable.find((l) => l.id === overlay.querySelector<HTMLSelectElement>("[name=level]")?.value)?.id ?? room.level,
+    hardcore: overlay.querySelector<HTMLInputElement>("[name=hardcore]")?.checked ?? room.hardcore,
+    arena: chosenArena(overlay, room.arena)
+  })
+  overlay.querySelectorAll("[name=level], [name=hardcore], [name=arena]").forEach((control) =>
+    control.addEventListener("change", () => r.connection.send({ t: "settings", ...chosen() }))
+  )
   overlay.querySelector<HTMLButtonElement>("[data-copy]")?.addEventListener("click", (event) => {
     const button = event.currentTarget as HTMLButtonElement
     void navigator.clipboard.writeText(shareLink(room.code)).then(() => {
@@ -456,9 +564,7 @@ const showLobby = () => {
   })
   overlay.querySelector<HTMLButtonElement>("[data-start]")?.addEventListener("click", () => {
     audio.unlock()
-    const chosen = overlay.querySelector<HTMLSelectElement>("[name=level]")?.value
-    const level = playable.find((l) => l.id === chosen)?.id ?? room.level
-    r.connection.send({ t: "start", level })
+    r.connection.send({ t: "start", ...chosen() })
   })
   overlay.querySelector<HTMLButtonElement>("[data-leave]")?.addEventListener("click", () => {
     leaveRemote()
@@ -498,8 +604,10 @@ const fillOverActions = () => {
 }
 
 const startLevel = (index: number) => {
-  const level = playable[index]
-  if (!level) return showTitle()
+  const chosen = playable[index]
+  if (!chosen) return showTitle()
+  // Endless is played in the arena picked in the menu.
+  const level = chosen.endless ? endlessIn(pickedArena()) : chosen
   leaveRemote()
   levelIndex = index
   // Phones play fullscreen and landscape where the browser allows it; this runs inside the tap.
@@ -509,6 +617,7 @@ const startLevel = (index: number) => {
     level,
     locale: locale(),
     seed: (Date.now() ^ (index * 7919)) >>> 0,
+    hardcore,
     input,
     presentation: { fx: playFx, chat: (event) => chat.push(event) }
   })
@@ -527,7 +636,8 @@ const startLevel = (index: number) => {
       <div class="intro-sprint">${level.sprint}</div>
       <div class="intro-name">${level.name}</div>
       <div class="intro-tagline">${escape(t().taglines[level.id])}</div>
-      <div class="intro-meta">${level.endless ? t().menu.endless(level.endless.every) : t().menu.openBugs(level.bugs.length)} · ${t().intro.clientsOnline} ${avatars(level.clients)}</div>
+      ${hardcore ? html`<div class="intro-hardcore">${hardcoreRules()}</div>` : ""}
+      <div class="intro-meta">${level.endless ? `${t().menu.endless(level.endless.every)} · ${t().arena.label} ${t().arena.names[endlessArenaOf(level)]}` : level.bonus ? t().menu.bonusMeta(level.bonus.tickets) : t().menu.openBugs(level.bugs.length)} · ${t().intro.clientsOnline} ${avatars(level.clients)}</div>
       <div class="intro-go">${touchMode() ? t().intro.startTouch : t().intro.start}</div>
     </div>`, "intro-overlay")
   const begin = () => {
@@ -575,6 +685,7 @@ const showPause = () => {
 }
 
 const stats = (v: View) => html`
+  ${v.hardcore ? html`<p class="hardcore-run">${t().hardcore.run}</p>` : ""}
   <div class="stats">
     <div><b>${formatNumber(v.run.score)}</b><span>${t().stats.points}</span></div>
     <div><b>${v.run.fixed.length}</b><span>${t().stats.closed}</span></div>
@@ -584,6 +695,16 @@ const stats = (v: View) => html`
     <div><b>${v.run.hitsTaken}</b><span>${t().stats.breakdowns}</span></div>
   </div>
   ${team(v)}`
+
+/**
+ * The release's version: a sprint's number, and a bonus level as a pre-release
+ * of the sprint that unlocks it (`v3.4.12-hotdesk`). Endless is never cleared, so it has none.
+ */
+const versionOf = (v: View): string => {
+  const sprint = levels.findIndex((level) => level.id === v.level.id)
+  const major = v.level.bonus ? v.level.bonus.after : sprint + 1
+  return `v${major}.${v.run.wave}.${v.run.fixed.length}${v.level.bonus ? `-${v.level.id}` : ""}`
+}
 
 /** Whether a fixed ticket goes in the release notes: not scope creep, nor a boss's minion. */
 const noteworthy = (f: { readonly key: string }) => !["ESC-", ...minionPrefixes].some((prefix) => f.key.startsWith(prefix))
@@ -596,7 +717,7 @@ const releaseNotes = (v: View) => {
   const creep = v.run.fixed.filter((f) => f.key.startsWith("ESC-"))
   return html`
     <div class="notes">
-      <div class="notes-title">${t().notes.title} · ${escape(v.level.name)} v${levelIndex + 1}.${v.run.wave}.${v.run.fixed.length}</div>
+      <div class="notes-title">${t().notes.title} · ${escape(v.level.name)} ${versionOf(v)}</div>
       <ul>${items}</ul>
       ${v.run.subtasks ? html`<div class="notes-creep">${escape(t().notes.subtasks(v.run.subtasks))}</div>` : ""}
       ${creep.length ? html`<div class="notes-creep">${escape(t().notes.scopeCreep(creep.length))}</div>` : ""}
@@ -609,10 +730,12 @@ const markdownNotes = (v: View) =>
 
 const showCleared = (v: View) => {
   setMode("over")
-  // A sprint cleared together unlocks the next one here too; best scores stay solo.
-  progress = clearSprint(progress, levelIndex, { score: v.run.score, solo: !remote })
+  // A sprint cleared together unlocks the next one here too; best scores stay solo. A bonus level unlocks nothing.
+  const result = { score: v.run.score, solo: !remote, hardcore: v.hardcore }
+  progress = v.level.bonus ? clearBonus(progress, v.level, result) : clearSprint(progress, levelIndex, result)
   writeProgress(progress)
   const last = levelIndex === levels.length - 1
+  const next = !last && !v.level.bonus
   show(html`
     <div class="panel wide">
       ${last
@@ -625,7 +748,7 @@ const showCleared = (v: View) => {
       ${remote
         ? html`<div class="actions" data-over-actions></div>`
         : html`<div class="actions">
-          ${last ? "" : html`<button data-act="next" class="primary">${t().cleared.next}</button>`}
+          ${next ? html`<button data-act="next" class="primary">${t().cleared.next}</button>` : ""}
           <button data-act="copy">${t().cleared.copy}</button>
           <button data-act="restart">${t().cleared.replay}</button>
           <button data-act="menu">${t().pause.menu}</button>
@@ -638,7 +761,7 @@ const showCleared = (v: View) => {
 const showDead = (v: View) => {
   setMode("over")
   // Endless only ends here, so this is where its best score is kept.
-  const ended = v.level.endless !== undefined ? endEndless(progress, { score: v.run.score, solo: !remote }) : undefined
+  const ended = v.level.endless !== undefined ? endEndless(progress, { score: v.run.score, solo: !remote, hardcore: v.hardcore, arena: endlessArenaOf(v.level) }) : undefined
   const record = ended?.record ?? false
   if (ended && record) {
     progress = ended.progress
@@ -646,7 +769,7 @@ const showDead = (v: View) => {
   }
   const summary = v.level.endless
     ? html`${escape(t().dead.endless(v.run.wave, v.run.loop))}${record ? html` <b>${t().dead.record}</b>` : ""}`
-    : html`${t().dead.stillOpen} <b>${v.level.bugs.length - Math.min(v.level.bugs.length, v.run.nextBug) + v.bugs.length}</b>${v.bosses[0] ? html` · ${t().dead.bossStillThere(v.bosses[0].key)}` : ""}`
+    : html`${t().dead.stillOpen} <b>${ticketsOf(v.level) - Math.min(ticketsOf(v.level), v.run.nextBug) + v.bugs.length}</b>${v.bosses[0] ? html` · ${t().dead.bossStillThere(v.bosses[0].key)}` : ""}`
   show(html`
     <div class="panel">
       <h2 class="lose">💀 ${t().dead.lines[Math.floor(Math.random() * t().dead.lines.length)]}</h2>
