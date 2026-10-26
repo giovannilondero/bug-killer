@@ -8,18 +8,22 @@ import { arenaOf } from "../content/arenas.ts"
 import type { Arena } from "../content/arenas.ts"
 import { bugKinds } from "../content/bugs.ts"
 import { clients } from "../content/clients.ts"
+import type { BossPattern } from "../content/levels.ts"
 import { comboMultiplier } from "../sim/systems/combat.ts"
-import { BREAKPOINT, BUFF_SECONDS, DEPLOY, PARTY, PLAYER, ROCKET, TURRET } from "../sim/constants.ts"
+import { lapOf, otherThread, raceSpot } from "../sim/bosses.ts"
+import { BREAKPOINT, BUFF_SECONDS, DEPLOY, PARTY, PLAYER, ROCKET, STACK, TURRET } from "../sim/constants.ts"
 import { isUnlocked } from "../sim/tiers.ts"
 import { hasStatus } from "../sim/statuses.ts"
 import { WEAPONS } from "../sim/weapons.ts"
 import type { FxValue, PickupKind, Vec } from "../sim/schema.ts"
 import type { View } from "../sim/simulation.ts"
 import { formatNumber, locale, t } from "./language.ts"
-import { floorKey, fuseBlink, fuseProgress, MONO, paintBreakpoint, paintBug, paintFloor, paintFuseRing, paintHeart, paintHostile, paintLabel, paintNest, paintPickup, paintPing, paintPlayer, paintRocket, paintRocketTarget, paintTooltip, pickupIcons, pickupInfo, SANS, shade, tooltipHeight, TOOLTIP_WIDTH, truncate } from "./paint.ts"
+import { bossHealth, conflictMarkerColors, conflictMarkers, floorKey, fuseBlink, fuseProgress, MONO, paintBreakpoint, paintBug, paintFloor, paintFuseRing, paintHeart, paintHostile, paintLabel, paintNest, paintPickup, paintPing, paintPlayer, paintCircuit, paintRestartGhost, paintRocket, paintRocketTarget, paintStack, paintTooltip, pickupIcons, pickupInfo, SANS, shade, shieldLabel, tooltipHeight, TOOLTIP_WIDTH, truncate } from "./paint.ts"
 import type { BugLook, TooltipBug } from "./paint.ts"
 import type { Camera, Renderer } from "./render.ts"
 import { touchMode } from "./touch.ts"
+
+type ViewBoss = View["bosses"][number]
 
 interface Particle {
   x: number
@@ -579,12 +583,79 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
     }
   }
 
-  const drawBoss = (boss: View["bosses"][number]) => {
+  /** What each boss pattern adds to the plain boss: drawn under it, or over it. */
+  const bossMarks: Record<BossPattern, { readonly under?: (boss: ViewBoss, heading: number, arena: Arena) => void; readonly over?: (boss: ViewBoss, arena: Arena) => void }> = {
+    dispenser: {},
+    crash: {
+      // Glitches now and then, a ghost of the restart.
+      under: (boss, heading) => {
+        if (Math.sin(time * 30) <= 0.7) return
+        drawBug(boss.position.x + Math.random() * 10 - 5, boss.position.y, boss.radius, boss.radius, "#ff00ff", heading, boss.age, { flash: 0, trait: "plain", reopened: false, boss: true }, 0.4)
+      }
+    },
+    twoFactor: {
+      over: (boss) => {
+        if (boss.phase === 2) text(W, wres, t().hud.factor, `bold 13px ${MONO}`, "#c79bff", boss.position.x, boss.position.y + boss.radius * 1.6)
+      }
+    },
+    undefined: {
+      over: (boss) => {
+        for (let i = 0; i < 6; i++) {
+          const a = (i / 6) * TAU + time * 0.8
+          text(W, wres, i % 2 ? "null" : "undefined", `bold 13px ${MONO}`, "rgba(255,122,89,0.8)", boss.position.x + Math.cos(a) * boss.radius * 1.6, boss.position.y + Math.sin(a) * boss.radius * 1.6)
+        }
+      }
+    },
+    mergeConflict: {
+      over: (boss) => {
+        if (boss.side) {
+          text(W, wres, t().hud.sides[boss.side], `bold 13px ${MONO}`, boss.color, boss.position.x, boss.position.y + boss.radius * 1.6)
+          return
+        }
+        // Whole, the conflict markers circle it.
+        for (const [i, marker] of conflictMarkers.entries()) {
+          const a = (i / conflictMarkers.length) * TAU - time * 0.6
+          text(W, wres, marker, `bold 13px ${MONO}`, conflictMarkerColors[i]!, boss.position.x + Math.cos(a) * boss.radius * 1.6, boss.position.y + Math.sin(a) * boss.radius * 1.6)
+        }
+      }
+    },
+    raceCondition: {
+      over: (boss, arena) => {
+        if (!boss.thread) return
+        text(W, wres, t().hud.threads[boss.thread], `bold 13px ${MONO}`, boss.color, boss.position.x, boss.position.y + boss.radius * 1.6)
+        if (boss.revive <= 0) return
+        // Its twin was fixed: a ghost where it restarts, and the seconds left to stop it.
+        const spot = raceSpot(arena, boss.age, otherThread(boss.thread))
+        W.sprite(bakery.bake(`restartGhost|${boss.radius}`, wres, around(boss.radius + 3), (g) => paintRestartGhost(g, boss.radius, "#ffffff")), spot.x, spot.y, { rotation: time * 1.5 })
+        text(W, wres, t().hud.restarting(boss.revive), `bold 14px ${MONO}`, Math.sin(time * 12) > 0 ? "#ffffff" : boss.color, spot.x, spot.y)
+      }
+    },
+    infiniteLoop: {
+      // The circuit it runs, baked once at one pixel per world unit, and the lap it is on.
+      under: (boss, _heading, arena) => {
+        W.sprite(bakery.bake(`circuit|${arena.width}x${arena.height}|${boss.color}`, 1, { left: 0, top: 0, right: arena.width, bottom: arena.height }, (g) => paintCircuit(g, arena, boss.color)), 0, 0)
+      },
+      over: (boss) => {
+        text(W, wres, t().hud.lap(lapOf(boss.course) + 1), `bold 13px ${MONO}`, boss.color, boss.position.x, boss.position.y + boss.radius * 1.6)
+      }
+    },
+    stackOverflow: {
+      // The frames still stacked on it, baked once per height, and how deep the stack is.
+      under: (boss) => {
+        const top = boss.radius + STACK.frames * STACK.frameHeight
+        W.sprite(bakery.bake(`stack|${boss.radius}|${boss.frames}|${boss.color}`, wres, { left: -boss.radius, top: -top, right: boss.radius, bottom: 0 }, (g) => paintStack(g, boss.radius, boss.frames, boss.color)), boss.position.x, boss.position.y)
+      },
+      over: (boss) => {
+        text(W, wres, t().hud.depth(boss.frames), `bold 13px ${MONO}`, boss.color, boss.position.x, boss.position.y + boss.radius * 1.6)
+      }
+    }
+  }
+
+  const drawBoss = (boss: ViewBoss, arena: Arena) => {
     const { x, y } = boss.position
     const heading = Math.atan2(boss.position.y - (boss.position.y - 1), 0) + Math.sin(boss.age) * 0.2 + Math.PI / 2
-    if (boss.pattern === "crash" && Math.sin(time * 30) > 0.7) {
-      drawBug(x + Math.random() * 10 - 5, y, boss.radius, boss.radius, "#ff00ff", heading, boss.age, { flash: 0, trait: "plain", reopened: false, boss: true }, 0.4)
-    }
+    const marks = bossMarks[boss.pattern]
+    marks.under?.(boss, heading, arena)
     drawBug(x, y, boss.radius, boss.radius, boss.color, heading, boss.age, { flash: boss.hitFlash, trait: "plain", reopened: true, boss: true, frozen: hasStatus(boss.statuses, "freeze"), poisoned: hasStatus(boss.statuses, "poison"), burning: hasStatus(boss.statuses, "burn") }, 1)
     if (boss.shield > 0) {
       const r = boss.radius * 1.35
@@ -595,17 +666,9 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
         g.shadowBlur = 20
         g.beginPath(); g.arc(0, 0, r, 0, TAU); g.stroke()
       }), x, y)
-      text(W, wres, boss.pattern === "twoFactor" ? "🔐 OTP ******" : t().hud.booting, `bold 14px ${MONO}`, "#ffffff", x, y - boss.radius * 1.5)
+      text(W, wres, shieldLabel(boss), `bold 14px ${MONO}`, "#ffffff", x, y - boss.radius * 1.5)
     }
-    if (boss.pattern === "undefined") {
-      for (let i = 0; i < 6; i++) {
-        const a = (i / 6) * TAU + time * 0.8
-        text(W, wres, i % 2 ? "null" : "undefined", `bold 13px ${MONO}`, "rgba(255,122,89,0.8)", x + Math.cos(a) * boss.radius * 1.6, y + Math.sin(a) * boss.radius * 1.6)
-      }
-    }
-    if (boss.pattern === "twoFactor" && boss.phase === 2) {
-      text(W, wres, t().hud.factor, `bold 13px ${MONO}`, "#c79bff", x, y + boss.radius * 1.6)
-    }
+    marks.over?.(boss, arena)
     text(W, wres, boss.key, `bold 14px ${MONO}`, "#ffffff", x, y - boss.radius - 14)
   }
 
@@ -771,7 +834,7 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
       }
     }
 
-    for (const boss of view.bosses) drawBoss(boss)
+    for (const boss of view.bosses) drawBoss(boss, arena)
 
     // Shots
     for (const shot of view.shots) {
@@ -1029,11 +1092,12 @@ export const makePixiRenderer = async (canvas: HTMLCanvasElement): Promise<Rende
     // Top-centre: backlog or boss.
     const boss = view.bosses[0]
     if (boss) {
+      const health = bossHealth(view.bosses, boss.key)
       const w = Math.min(560, width - 420)
       const x = width / 2 - w / 2
       text(S, res, `☠ ${boss.key}`, `bold 13px ${MONO}`, boss.color, width / 2, 24)
       text(S, res, truncate(boss.title, 80), `12px ${SANS}`, "#d8dee9", width / 2, 42)
-      bar(x, 52, w, 12, 6, boss.hp / boss.maxHp, boss.shield > 0 ? "#ffffff" : boss.color)
+      bar(x, 52, w, 12, 6, health.left, health.shielded ? "#ffffff" : boss.color)
     } else if (run.phase === "waves" && view.level.endless) {
       // Endless: no backlog to empty, only the next boss getting closer.
       const every = view.level.endless.every

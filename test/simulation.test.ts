@@ -1005,7 +1005,8 @@ test("git push --force fires slowly; Hotfix speeds it up, Refactor and Tools lea
 
 test("git push --force arrives with Sprint 5: a rare drop and a possible reward, never earlier", () => {
   assert.equal(contentTiers.pushForce, 4)
-  for (const level of levels) assert.ok(!isUnlocked("pushForce", level.tier), `not in ${level.id}`)
+  for (const level of levels.slice(0, 4)) assert.ok(!isUnlocked("pushForce", level.tier), `not in ${level.id}`)
+  assert.ok(isUnlocked("pushForce", levels[4]!.tier), "Sprint 5 has it")
   assert.ok(isUnlocked("pushForce", 4))
   assert.ok(!isUnlocked("pushForce", tierOf(endlessLevel, 1)), "not in Endless's first waves")
   assert.ok(isUnlocked("pushForce", endlessLevel.tier), "but Endless gets there")
@@ -1148,7 +1149,8 @@ test("Flame war flashes the bugs it burns without a hit sound per puff: the burn
 
 test("Flame war arrives with sprint 6 and not before", () => {
   assert.equal(contentTiers.flameWar, 5)
-  for (const level of levels) assert.ok(level.tier >= 5 || !isUnlocked("flameWar", level.tier), `not in ${level.id}`)
+  for (const level of levels.slice(0, 5)) assert.ok(!isUnlocked("flameWar", level.tier), `not in ${level.id}`)
+  assert.ok(isUnlocked("flameWar", levels[5]!.tier), "Sprint 6 has it")
   assert.ok(!isUnlocked("flameWar", tierOf(endlessLevel, 15)), "not in Endless before wave 16")
   assert.ok(isUnlocked("flameWar", tierOf(endlessLevel, 16)))
 })

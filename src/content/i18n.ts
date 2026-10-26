@@ -1,6 +1,6 @@
 import type { Priority, StatusTrait, TicketType } from "./bugs.ts"
 import type { CallKind, ClientId, MissionKind } from "./clients.ts"
-import type { LevelId } from "./levels.ts"
+import type { ConflictSide, LevelId, RaceThread } from "./levels.ts"
 import type { Voice } from "./text/voice.ts"
 import { en } from "./text/en.ts"
 import { it } from "./text/it.ts"
@@ -38,7 +38,12 @@ export interface Strings {
   readonly regression: (key: string) => string
   /** The summary of one of a Story's sub-tasks. */
   readonly subtask: (summary: string) => string
-  readonly minions: { readonly crash: string; readonly null: string }
+  readonly minions: {
+    readonly crash: string
+    readonly null: string
+    /** A frame that dropped off a stack overflow's tower, `depth` frames up the stack. */
+    readonly frame: (depth: number) => string
+  }
   readonly calls: {
     readonly meetTitles: ReadonlyArray<string>
     readonly meetInvite: (title: string, seconds: number) => string
@@ -53,7 +58,22 @@ export interface Strings {
     readonly room: string
     readonly answered: (points: number) => string
   }
-  readonly bossPhase: { readonly dispenserRestart: string; readonly otp: string }
+  readonly bossPhase: {
+    readonly dispenserRestart: string
+    readonly otp: string
+    /** A merge conflict splits in two. */
+    readonly conflict: string
+    /** One half of a merge conflict is fixed, the other is still there. */
+    readonly halfResolved: string
+    /** One twin of a race condition is fixed: the other has to follow, fast. */
+    readonly threadDown: string
+    /** The twin left running restarted the one that was fixed. */
+    readonly restarted: string
+    /** An infinite loop starts another lap, faster. */
+    readonly faster: string
+    /** A stack overflow drops its top frame, and shields itself while the frame runs. */
+    readonly frameDropped: string
+  }
 
   // --- What the host draws --------------------------------------------------
   readonly traits: Record<StatusTrait, string>
@@ -82,6 +102,18 @@ export interface Strings {
     readonly testsPassing: string
     readonly booting: string
     readonly factor: string
+    /** Under each half of a merge conflict. */
+    readonly sides: Record<ConflictSide, string>
+    /** Under each twin of a race condition. */
+    readonly threads: Record<RaceThread, string>
+    /** Over the spot where a fixed twin comes back, with the seconds left. */
+    readonly restarting: (seconds: number) => string
+    /** Under an infinite loop: the lap it is running. */
+    readonly lap: (lap: number) => string
+    /** Under a stack overflow: how many frames its tower has left. */
+    readonly depth: (frames: number) => string
+    /** Over a stack overflow shielded while its dropped frames run. */
+    readonly stackGuard: string
     readonly startBanner: string
     readonly audioOn: string
     readonly audioOff: string

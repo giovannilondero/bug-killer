@@ -1,5 +1,5 @@
 import type { Strings } from "../i18n.ts"
-import { shout } from "./voice.ts"
+import { morePop, plusOne, shout } from "./voice.ts"
 
 export const en: Strings = {
   tag: "en-US",
@@ -27,7 +27,9 @@ export const en: Strings = {
       laugh: "lol",
       voice: (text) => `It worked on staging, you know. Anyway: ${text}`
     },
-    tobia: { role: "Tech Lead", laugh: "haha", voice: (text) => text }
+    tobia: { role: "Tech Lead", laugh: "haha", voice: (text) => text },
+    fabrizio: { role: "Stakeholder (cc'd on everything)", laugh: "+1", voice: plusOne },
+    debora: { role: "Marketing", laugh: "ahah love it ✨", voice: morePop("Can we make it a bit more pop? By Friday, ideally ✨", "And a bit more pop, please. It's for Friday 🎨", "Love it, just needs to pop more. Friday? 💥") }
   },
 
   tobiaLines: [
@@ -62,6 +64,11 @@ export const en: Strings = {
     tobia: {
       success: ["see? with the _tools_ it's a breeze"],
       failure: ["ok but next time use the _tools_"]
+    },
+    fabrizio: { success: ["+1"], failure: ["up"] },
+    debora: {
+      success: ["Love it!! Now can we make the logo bigger? 💖", "Perfect, posting it on LinkedIn right now ✨"],
+      failure: ["Hmm, it doesn't pop. We'll talk on Friday.", "Moving the launch, again. And the font is still sad."]
     }
   },
   missions: {
@@ -85,7 +92,7 @@ export const en: Strings = {
   ],
   regression: (key) => `Regression introduced by the fix for ${key}`,
   subtask: (summary) => `Sub-task: ${summary}`,
-  minions: { crash: "Crash report without a stack trace", null: "Cannot read properties of null" },
+  minions: { crash: "Crash report without a stack trace", null: "Cannot read properties of null", frame: (depth) => `at recurse (index.js:${depth})` },
   calls: {
     meetTitles: [
       "Quick sync (5 min)",
@@ -121,7 +128,16 @@ export const en: Strings = {
     room: "MEET",
     answered: (points) => `+${points} call answered`
   },
-  bossPhase: { dispenserRestart: "timeout... restarting", otp: "Enter your OTP code" },
+  bossPhase: {
+    dispenserRestart: "timeout... restarting",
+    otp: "Enter your OTP code",
+    conflict: "CONFLICT: ours vs theirs",
+    halfResolved: "one side resolved, one to go",
+    threadDown: "one thread down: fix the other, fast",
+    faster: "GOTO 10: one more lap, faster",
+    frameDropped: "a frame popped off the stack: catch it first",
+    restarted: "race lost: the thread restarted"
+  },
 
   traits: {
     armored: "BLOCKED: takes half damage",
@@ -141,6 +157,10 @@ export const en: Strings = {
     sidequests: "Seven small projects, seven big clients.",
     keystone: "Permissions, SSO and CVEs. Did somebody say 2FA?",
     foundry: "The biggest backlog. Ugo is online.",
+    monorepo: "One repo for everything, and everyone on it. Fabrizio says +1.",
+    microservices: "Forty services, one bug in each. Debora wants it more pop by Friday.",
+    legacy: "A green screen, COBOL and a loop nobody dares to touch. Harder than ever.",
+    production: "It's live, it's Friday, and the stack is overflowing. The last sprint, and the hardest.",
     endless: "Every bug from every project, forever. How long can you last?"
   },
   pickups: {
@@ -189,6 +209,12 @@ export const en: Strings = {
     testsPassing: "✓ tests passing",
     booting: "⏳ booting...",
     factor: "FACTOR 2/2",
+    sides: { ours: "<<<<<<< ours", theirs: ">>>>>>> theirs" },
+    threads: { main: "thread: main", worker: "thread: worker" },
+    lap: (lap) => `LAP ${lap}`,
+    depth: (frames) => `STACK DEPTH ${frames}`,
+    stackGuard: "🧱 close the dropped frames first",
+    restarting: (seconds) => `⟳ restarting in ${seconds.toFixed(1)}s`,
     startBanner: "Close the backlog before the client shows up",
     audioOn: "🔊 AUDIO ON",
     audioOff: "🔇 AUDIO OFF",

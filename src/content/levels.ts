@@ -6,8 +6,16 @@ import type { ClientId } from "./clients.ts"
 import type { Tier } from "../sim/tiers.ts"
 
 /** How a boss fights; each pattern is one branch of the boss system. */
-export const bossPatterns = ["dispenser", "crash", "twoFactor", "undefined"] as const
+export const bossPatterns = ["dispenser", "crash", "twoFactor", "undefined", "mergeConflict", "raceCondition", "infiniteLoop", "stackOverflow"] as const
 export type BossPattern = (typeof bossPatterns)[number]
+
+/** The two halves a merge conflict splits into. */
+export const conflictSides = ["ours", "theirs"] as const
+export type ConflictSide = (typeof conflictSides)[number]
+
+/** The twins a race condition forks into. */
+export const raceThreads = ["main", "worker"] as const
+export type RaceThread = (typeof raceThreads)[number]
 
 export interface Boss {
   readonly key: string
@@ -20,7 +28,7 @@ export interface Boss {
   readonly shotText: string
 }
 
-export const levelIds = ["glacier", "sidequests", "keystone", "foundry", "endless"] as const
+export const levelIds = ["glacier", "sidequests", "keystone", "foundry", "monorepo", "microservices", "legacy", "production", "endless"] as const
 export type LevelId = (typeof levelIds)[number]
 
 export interface Level {
@@ -28,12 +36,15 @@ export interface Level {
   readonly sprint: string
   readonly name: string
   readonly projects: ReadonlyArray<string>
-  readonly theme: { readonly background: string; readonly grid: string; readonly accent: string }
+  /** `crt`: an old terminal's floor, with phosphor glow and scanlines. */
+  readonly theme: { readonly background: string; readonly grid: string; readonly accent: string; readonly crt?: boolean }
   readonly clients: ReadonlyArray<ClientId>
   /** Seconds between client messages. */
   readonly clientEvery: number
   /** Bugs released per wave. */
   readonly waveSize: number
+  /** How much tougher than usual its tickets come in: their health ×; 1 when left out. */
+  readonly bugHp?: number
   /** The highest content tier this level offers (see `src/sim/tiers.ts`); Endless climbs to it. */
   readonly tier: Tier
   readonly boss: Boss
@@ -129,12 +140,96 @@ export const levels: ReadonlyArray<Level> = [
       color: "#ff7a59",
       shotText: "undefined"
     }
+  }),
+  level({
+    id: "monorepo",
+    sprint: "Sprint 5",
+    name: "Monorepo",
+    projects: ["MONO"],
+    theme: { background: "#15120a", grid: "#2c2612", accent: "#e3b341" },
+    clients: ["fabrizio", "samanta", "kevin", "fabrizio", "ugo"],
+    clientEvery: 10,
+    waveSize: 7,
+    tier: 4,
+    boss: {
+      key: "MONO-4096",
+      title: "CONFLICT (content): Merge conflict in pnpm-lock.yaml",
+      pattern: "mergeConflict",
+      hp: 120,
+      radius: 58,
+      color: "#e3b341",
+      shotText: "======="
+    }
+  }),
+  level({
+    id: "microservices",
+    sprint: "Sprint 6",
+    name: "Microservices",
+    projects: ["MSVC"],
+    theme: { background: "#081517", grid: "#11302f", accent: "#3ee6c4" },
+    clients: ["debora", "kevin", "fabrizio", "debora", "samanta"],
+    clientEvery: 10,
+    waveSize: 7,
+    tier: 5,
+    boss: {
+      key: "MSVC-1024",
+      title: "Race condition: two services write the same order at once",
+      pattern: "raceCondition",
+      hp: 140,
+      radius: 50,
+      color: "#3ee6c4",
+      shotText: "409"
+    }
+  }),
+  level({
+    id: "legacy",
+    sprint: "Sprint 7",
+    name: "Legacy",
+    projects: ["LGC"],
+    theme: { background: "#020a03", grid: "#0b2a10", accent: "#33ff66", crt: true },
+    clients: ["gualtiero", "ugo", "ornella", "debora", "fabrizio"],
+    clientEvery: 9,
+    waveSize: 8,
+    bugHp: 1.15,
+    tier: 5,
+    boss: {
+      key: "LGC-1983",
+      title: "10 GOTO 10",
+      pattern: "infiniteLoop",
+      hp: 170,
+      radius: 48,
+      color: "#33ff66",
+      shotText: "GOTO"
+    }
+  }),
+  level({
+    id: "production",
+    sprint: "Sprint 8",
+    name: "Production",
+    projects: ["PROD"],
+    theme: { background: "#170909", grid: "#311212", accent: "#ff5a4f" },
+    clients: ["ugo", "debora", "fabrizio", "gualtiero", "ornella", "kevin"],
+    clientEvery: 8,
+    waveSize: 9,
+    bugHp: 1.3,
+    tier: 5,
+    boss: {
+      key: "PROD-404",
+      title: "RangeError: Maximum call stack size exceeded",
+      pattern: "stackOverflow",
+      hp: 200,
+      radius: 54,
+      color: "#f48024",
+      shotText: "f()"
+    }
   })
 ]
 
 /**
  * Endless: every open bug from every project, drawn at random and forever,
- * a little tougher after each boss. The four sprint bosses take turns.
+ * a little tougher after each boss. Every sprint's boss takes its turn, in
+ * campaign order, and every sprint's clients write in: a new sprint joins
+ * the rotation just by being in `levels`.
  */
 export const endlessLevel: Level = {
   id: "endless",
@@ -142,7 +237,7 @@ export const endlessLevel: Level = {
   name: "Endless",
   projects: [...new Set(levels.flatMap((l) => l.projects))],
   theme: { background: "#0e0b14", grid: "#221a30", accent: "#ffd84a" },
-  clients: ["ugo", "ornella", "kevin", "samanta", "gualtiero"],
+  clients: [...new Set(levels.flatMap((l) => l.clients))],
   clientEvery: 13,
   waveSize: 4,
   // Every tier, up to S6: Endless climbs there a step at a time.

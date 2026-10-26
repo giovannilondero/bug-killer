@@ -2,7 +2,7 @@
  * The people who interrupt the sprint: the clients, and Tobia from the
  * team. First names only: they are archetypes, not people.
  */
-export const clientIds = ["ugo", "ornella", "kevin", "samanta", "gualtiero", "tobia"] as const
+export const clientIds = ["ugo", "ornella", "kevin", "samanta", "gualtiero", "tobia", "fabrizio", "debora"] as const
 export type ClientId = (typeof clientIds)[number]
 
 export const missionKinds = ["killCount", "killTarget", "noHit", "combo", "priorityHunt"] as const
@@ -29,5 +29,7 @@ export const clients = {
   samanta: { name: "Samanta", color: "#58e6a0", missions: { killCount: 2, priorityHunt: 3 }, patience: 1 },
   gualtiero: { name: "Gualtiero", color: "#ffd84a", missions: { noHit: 2, killTarget: 2, combo: 1 }, patience: 1.2 },
   // Not a client: Tobia never assigns missions, only checks how you work.
-  tobia: { name: "Tobia", color: "#ff9f1c", missions: {}, patience: 1 }
+  tobia: { name: "Tobia", color: "#ff9f1c", missions: {}, patience: 1 },
+  fabrizio: { name: "Fabrizio", color: "#9aa7b8", missions: { killTarget: 2, killCount: 2, combo: 1 }, patience: 1 },
+  debora: { name: "Debora", color: "#ff6ec7", missions: { combo: 3, killCount: 2, noHit: 1 }, patience: 0.9 }
 } as const satisfies Record<ClientId, Client>
