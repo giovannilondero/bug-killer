@@ -7,3 +7,6 @@ minimumReleaseAgeExclude:
   - '@typeonce/ritmo-devtools@0.14.0'
   - '@typeonce/ritmo-math@0.14.0'
   - '@typeonce/ritmo@0.14.0'
+overrides:
+  # miniflare pins undici 7.29.1, vulnerable to GHSA-xjj6-f33q-929c (DoS); drop once wrangler ships >= 7.30.1
+  'miniflare>undici': 7.30.1
