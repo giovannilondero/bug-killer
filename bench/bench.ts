@@ -59,7 +59,7 @@ const bugs = Array.from({ length: count }, (_, i) => {
   const t = templates[i % templates.length]!
   return { ...t, key: `${t.key.split("-")[0]}-${100 + i}`, age: 1 + i * 0.13, hp: i % 3 === 0 ? t.maxHp / 2 : t.maxHp, resurrectedBy: i % 17 === 0 ? ("ugo" as const) : null }
 })
-const shots = Array.from({ length: 40 }, (_, i) => ({ id: templates[0]!.id, position: { ...center }, velocity: { x: Math.cos(i) * 900, y: Math.sin(i) * 900 }, homing: i % 5 === 0 }))
+const shots = Array.from({ length: 40 }, (_, i) => ({ id: templates[0]!.id, position: { ...center }, velocity: { x: Math.cos(i) * 900, y: Math.sin(i) * 900 }, homing: i % 5 === 0, owner: 0 }))
 const view: View = { ...base, player, players: [player], bugs, shots, bosses: [], hostile: [] }
 
 const renderer = (await createRenderer(document.querySelector<HTMLCanvasElement>("#game")!)).renderer

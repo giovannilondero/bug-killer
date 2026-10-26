@@ -266,12 +266,13 @@ export type FxValue =
   | { type: "kill"; x: number; y: number; color: string; key: string; summary: string; points: number; boss: boolean }
   /** `quiet`: flash it, but no hit sound (a weapon whose own sound covers its hits, like Flame war). */
   | { type: "hit"; x: number; y: number; color: string; quiet?: boolean }
-  | { type: "shoot"; x: number; y: number; weapon: WeaponKind }
+  /** `slot`: the developer who fired; none for a turret. */
+  | { type: "shoot"; x: number; y: number; weapon: WeaponKind; slot?: number }
   | { type: "hurt"; x: number; y: number }
   | { type: "pickup"; x: number; y: number; kind: PickupKind }
   | { type: "reopen"; x: number; y: number; key: string }
   | { type: "bomb"; x: number; y: number }
-  | { type: "dash"; x: number; y: number }
+  | { type: "dash"; x: number; y: number; slot: number }
   | { type: "spawn"; x: number; y: number }
   | { type: "bossPhase"; x: number; y: number; text: string }
   | { type: "teleport"; x: number; y: number }
@@ -286,7 +287,7 @@ export type FxValue =
   | { type: "deploy"; x: number; y: number }
   | { type: "explosion"; x: number; y: number; radius: number }
   /** One puff of Flame war: from `x, y` along `angle`, as far and as wide as the cone it burns. */
-  | { type: "flame"; x: number; y: number; angle: number; range: number; spread: number }
+  | { type: "flame"; x: number; y: number; angle: number; range: number; spread: number; slot: number }
   | { type: "breakpointSet"; x: number; y: number }
   | { type: "breakpoint"; x: number; y: number }
 export const Fx = Descriptor.Event<FxValue>()("BugKiller/Fx")
