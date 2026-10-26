@@ -112,6 +112,7 @@ export const IntegrateSystem = Game.System(
       const velocity = match.data.velocity.get()
       match.data.position.update((p) => ({ x: p.x + velocity.x * DT, y: p.y + velocity.y * DT }))
     }
+    // A developer's step here is `glide` in `motion.ts`, which a browser predicting them replays.
     for (const match of queries.contained.each()) {
       const radius = match.data.body.get().radius
       match.data.position.update((p) => clampToArena(p, radius, arena))
