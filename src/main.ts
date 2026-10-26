@@ -119,11 +119,29 @@ interface Remote {
   running: boolean
 }
 let remote: Remote | null = null
-/** Input goes to the run server every other step, 30 times a second: half the messages, same feel. */
+/**
+ * Input goes to the run server every other step, 30 times a second: half the
+ * messages (the Durable Object counts them), same feel for the aim. What the
+ * developer does (a press, a trigger, a turn) goes out on the step it happens.
+ */
 const INPUT_EVERY = 2
 let inputSteps = 0
 /** Snapshots taken since the last message: a dash, bomb or Breakpoint pressed in between rides along with the next one. */
 let unsent: InputValue | null = null
+let sent: InputValue = idleInput
+const sendInput = (connection: Connection, value: InputValue) => {
+  connection.send({ t: "input", input: value })
+  sent = value
+  inputSteps = 0
+}
+/** A move this much off the last one sent is a turn, not a stick's drift. */
+const TURN = 0.5
+const urgent = (value: InputValue) =>
+  value.dash ||
+  value.bomb ||
+  value.breakpoint ||
+  value.fire !== sent.fire ||
+  Math.abs(value.move.x - sent.move.x) + Math.abs(value.move.y - sent.move.y) > TURN
 const levelById = (id: LevelId): Level => playable.find((level) => level.id === id) ?? endlessLevel
 
 /** "lobby" is every multiplayer screen before a run: the join form and the room. */
@@ -367,6 +385,8 @@ const onServer = (message: ServerMessage) => {
       r.level = level.endless ? endlessIn(message.arena) : level
       r.running = true
       r.frames.reset()
+      // The server starts every seat standing still.
+      sent = idleInput
       levelIndex = playable.indexOf(level)
       view = null
       lastPhase = "waves"
@@ -379,7 +399,7 @@ const onServer = (message: ServerMessage) => {
       break
     }
     case "frame":
-      r.frames.push(message.view)
+      r.frames.push(message.view, message.step)
       for (const event of message.fx) playFx(event)
       for (const event of message.chat) chat.push(event)
       break
@@ -658,7 +678,7 @@ const showPause = () => {
   setMode("paused")
   if (remote) {
     // The run goes on: stand still rather than keep running into the bugs.
-    remote.connection.send({ t: "input", input: { ...idleInput, aim: view?.player?.aim ?? idleInput.aim } })
+    sendInput(remote.connection, { ...idleInput, aim: view?.player?.aim ?? idleInput.aim })
     show(html`
       <div class="panel">
         <h2>${t().pause.title}</h2>
@@ -879,8 +899,8 @@ const loop = FixedLoop.start({
           ? { ...latest, dash: unsent.dash || latest.dash, bomb: unsent.bomb || latest.bomb, breakpoint: unsent.breakpoint || latest.breakpoint }
           : latest
         inputSteps += 1
-        if (inputSteps % INPUT_EVERY === 0) {
-          remote.connection.send({ t: "input", input: unsent })
+        if (inputSteps >= INPUT_EVERY || urgent(unsent)) {
+          sendInput(remote.connection, unsent)
           unsent = null
         }
       }
