@@ -165,15 +165,15 @@ export const it: Strings = {
     hotdesk: "Niente scrivania fissa, niente spazio per i gomiti. Il boss del 2FA ha prenotato la sala riunioni.",
     cubicles: "Un open space diviso in cubicoli: i muri fermano i tuoi colpi e i loro. Il boss del crash si riavvia dietro ognuno."
   },
-  bossProblems: {
-    dispenser: "Il distributore non smette di versare finché la richiesta non va in timeout.",
-    crash: "L'app crasha all'avvio su iOS 17.",
-    twoFactor: "L'API fa entrare senza il secondo fattore.",
-    undefined: "Qualcosa legge l'id di un oggetto che non c'è.",
-    mergeConflict: "Due branch hanno modificato lo stesso lockfile.",
-    raceCondition: "Due servizi scrivono lo stesso ordine nello stesso momento.",
-    infiniteLoop: "Un programma del 1983 bloccato su 10 GOTO 10.",
-    stackOverflow: "Una funzione che chiama sé stessa finché lo stack non finisce."
+  bossConcepts: {
+    dispenser: "Timeout",
+    crash: "Crash all'avvio",
+    twoFactor: "Bypass del 2FA",
+    undefined: "undefined",
+    mergeConflict: "Merge conflict",
+    raceCondition: "Race condition",
+    infiniteLoop: "Loop infinito",
+    stackOverflow: "Stack overflow"
   },
   pickups: {
     hotfix: { label: "Hotfix", hint: "fuoco rapido" },

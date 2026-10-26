@@ -177,7 +177,7 @@ code { font-family: var(--mono); color: #ffd84a; }
 .level-name { font: 800 24px var(--sans); color: var(--accent); }
 .level-tagline { flex: 1; font-size: 13px; line-height: 1.4; color: var(--text); text-wrap: pretty; }
 .level-meta { font-size: 13px; color: var(--muted); }
-.level-boss { font-size: 12px; line-height: 1.35; color: var(--muted); text-wrap: pretty; }
+.level-boss { font-size: 13px; color: var(--text); }
 .level-boss b { font-family: var(--mono); color: var(--accent); }
 .level-meta b { font-family: var(--mono); color: var(--text); }
 .level-clients { display: flex; gap: 4px; margin-top: 4px; }
