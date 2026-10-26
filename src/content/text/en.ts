@@ -165,15 +165,15 @@ export const en: Strings = {
     hotdesk: "No assigned desks and no elbow room. The 2FA boss has booked the meeting room.",
     cubicles: "An open space cut into cubicles: walls stop your shots and theirs. The crash boss reboots behind every one."
   },
-  bossIdeas: {
-    dispenser: "pours shots for a while, then stops for timeout",
-    crash: "crashes and restarts somewhere else",
-    twoFactor: "fixed once, asks for a second factor: full health, behind a shield",
-    undefined: "is everywhere: rings of shots and null bugs",
-    mergeConflict: "at half health splits into ours and theirs, firing in mirror",
-    raceCondition: "twins: fix one and the other restarts it, unless you're quick",
-    infiniteLoop: "runs an ∞ round the arena, faster every lap",
-    stackOverflow: "a tower of frames that drop off and run for you; shielded while they live"
+  bossProblems: {
+    dispenser: "The dispenser won't stop pouring until the request times out.",
+    crash: "The app crashes on launch on iOS 17.",
+    twoFactor: "The API lets you in without the second factor.",
+    undefined: "Something reads the id of an object that isn't there.",
+    mergeConflict: "Two branches changed the same lockfile.",
+    raceCondition: "Two services write the same order at the same time.",
+    infiniteLoop: "A program from 1983 stuck on 10 GOTO 10.",
+    stackOverflow: "A function that calls itself until the stack runs out."
   },
   pickups: {
     hotfix: { label: "Hotfix", hint: "rapid fire" },

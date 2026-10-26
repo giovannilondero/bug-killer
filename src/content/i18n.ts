@@ -81,8 +81,8 @@ export interface Strings {
   /** The ticket type in the tooltip, and what it does (empty for a plain bug). */
   readonly ticketTypes: Record<TicketType, { readonly label: string; readonly hint: string }>
   readonly taglines: Record<LevelId, string>
-  /** How each boss fights, in a line: under the sprint's tagline on its card. */
-  readonly bossIdeas: Record<BossPattern, string>
+  /** The real-world problem each boss is, in a line: under the sprint's tagline on its card. */
+  readonly bossProblems: Record<BossPattern, string>
   readonly pickups: Record<Pickups, { readonly label: string; readonly hint: string }>
   /** Code scrawled on the arena floor. */
   readonly floorCode: ReadonlyArray<string>
