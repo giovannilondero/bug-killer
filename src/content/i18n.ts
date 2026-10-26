@@ -1,7 +1,7 @@
 import type { ArenaId } from "./arenas.ts"
 import type { Priority, StatusTrait, TicketType } from "./bugs.ts"
 import type { CallKind, ClientId, MissionKind } from "./clients.ts"
-import type { ConflictSide, LevelId, RaceThread } from "./levels.ts"
+import type { BossPattern, ConflictSide, LevelId, RaceThread } from "./levels.ts"
 import type { Voice } from "./text/voice.ts"
 import { en } from "./text/en.ts"
 import { it } from "./text/it.ts"
@@ -81,6 +81,8 @@ export interface Strings {
   /** The ticket type in the tooltip, and what it does (empty for a plain bug). */
   readonly ticketTypes: Record<TicketType, { readonly label: string; readonly hint: string }>
   readonly taglines: Record<LevelId, string>
+  /** How each boss fights, in a line: under the sprint's tagline on its card. */
+  readonly bossIdeas: Record<BossPattern, string>
   readonly pickups: Record<Pickups, { readonly label: string; readonly hint: string }>
   /** Code scrawled on the arena floor. */
   readonly floorCode: ReadonlyArray<string>

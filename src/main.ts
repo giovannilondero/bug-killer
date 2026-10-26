@@ -218,6 +218,7 @@ const showTitle = () => {
       <button class="level ${locked ? "locked" : ""}" data-level="${i}" ${locked ? "disabled" : ""} style="--accent:${level.theme.accent}">
         <span class="level-name">${level.sprint}${hardcoreBadge(progress, level.id) ? html` <span class="hardcore-badge" title="${t().hardcore.badge}" aria-label="${t().hardcore.badge}">☠</span>` : ""}</span>
         <span class="level-tagline">${escape(t().taglines[level.id])}</span>
+        <span class="level-boss"><b>${level.boss.key}</b> ${escape(t().bossIdeas[level.boss.pattern])}</span>
         <span class="level-meta">${t().menu.openBugs(level.bugs.length)}</span>
         <span class="level-clients">${avatars(level.clients)}</span>
         <span class="level-best">${locked ? t().menu.locked : best ? t().menu.best(formatNumber(best)) : t().menu.fresh}</span>

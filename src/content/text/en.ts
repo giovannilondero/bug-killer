@@ -165,6 +165,16 @@ export const en: Strings = {
     hotdesk: "No assigned desks and no elbow room. The 2FA boss has booked the meeting room.",
     cubicles: "An open space cut into cubicles: walls stop your shots and theirs. The crash boss reboots behind every one."
   },
+  bossIdeas: {
+    dispenser: "pours shots for a while, then stops for timeout",
+    crash: "crashes and restarts somewhere else",
+    twoFactor: "fixed once, asks for a second factor: full health, behind a shield",
+    undefined: "is everywhere: rings of shots and null bugs",
+    mergeConflict: "at half health splits into ours and theirs, firing in mirror",
+    raceCondition: "twins: fix one and the other restarts it, unless you're quick",
+    infiniteLoop: "runs an ∞ round the arena, faster every lap",
+    stackOverflow: "a tower of frames that drop off and run for you; shielded while they live"
+  },
   pickups: {
     hotfix: { label: "Hotfix", hint: "rapid fire" },
     refactor: { label: "Refactor", hint: "spread shot" },
