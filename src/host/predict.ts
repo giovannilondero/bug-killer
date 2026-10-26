@@ -1,18 +1,22 @@
 /**
  * The browser's own developer, drawn where its input has already taken them:
  * the run server's last word on them, plus every step of input the server
- * has not stepped yet, replayed with the server's own `steer` and `glide`.
- * When the server disagrees (a bug's knockback, a step it had to repeat),
- * the gap fades instead of jumping.
+ * has not stepped yet, replayed with the server's own `steer`, `glide`,
+ * `wearOff` and `pull`. When the server disagrees (a bug's knockback, a step
+ * it had to repeat), the gap fades instead of jumping. A step taken here for
+ * the first time also says what it fired, so the screen shows it at once.
  */
 import { arenaOf } from "../content/arenas.ts"
 import type { Arena } from "../content/arenas.ts"
 import type { Level } from "../content/levels.ts"
 import type { NetView } from "../net/protocol.ts"
-import { DT } from "../sim/constants.ts"
+import { SHOT } from "../sim/constants.ts"
 import { glide, steer } from "../sim/motion.ts"
 import type { Motion } from "../sim/motion.ts"
-import type { InputValue, Phase, Vec } from "../sim/schema.ts"
+import type { FxValue, InputValue, Phase, Vec } from "../sim/schema.ts"
+import { bulletsOf, flameOf, pull, wearOff } from "../sim/trigger.ts"
+import type { Buffs } from "../sim/trigger.ts"
+import type { WeaponValue } from "../sim/weapons.ts"
 
 type Developer = NetView["players"][number]
 
@@ -26,9 +30,36 @@ const SNAP = 120
 interface Predicted {
   readonly position: Vec
   readonly motion: Motion
-  /** Coffee left: it makes the developer faster until it runs out. */
-  readonly coffee: number
+  readonly fireCooldown: number
+  readonly weapon: WeaponValue
+  readonly buffs: Buffs
 }
+
+/** A bullet this browser's developer just fired, as the server will fire it. */
+export interface OwnBullet {
+  readonly at: Vec
+  readonly velocity: Vec
+  readonly life: number
+  readonly homing: boolean
+  /** Bugs it goes through before stopping: Refactor's. */
+  readonly pierce: number
+}
+
+/** What one step did that the screen shows at once: the developer's own sounds and puffs, and the bullets leaving the barrel. */
+export interface Fired {
+  readonly fx: ReadonlyArray<FxValue>
+  readonly bullets: ReadonlyArray<OwnBullet>
+}
+
+const nothing: Fired = { fx: [], bullets: [] }
+
+const fromServer = (developer: Developer): Predicted => ({
+  position: developer.position,
+  motion: developer,
+  fireCooldown: developer.fireCooldown,
+  weapon: developer.weapon,
+  buffs: developer.buffs
+})
 
 export const makePrediction = () => {
   let arena: Arena | null = null
@@ -45,11 +76,26 @@ export const makePrediction = () => {
 
   const free = () => confirmed !== null && confirmed.developer.hp > 0 && confirmed.phase !== "dead" && confirmed.phase !== "cleared"
 
-  const advance = (from: Predicted, input: InputValue): Predicted => {
-    if (!arena || !free()) return from
-    const coffee = Math.max(0, from.coffee - DT)
-    const steered = steer(from.motion, from.position, input, coffee > 0)
-    return { position: glide(from.position, steered.velocity, arena), motion: steered.motion, coffee }
+  const advance = (from: Predicted, input: InputValue): { readonly next: Predicted; readonly fired: Fired } => {
+    if (!arena || !confirmed || !free()) return { next: from, fired: nothing }
+    const slot = confirmed.developer.slot
+    const { buffs, weapon } = wearOff(from.buffs, from.weapon)
+    const steered = steer(from.motion, from.position, input, buffs.coffee > 0)
+    const { fireCooldown, trigger } = pull(from.fireCooldown, weapon.kind, buffs, from.position, input)
+    const next = { position: glide(from.position, steered.velocity, arena), motion: steered.motion, fireCooldown, weapon, buffs }
+    const fx: Array<FxValue> = []
+    if (steered.dashed) fx.push({ type: "dash", x: from.position.x, y: from.position.y, slot })
+    if (!trigger) return { next, fired: { fx, bullets: [] } }
+    fx.push({ type: "shoot", x: trigger.muzzle.x, y: trigger.muzzle.y, weapon: weapon.kind, slot })
+    if (weapon.kind === "flameWar") fx.push(flameOf(trigger, arena, slot).fx)
+    const bullets = bulletsOf(trigger).map(({ at, direction }) => ({
+      at,
+      velocity: { x: direction.x * SHOT.speed, y: direction.y * SHOT.speed },
+      life: trigger.tools ? SHOT.life * 1.4 : SHOT.life,
+      homing: trigger.tools,
+      pierce: trigger.refactor ? 1 : 0
+    }))
+    return { next, fired: { fx, bullets } }
   }
 
   return {
@@ -62,14 +108,16 @@ export const makePrediction = () => {
       aim = null
       error = { x: 0, y: 0 }
     },
-    /** One step of this browser's input: numbered for the server, and applied here right away. */
-    record: (input: InputValue): number => {
+    /** One step of this browser's input: numbered for the server, applied here right away, and what it fired. */
+    record: (input: InputValue): { readonly seq: number; readonly fired: Fired } => {
       seq += 1
       aim = input.aim
       history.push({ seq, input })
       if (history.length > HISTORY) history = history.slice(-HISTORY)
-      if (predicted) predicted = advance(predicted, input)
-      return seq
+      if (!predicted) return { seq, fired: nothing }
+      const { next, fired } = advance(predicted, input)
+      predicted = next
+      return { seq, fired }
     },
     /** A frame: where the server has the developer after stepping input `ack`; everything after it is replayed. */
     confirm: (developer: Developer | undefined, phase: Phase, ack: number) => {
@@ -80,8 +128,9 @@ export const makePrediction = () => {
       }
       confirmed = { developer, phase }
       history = history.filter((entry) => entry.seq > ack)
-      let next: Predicted = { position: developer.position, motion: developer, coffee: developer.buffs.coffee }
-      for (const { input } of history) next = advance(next, input)
+      // Replayed steps were shown when first taken: what they fire is not shown again.
+      let next = fromServer(developer)
+      for (const { input } of history) next = advance(next, input).next
       if (predicted) {
         // The screen showed `predicted + error`; it keeps showing that, and the gap fades from there.
         error = { x: predicted.position.x + error.x - next.position.x, y: predicted.position.y + error.y - next.position.y }

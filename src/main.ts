@@ -5,6 +5,7 @@ import * as Result from "@typeonce/ritmo/Result"
 import { bugKinds, ticketColors } from "./content/bugs.ts"
 import { clients } from "./content/clients.ts"
 import { locales } from "./content/i18n.ts"
+import { arenaOf } from "./content/arenas.ts"
 import type { ArenaId } from "./content/arenas.ts"
 import { bonusLevels, endlessArenaOf, endlessArenas, endlessIn, endlessLevel, isEndlessArena, levels, ticketsOf } from "./content/levels.ts"
 import type { Level, LevelId } from "./content/levels.ts"
@@ -14,6 +15,7 @@ import { enterFullscreen, fullscreenSupported, standalone, toggleFullscreen } fr
 import { makeInput, typing } from "./host/input.ts"
 import { formatNumber, locale, setLocale, t } from "./host/language.ts"
 import { connect, makeFrames } from "./host/net.ts"
+import { makeOwnShots } from "./host/own-shots.ts"
 import { makePrediction } from "./host/predict.ts"
 import type { Connection } from "./host/net.ts"
 import { createRenderer } from "./host/renderer.ts"
@@ -116,6 +118,8 @@ interface Remote {
   readonly frames: ReturnType<typeof makeFrames>
   /** This browser's developer, drawn ahead of the frames: where its input has already taken them. */
   readonly prediction: ReturnType<typeof makePrediction>
+  /** Its bullets, drawn on the same clock as the developer who fires them. */
+  readonly ownShots: ReturnType<typeof makeOwnShots>
   room: RoomInfo | null
   you: number
   level: Level
@@ -132,11 +136,16 @@ const INPUT_EVERY = 2
 let unsent: Array<InputValue> = []
 let unsentSeq = -1
 let sent: InputValue = idleInput
-/** Numbers one step of input and has the prediction apply it; it goes out with the next message. */
+/** Numbers one step of input and has the prediction apply it, showing what it fired; it goes out with the next message. */
 const record = (r: Remote, value: InputValue) => {
   unsent.push(value)
-  unsentSeq = r.prediction.record(value)
+  const { seq, fired } = r.prediction.record(value)
+  unsentSeq = seq
+  for (const event of fired.fx) playFx(event)
+  r.ownShots.fire(fired.bullets)
 }
+/** What this browser already showed when its developer did it: the server's copy would come a round trip late. */
+const predictedFx = (event: FxValue, you: number) => (event.type === "shoot" || event.type === "dash" || event.type === "flame") && event.slot === you
 const flushInput = (r: Remote) => {
   if (unsent.length === 0) return
   r.connection.send({ t: "input", inputs: unsent, seq: unsentSeq })
@@ -395,6 +404,7 @@ const onServer = (message: ServerMessage) => {
       r.running = true
       r.frames.reset()
       r.prediction.reset(r.level)
+      r.ownShots.reset()
       // The server starts every seat standing still.
       sent = idleInput
       unsent = []
@@ -416,7 +426,7 @@ const onServer = (message: ServerMessage) => {
         message.view.run.phase,
         message.ack
       )
-      for (const event of message.fx) playFx(event)
+      for (const event of message.fx) if (!predictedFx(event, r.you)) playFx(event)
       for (const event of message.chat) chat.push(event)
       break
     case "error":
@@ -450,6 +460,7 @@ const openRemote = (): Remote => {
     }),
     frames: makeFrames(),
     prediction: makePrediction(),
+    ownShots: makeOwnShots(),
     room: null,
     you: 0,
     level: playable[0] ?? endlessLevel,
@@ -925,11 +936,12 @@ const loop = FixedLoop.start({
       if (!remote.running) return
       view = remote.frames.sample(remote.level, remote.you) ?? view
       const own = remote.prediction.draw()
+      const you = remote.you
       if (view?.player && own) {
         const player = { ...view.player, position: own.position, aim: own.aim }
-        const you = remote.you
         view = { ...view, player, players: view.players.map((p) => (p.slot === you ? player : p)) }
       }
+      if (view) view = { ...view, shots: remote.ownShots.draw(view, you, arenaOf(remote.level)) }
     } else if (sim) {
       view = sim.view()
     } else {

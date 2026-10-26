@@ -135,7 +135,7 @@ export const ViewInspector = Game.Inspector(
       player: players[0] ?? null,
       bugs: queries.bugs.each().map((m) => ({ id: m.entity.id, position: m.data.position.get(), radius: m.data.body.get().radius, ...m.data.bug.get() })),
       bosses: queries.bosses.each().map((m) => ({ id: m.entity.id, position: m.data.position.get(), radius: m.data.body.get().radius, ...m.data.boss.get() })),
-      shots: queries.shots.each().map((m) => ({ id: m.entity.id, position: m.data.position.get(), velocity: m.data.velocity.get(), homing: m.data.shot.get().homing })),
+      shots: queries.shots.each().map((m) => ({ id: m.entity.id, position: m.data.position.get(), velocity: m.data.velocity.get(), homing: m.data.shot.get().homing, owner: m.data.shot.get().owner })),
       hostile: queries.hostile.each().map((m) => ({ id: m.entity.id, position: m.data.position.get(), text: m.data.shot.get().text })),
       turrets: queries.turrets.each().map((m) => ({ id: m.entity.id, position: m.data.position.get(), ...m.data.turret.get() })),
       pickups: queries.pickups.each().map((m) => ({ id: m.entity.id, position: m.data.position.get(), ...m.data.pickup.get() })),

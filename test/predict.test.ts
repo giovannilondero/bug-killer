@@ -6,19 +6,25 @@ import { makePrediction } from "../src/host/predict.ts"
 import type { ServerMessage } from "../src/net/protocol.ts"
 import { makeRooms } from "../src/server/rooms.ts"
 import { idleInput } from "../src/sim/simulation.ts"
-import type { InputValue, Vec } from "../src/sim/schema.ts"
+import type { FxValue, InputValue, Vec } from "../src/sim/schema.ts"
 
 const level = levels[0]!
 const STEP_MS = 1000 / 60
 
 type Frame = Extract<ServerMessage, { t: "frame" }>
 
-/** What the developer does on step `i`: right, a dash, then up and left on a diagonal, then still. */
+/** What the developer does on step `i`: right, a dash, then up and left on a diagonal, then still; the trigger held from step 10 to 100. */
 const script = (i: number): InputValue => ({
   ...idleInput,
   move: i < 40 ? { x: 1, y: 0 } : i < 80 ? { x: -0.7, y: -0.7 } : { x: 0, y: 0 },
-  dash: i === 25 || i === 60
+  aim: { x: 200, y: 150 },
+  fire: i >= 10 && i < 100,
+  dash: i === 25 || i === 85
 })
+
+/** The developer's own shots and dashes, in order, where they happened. */
+const ownFx = (events: ReadonlyArray<FxValue>) =>
+  events.flatMap((event) => ((event.type === "shoot" || event.type === "dash") && event.slot === 0 ? [`${event.type} ${event.x} ${event.y}`] : []))
 
 /**
  * One browser and the run server, `latency` steps apart each way: the
@@ -41,17 +47,22 @@ const play = (latency: number, steps: number) => {
   const drawnAfter = new Map<number, Vec>()
   /** For every frame: the step it confirmed, and where the server had the developer. */
   const confirmed: Array<{ ack: number; server: Vec }> = []
+  /** What the browser showed as it stepped, and what the frames later said happened. */
+  const shown: Array<FxValue> = []
+  const happened: Array<FxValue> = []
 
   for (now = 0; now < steps; now++) {
     for (const { message } of toServer.filter((m) => m.at === now)) rooms.receive(peer, message)
     rooms.advance(1 / 60)
     for (const { frame } of toBrowser.filter((m) => m.at === now)) {
+      happened.push(...frame.fx)
       const developer = frame.view.players.find((p) => p.slot === 0)
       prediction.confirm(developer, frame.view.run.phase, frame.ack)
       if (developer && frame.ack >= 0) confirmed.push({ ack: frame.ack, server: developer.position })
     }
     const input = script(now)
-    const seq = prediction.record(input)
+    const { seq, fired } = prediction.record(input)
+    shown.push(...fired.fx)
     unsent.push(input)
     // Before the first frame there is nothing to predict from.
     const drawn = prediction.draw(now * STEP_MS)
@@ -61,7 +72,7 @@ const play = (latency: number, steps: number) => {
       unsent = []
     }
   }
-  return { drawnAfter, confirmed }
+  return { drawnAfter, confirmed, shown: ownFx(shown), happened: ownFx(happened) }
 }
 
 test("the server puts the developer exactly where this browser predicted, step by step", () => {
@@ -97,4 +108,13 @@ test("when the server disagrees, the developer glides to it instead of jumping",
   // Further than a nudge is a teleport: straight there.
   prediction.confirm({ ...developer, position: { x: developer.position.x + 400, y: developer.position.y } }, view.run.phase, -1)
   assert.equal(prediction.draw(300)!.position.x, developer.position.x + 400)
+})
+
+test("shots and dashes show on the step they are taken, as the server later steps them", () => {
+  // Long enough for every frame of the script to come back.
+  const { shown, happened } = play(5, 140)
+  assert.ok(shown.length >= 8, `${shown.length} shown`)
+  assert.ok(shown.filter((fx) => fx.startsWith("dash")).length === 2 && shown.some((fx) => fx.startsWith("shoot")))
+  // Before the first frame the browser had nothing to predict from: it shows the rest.
+  assert.deepEqual(shown, happened.slice(-shown.length))
 })
