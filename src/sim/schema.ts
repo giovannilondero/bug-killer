@@ -1,5 +1,5 @@
 import { Descriptor, Schema } from "@typeonce/ritmo"
-import * as Random from "@typeonce/ritmo-math/Random"
+import * as Random from "@typeonce/ritmo/Random"
 
 import type { Priority, StatusTrait, TicketType } from "../content/bugs.ts"
 import type { CallKind, ClientId, MissionKind } from "../content/clients.ts"

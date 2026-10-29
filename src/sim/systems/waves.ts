@@ -1,4 +1,4 @@
-import * as Random from "@typeonce/ritmo-math/Random"
+import * as Random from "@typeonce/ritmo/Random"
 
 import { arenaOf } from "../../content/arenas.ts"
 import { ticketsOf } from "../../content/levels.ts"

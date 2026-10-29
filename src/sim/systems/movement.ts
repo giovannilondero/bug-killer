@@ -1,4 +1,4 @@
-import * as Random from "@typeonce/ritmo-math/Random"
+import * as Random from "@typeonce/ritmo/Random"
 
 import { arenaOf } from "../../content/arenas.ts"
 import type { Arena } from "../../content/arenas.ts"
@@ -8,7 +8,7 @@ import { BossRead, BugRead, BugWrite, HostileShotWrite, Moving, PickupWrite, Pla
 import { Body, Fx, Game, HostileShot, LevelSpec, Pickup, Position, Rng, Rocket, Run, Shot, Velocity } from "../schema.ts"
 import { speedFactor } from "../statuses.ts"
 import { detour } from "../walls.ts"
-import { Ops } from "@typeonce/ritmo-math"
+import { Ops } from "@typeonce/ritmo"
 
 /** Bugs crawl toward the nearest developer still standing; each workflow status moves differently. */
 export const BugBrainSystem = Game.System(

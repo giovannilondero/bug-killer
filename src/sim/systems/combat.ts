@@ -1,4 +1,4 @@
-import * as Random from "@typeonce/ritmo-math/Random"
+import * as Random from "@typeonce/ritmo/Random"
 
 import { arenaOf } from "../../content/arenas.ts"
 import { bugKinds } from "../../content/bugs.ts"
@@ -42,7 +42,7 @@ import type { BugSeed } from "../drafts.ts"
 import { isUnlocked, tierOf } from "../tiers.ts"
 import { blocked, inWall } from "../walls.ts"
 import { FLAME, inCone, isWeapon, pickUp } from "../weapons.ts"
-import { Ops } from "@typeonce/ritmo-math"
+import { Ops } from "@typeonce/ritmo"
 
 const REOPEN_CHANCE = 0.4
 /** Who a fix is credited to when no developer made it, as when a Deploying bug goes off by itself. */

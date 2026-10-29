@@ -6,7 +6,7 @@
  * only the party, the input source, and the presentation sink differ.
  */
 import { InputCapture } from "@typeonce/ritmo-browser"
-import * as Random from "@typeonce/ritmo-math/Random"
+import * as Random from "@typeonce/ritmo/Random"
 import * as Result from "@typeonce/ritmo/Result"
 
 import { defaultLocale } from "../content/i18n.ts"

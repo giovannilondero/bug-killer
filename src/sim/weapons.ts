@@ -1,6 +1,6 @@
 import { PLAYER, ROCKET } from "./constants.ts"
 import type { PickupKind, Vec } from "./schema.ts"
-import { Ops } from "@typeonce/ritmo-math"
+import { Ops } from "@typeonce/ritmo"
 
 /**
  * Weapons a developer picks up from the floor. Each is also a pickup kind;

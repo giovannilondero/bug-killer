@@ -1,4 +1,4 @@
-import * as Random from "@typeonce/ritmo-math/Random"
+import * as Random from "@typeonce/ritmo/Random"
 
 import { priorities } from "../../content/bugs.ts"
 import type { Priority } from "../../content/bugs.ts"
@@ -15,7 +15,7 @@ import { BugRead, PlayerRead, standing } from "../queries.ts"
 import { Bug, BugFixed, Chat, Fx, Game, Hardcore, Language, LevelSpec, Missions, Pickup, PlayerHurt, Rng, Run, Tiers } from "../schema.ts"
 import type { BugValue, MissionValue, PickupKind } from "../schema.ts"
 import { tierOf, unlocked } from "../tiers.ts"
-import { Ops } from "@typeonce/ritmo-math"
+import { Ops } from "@typeonce/ritmo"
 
 const MISSION_POINTS = 400
 const ESCALATION_BUGS = 3

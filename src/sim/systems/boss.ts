@@ -1,4 +1,4 @@
-import * as Random from "@typeonce/ritmo-math/Random"
+import * as Random from "@typeonce/ritmo/Random"
 
 import { text } from "../../content/i18n.ts"
 import { arenaOf } from "../../content/arenas.ts"

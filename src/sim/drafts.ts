@@ -7,7 +7,7 @@ import { BREAKPOINT, EPIC, HOSTILE_SHOT, PICKUP_RADIUS, PLAYER, RESURRECT, ROCKE
 import { Body, Boss, Breakpoint, Bug, Game, HostileShot, Pickup, Player, Position, Rocket, Shot, Turret, Velocity } from "./schema.ts"
 import type { BossValue, PickupKind, TeammateValue, Vec } from "./schema.ts"
 import { basicGun } from "./weapons.ts"
-import { Ops } from "@typeonce/ritmo-math"
+import { Ops } from "@typeonce/ritmo"
 
 /**
  * A developer at `at`; `breakpoints` is how many they start with (none before

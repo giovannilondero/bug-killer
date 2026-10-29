@@ -13,7 +13,7 @@ import type { FxValue, InputValue, PickupKind, Vec } from "./schema.ts"
 import { firstWall } from "./walls.ts"
 import { HOTFIX_COOLDOWN, WEAPONS, basicGun, flameCone } from "./weapons.ts"
 import type { Cone, WeaponKind, WeaponValue } from "./weapons.ts"
-import { Ops } from "@typeonce/ritmo-math"
+import { Ops } from "@typeonce/ritmo"
 
 export type Buffs = Record<PickupKind, number>
 

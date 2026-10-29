@@ -1,10 +1,10 @@
-import type * as Random from "@typeonce/ritmo-math/Random"
+import type * as Random from "@typeonce/ritmo/Random"
 
 import type { Arena } from "../content/arenas.ts"
 import { SPAWN_SAFE_DISTANCE } from "./constants.ts"
 import type { Vec } from "./schema.ts"
 import { inWall, outOfWalls } from "./walls.ts"
-import { Ops } from "@typeonce/ritmo-math"
+import { Ops } from "@typeonce/ritmo"
 
 export const length = (v: Vec): number => Ops.hypot(v.x, v.y)
 
